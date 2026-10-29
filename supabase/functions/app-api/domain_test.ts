@@ -1,0 +1,8 @@
+import {ApiError,username,uuid,jpeg,base64,evidence,visibility,password} from './domain.ts';
+function assert(condition:boolean,message='assertion failed'){if(!condition)throw new Error(message);}
+function rejects(fn:()=>unknown){try{fn();}catch(e){assert(e instanceof ApiError);return;}throw new Error('expected validation failure');}
+Deno.test('usernames normalize and reject email/path injection',()=>{assert(username('Friend_01')==='friend_01');rejects(()=>username('../admin'));rejects(()=>username('a@b.com'));});
+Deno.test('UUID and visibility cannot smuggle database filters',()=>{rejects(()=>uuid('x&user_id=eq.admin'));rejects(()=>visibility('public'));assert(visibility('circle')==='circle');});
+Deno.test('password bounds are enforced',()=>{rejects(()=>password('short'));assert(password('test-password-123')==='test-password-123');});
+Deno.test('JPEG signature size and base64 validation',()=>{const bytes=new Uint8Array([255,216,255,224,0,0,255,217]);assert(jpeg(base64(bytes)).length===8);rejects(()=>jpeg(base64(new Uint8Array([1,2,3,4]))));rejects(()=>jpeg('%%'));rejects(()=>jpeg(base64(new Uint8Array(409601))));});
+Deno.test('offline capture allowed, stale location rejected',()=>{const now=Date.now()-86400000;const p={clientCreatedAt:new Date(now).toISOString(),evidence:{latitude:25,longitude:121,accuracy:10,capturedAt:new Date(now-1000).toISOString(),ageMillis:1000}};evidence(p);rejects(()=>evidence({...p,evidence:{...p.evidence,ageMillis:120001}}));rejects(()=>evidence({...p,evidence:{...p.evidence,accuracy:100}}));rejects(()=>evidence({...p,evidence:{...p.evidence,latitude:Number.NaN}}));});

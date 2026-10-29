@@ -1,0 +1,1 @@
+Shared Source Han Sans CN / Source Han Serif CN fonts are bundled once under res/font. Their original font data is unchanged. See LICENSE-sans.txt and LICENSE-serif.txt for SIL OFL 1.1 attribution and terms. The manifest records original font identity and source tracing.

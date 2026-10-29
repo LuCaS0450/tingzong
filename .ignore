@@ -1,0 +1,25 @@
+# ripgrep search filters; apply even when this directory has no .git metadata.
+# These rules do not delete files or prevent explicit file-path reads.
+/.gradle/
+/.kotlin/
+/.idea/
+/.private/
+/.tooling/
+/.agents/teamwork/
+**/build/
+**/node_modules/
+**/__pycache__/
+**/.npm-cache/
+**/.deno-cache/
+**/.temp/
+**/.branches/
+/artifacts/*
+/output/
+/tmp/
+*.log
+*.apk
+*.aab
+*.zip
+*.pyc
+/emulator_*.png
+/output_challenges.json

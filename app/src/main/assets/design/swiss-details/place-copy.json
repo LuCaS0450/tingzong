@@ -1,0 +1,682 @@
+{
+  "version": 1,
+  "purpose": "面向用户的地点名称与简介；坐标、证据和资格规则另行保留。",
+  "places": {
+    "mont-saint-michel": {
+      "name": "圣米歇尔山",
+      "intro": "《最伟大的作品》的专辑封面在圣米歇尔山拍摄，《倒影》的 MV 也在这里取景。"
+    },
+    "samaritaine": {
+      "name": "莎玛丽丹百货",
+      "intro": "《最伟大的作品》MV 中，周杰伦在莎玛丽丹百货弹奏钢琴。"
+    },
+    "shuinandong-port": {
+      "name": "水湳洞渔港",
+      "intro": "《交换余生》的 MV 拍到了水湳洞渔港，港池、渔船和依山而建的聚落一同入镜。"
+    },
+    "le-train-bleu": {
+      "name": "蓝色列车餐厅",
+      "intro": "《最伟大的作品》MV 中，穿越后的第一个场景是里昂车站的蓝色列车餐厅。"
+    },
+    "songshan-cultural-park": {
+      "name": "松山文创园区",
+      "intro": "《上爱唱的歌》的 MV 在松山文创园区取景，画面里有湖畔和园内餐厅。"
+    },
+    "lantau-mountain-camp": {
+      "name": "大东山烂头营",
+      "intro": "陈奕迅《Taste the Atmosphere》的专辑封面在大东山烂头营拍摄。"
+    },
+    "jewel-changi": {
+      "name": "星耀樟宜",
+      "intro": "《对的时间点》的 MV 在星耀樟宜取景。"
+    },
+    "taipei-guest-house": {
+      "name": "台北宾馆",
+      "intro": "《雨下一整晚》的 MV 在台北宾馆取景。"
+    },
+    "charles-bridge": {
+      "name": "查理大桥",
+      "intro": "查理大桥出现在《爱情废柴》《学不会》和《你听得到》的 MV 中。"
+    },
+    "xitang": {
+      "name": "西塘古镇",
+      "intro": "《天涯过客》的 MV 在西塘古镇取景，也从空中拍下了古镇。"
+    },
+    "palaceside": {
+      "name": "PalaceSide 大厦",
+      "intro": "《说好不哭》MV 中，乐队在 PalaceSide 大厦屋顶演出。"
+    },
+    "tower-view-street": {
+      "name": "Tower View 通街景",
+      "intro": "《说好不哭》MV 中，男女主角在 Tower View 通告别，远处是东京晴空塔。"
+    },
+    "akabanebashi-minami": {
+      "name": "赤羽桥南路口",
+      "intro": "《说好不哭》MV 的重逢场景在赤羽桥南路口拍摄，东京铁塔出现在背景中。"
+    },
+    "midorigaoka-railway": {
+      "name": "绿丘东横线铁路旁",
+      "intro": "《说好不哭》MV 中，女主角沿东横线旁的道路骑行。"
+    },
+    "miramar": {
+      "name": "美丽华摩天轮",
+      "intro": "美丽华摩天轮出现在《好久不见》的 MV 中。"
+    },
+    "taipei-101": {
+      "name": "台北 101",
+      "intro": "台北 101 出现在《好久不见》的城市远景中，也在《二十四小時柒天》和《傻笑》的 MV 中入镜。"
+    },
+    "shuiyuan-market": {
+      "name": "水源市场",
+      "intro": "《好久不见》的 MV 拍到了水源市场的公共艺术外墙。"
+    },
+    "malecon": {
+      "name": "马拉贡滨海大道（Malecón）",
+      "intro": "《Mojito》MV 中，古董车沿马拉贡滨海大道行驶。"
+    },
+    "vladivostok": {
+      "name": "海参崴",
+      "intro": "《七里香》的专辑封面在海参崴拍摄，《借口》的 MV 也在这座城市取景。"
+    },
+    "san-marco": {
+      "name": "圣马可广场",
+      "intro": "《十一月的萧邦》的专辑封面在清晨的圣马可广场拍摄，这里也出现在《黑色毛衣》的 MV 中。"
+    },
+    "chapelle-jeanne": {
+      "name": "Chapelle Sainte-Jeanne-d’Arc",
+      "intro": "《太阳之子》的专辑封面在巴黎的 Chapelle Sainte-Jeanne-d’Arc 拍摄。"
+    },
+    "lee-tung-street": {
+      "name": "利东街（囍帖街）",
+      "intro": "谢安琪《囍帖街》的歌名指向湾仔利东街。"
+    },
+    "greenwich": {
+      "name": "格林威治",
+      "intro": "《爱你没差》和《步步》的歌词都提到了格林威治。"
+    },
+    "shihsanhang-museum": {
+      "name": "十三行博物馆",
+      "intro": "《江南》的 MV 在十三行博物馆取景，画面中有一线天阶梯和两侧高墙。"
+    },
+    "tatung-university": {
+      "name": "大同大学",
+      "intro": "《因你而在》的 MV 拍到了尚志教育研究馆，画面中能看到立面的圆柱和露台。"
+    },
+    "tjfsu-machang-campus": {
+      "name": "天津外国语大学",
+      "intro": "《被风吹过的夏天》的 MV 在天津外国语大学取景，画面中有图书馆书架和校园钟楼。"
+    },
+    "grand-canyon-hualapai": {
+      "name": "大峡谷 Hualapai 区域",
+      "intro": "《我继续》的微电影在大峡谷取景，拍到了 Hualapai 区域的峡谷远景。"
+    },
+    "yangmingshan-reference": {
+      "name": "阳明山",
+      "intro": "《黑夜问白天》和《空城记》的 MV 在阳明山取景；《阳明山》也以这里为歌名。"
+    },
+    "swiss-alps-reference": {
+      "name": "瑞士阿尔卑斯山",
+      "intro": "《学不会》的 MV 在瑞士阿尔卑斯山取景，画面中有雪地列车。"
+    },
+    "wanhua-reference": {
+      "name": "万华",
+      "intro": "《Not Tonight》的 Steve Aoki Remix 版 MV 以万华街景为背景。"
+    },
+    "cheung-sha-reference": {
+      "name": "长沙海滩",
+      "intro": "陈奕迅《Stranger Under My Skin》的封面在长沙海滩拍摄。"
+    },
+    "rockybay118-reference": {
+      "name": "石梯湾118民宿",
+      "intro": "《渐渐》的 MV 在石梯湾118民宿取景，画面中能看到面向海景的大窗。"
+    },
+    "tamsui-north-coast-reference": {
+      "name": "台湾北海岸",
+      "intro": "《空城记》的 MV 在台湾北海岸取景，拍到了淡水一带的海岸风景。"
+    },
+    "familymart-sanfu": {
+      "name": "全家三富店",
+      "intro": "《她说》MV 中的转角便利店是全家三富店，画面里能看到门前台阶和相邻的白色拱门。"
+    },
+    "taipei-city-reference": {
+      "name": "台北",
+      "intro": "台北出现在《Susan说》和《二十四小時柒天》的歌词中，《台北一夜》也以这座城市为题。"
+    },
+    "nanjing-city-reference": {
+      "name": "南京",
+      "intro": "《Susan说》的歌词提到了南京。"
+    },
+    "shanghai-city-reference": {
+      "name": "上海",
+      "intro": "上海是《爱我还是他》的 MV 取景城市，也出现在《上海一九四三》的歌名和《你曾是少年》的歌词中。"
+    },
+    "joshua-tree-reference": {
+      "name": "约书亚树国家公园",
+      "intro": "Eagles 同名首张专辑的封面在约书亚树国家公园拍摄。"
+    },
+    "paramount-ranch": {
+      "name": "Paramount Ranch",
+      "intro": "Eagles《Desperado》的专辑封面在 Paramount Ranch 拍摄。"
+    },
+    "beverly-hills-hotel-reference": {
+      "name": "Beverly Hills Hotel",
+      "intro": "Eagles《Hotel California》的专辑封面拍摄了 Beverly Hills Hotel。"
+    },
+    "winslow-city-reference": {
+      "name": "Winslow",
+      "intro": "《Take It Easy》的歌词提到了亚利桑那州的 Winslow。"
+    },
+    "coffeyville-city-reference": {
+      "name": "Coffeyville",
+      "intro": "《Doolin-Dalton》的歌词提到了 Coffeyville。"
+    },
+    "providence-city-reference": {
+      "name": "Providence",
+      "intro": "《The Last Resort》的歌词提到了 Providence。"
+    },
+    "malibu-city-reference": {
+      "name": "Malibu",
+      "intro": "《The Last Resort》的歌词提到了 Malibu。"
+    },
+    "lahaina-city-reference": {
+      "name": "Lahaina",
+      "intro": "《The Last Resort》的歌词提到了 Lahaina。"
+    },
+    "appian-way-reference": {
+      "name": "Appian Way",
+      "intro": "《Long Road Out of Eden》的歌词提到了罗马的 Appian Way 古道。"
+    },
+    "hollywood-reference": {
+      "name": "Hollywood",
+      "intro": "Hollywood 出现在《Hollywood Waltz》和《King of Hollywood》的歌名中。"
+    },
+    "houston-city-reference": {
+      "name": "Houston",
+      "intro": "《The Long Run》的歌词提到了 Houston。"
+    },
+    "rome-city-reference": {
+      "name": "Rome",
+      "intro": "《The Disco Strangler》的歌词提到了罗马。"
+    },
+    "century-city-reference": {
+      "name": "Century City",
+      "intro": "《Business As Usual》的歌词提到了洛杉矶的 Century City。"
+    },
+    "white-house-reference": {
+      "name": "White House",
+      "intro": "《Business As Usual》的歌词提到了白宫。"
+    },
+    "guling-street-reference": {
+      "name": "牯岭街",
+      "intro": "《愛情怎麼了嗎》的 MV 在牯岭街取景。"
+    },
+    "red-house-steak-reference": {
+      "name": "红炉牛排馆",
+      "intro": "《愛情怎麼了嗎》的 MV 在红炉牛排馆取景。"
+    },
+    "kaohsiung-music-center": {
+      "name": "高雄流行音乐中心",
+      "intro": "卢广仲在高雄流行音乐中心演唱的《魚仔》《愛情怎麼了嗎》和《狂迪》留下了官方现场影像。"
+    },
+    "taipei-arena": {
+      "name": "台北小巨蛋",
+      "intro": "卢广仲和周杰伦在台北小巨蛋的演出留下了多首歌曲的官方现场影像。"
+    },
+    "reddot-hotel-reference": {
+      "name": "红点文旅",
+      "intro": "《二十四小時柒天》的 MV 在红点文旅取景。"
+    },
+    "daxi-honeymoon-bay-reference": {
+      "name": "大溪蜜月湾",
+      "intro": "《明仔載》的 MV 在大溪蜜月湾取景，海湾、沙滩和山坡一同入镜。"
+    },
+    "renai-road-reference": {
+      "name": "仁爱路",
+      "intro": "《幾分之幾》的 MV 拍到了仁爱路的林荫大道与沿街楼群。"
+    },
+    "tamkang-campus-reference": {
+      "name": "淡江大学",
+      "intro": "《100種生活》的 MV 在淡江大学取景，卢广仲在书卷广场附近的草地弹唱。"
+    },
+    "onomichi-ushitora-reference": {
+      "name": "尾道艮神社",
+      "intro": "《天然的最好》的 MV 拍到了尾道艮神社的鸟居，旁边可见千光寺山索道的标示。"
+    },
+    "onomichi-anago-reference": {
+      "name": "あなごのねどこ",
+      "intro": "《天然的最好》的 MV 拍到了あなごのねどこ的店面与招牌。"
+    },
+    "kurushima-itoyama-reference": {
+      "name": "来岛海峡大桥",
+      "intro": "来岛海峡大桥出现在《天然的最好》的 MV 中，画面里能看到白色桥塔与海上岛屿。"
+    },
+    "shezi-island-reference": {
+      "name": "社子岛",
+      "intro": "卢广仲《勵志論》的专辑封面在社子岛拍摄。"
+    },
+    "keelung-city-reference": {
+      "name": "基隆",
+      "intro": "《港邊男兒》和《退后》的 MV 都拍到了基隆的港湾景色。"
+    },
+    "taipei-ticc-reference": {
+      "name": "台北国际会议中心",
+      "intro": "卢广仲2008年在台北国际会议中心演唱《Rock'n Roll 的 Style》和《淵明》，留下了官方现场影像。"
+    },
+    "jianan-plain-reference": {
+      "name": "嘉南平原",
+      "intro": "《天然的最好》的歌词提到了嘉南平原。"
+    },
+    "kaohsiung-arena-reference": {
+      "name": "高雄巨蛋",
+      "intro": "《像你》《手機仔（一）》和《Live House》的官方现场影像来自卢广仲2023年的高雄巨蛋演出。"
+    },
+    "taoyuan-dome": {
+      "name": "桃园巨蛋",
+      "intro": "《世界末日》的官方影像记录了周杰伦2001年在桃园巨蛋的演出。"
+    },
+    "hutt-lagoon-reference": {
+      "name": "赫特潟湖",
+      "intro": "《粉色海洋》的 MV 拍到了赫特潟湖的粉色湖水与湖岸。"
+    },
+    "crawley-boatshed-reference": {
+      "name": "Crawley Edge 蓝色船屋",
+      "intro": "Crawley Edge 蓝色船屋与长栈桥出现在《粉色海洋》的 MV 中，歌词也写到了这处景色。"
+    },
+    "rottnest-island-reference": {
+      "name": "罗特尼斯岛",
+      "intro": "《粉色海洋》的 MV 在罗特尼斯岛取景，拍到了短尾矮袋鼠。"
+    },
+    "eiffel-tower-reference": {
+      "name": "埃菲尔铁塔",
+      "intro": "埃菲尔铁塔出现在《告白气球》的 MV 中，《最伟大的作品》的歌词也提到了它。"
+    },
+    "seine-paris-reference": {
+      "name": "塞纳河",
+      "intro": "《告白气球》的 MV 拍到了塞纳河畔，歌词也提到了这里。"
+    },
+    "calton-hill-reference": {
+      "name": "卡尔顿山",
+      "intro": "《明明就》的 MV 在卡尔顿山取景。"
+    },
+    "edinburgh-castle-reference": {
+      "name": "爱丁堡城堡",
+      "intro": "《明明就》的 MV 开场拍到了爱丁堡城堡。"
+    },
+    "forth-bridge-reference": {
+      "name": "福斯桥",
+      "intro": "《明明就》的 MV 拍到了福斯铁路桥及附近的旧公路桥。"
+    },
+    "sovereign-hill-reference": {
+      "name": "疏芬山",
+      "intro": "《淘金小镇》的 MV 在疏芬山博物馆取景，画面中有淘金时代的街道与店铺。"
+    },
+    "santorini-oia-reference": {
+      "name": "圣托里尼 · 伊亚",
+      "intro": "《爱琴海》的 MV 在圣托里尼取景，歌词也写到了伊亚的教堂。"
+    },
+    "aegean-sea-reference": {
+      "name": "爱琴海",
+      "intro": "《爱琴海》的歌名与歌词都写到了这片海。"
+    },
+    "lake-como-reference": {
+      "name": "科莫湖",
+      "intro": "《西西里》的 MV 在科莫湖取景，拍到了湖面与沿岸景色。"
+    },
+    "sicily-reference": {
+      "name": "西西里",
+      "intro": "《西西里》以这座岛屿为题，歌词也提到了这里。"
+    },
+    "fremont-street-reference": {
+      "name": "Fremont Street",
+      "intro": "《还在流浪》的 MV 在拉斯维加斯的 Fremont Street 取景。"
+    },
+    "istanbul-reference": {
+      "name": "伊斯坦布尔",
+      "intro": "《伊斯坦堡》以这座城市为题。"
+    },
+    "milan-duomo-reference": {
+      "name": "米兰 · 大教堂广场",
+      "intro": "《米兰的小铁匠》的 MV 开场拍到了米兰大教堂，歌名也写到了这座城市。"
+    },
+    "big-ben-reference": {
+      "name": "伦敦大笨钟",
+      "intro": "伦敦大笨钟出现在《大笨钟》和《心雨》的 MV 中，也被写进了《大笨钟》的歌名与歌词。"
+    },
+    "salute-venice-reference": {
+      "name": "安康圣母教堂",
+      "intro": "《窃爱》的 MV 从船上拍到了威尼斯大运河与安康圣母教堂的圆顶。"
+    },
+    "damascus-marjeh-reference": {
+      "name": "Damascus",
+      "intro": "《Long Road Out of Eden》的歌词提到了 Damascus。"
+    },
+    "mandalay-moat-road-reference": {
+      "name": "Mandalay",
+      "intro": "《Long Road Out of Eden》的歌词提到了 Mandalay。"
+    },
+    "lido-yucca-exterior-reference": {
+      "name": "Lido Apartments",
+      "intro": "Eagles《Hotel California》的展开内页照片在 Lido Apartments 大厅拍摄。"
+    },
+    "forum-inglewood-reference": {
+      "name": "Kia Forum",
+      "intro": "《Live From the Forum MMXVIII》记录了 Eagles 在这里的演出，专辑封面也描绘了这座场馆。"
+    },
+    "dunhuang-city-reference": {
+      "name": "敦煌",
+      "intro": "《龙拳》、《周大侠》、《月牙湾》的歌词提到了敦煌。"
+    },
+    "yellow-river-reference": {
+      "name": "黄河",
+      "intro": "《龙拳》的歌词提到了黄河。"
+    },
+    "mount-tai-reference": {
+      "name": "泰山",
+      "intro": "《龙拳》的歌词提到了泰山。"
+    },
+    "yangtze-river-reference": {
+      "name": "长江",
+      "intro": "《龙拳》的歌词提到了长江。"
+    },
+    "nile-river-reference": {
+      "name": "尼罗河",
+      "intro": "《蛇舞》的歌词提到了尼罗河。"
+    },
+    "luoyang-city-reference": {
+      "name": "洛阳",
+      "intro": "《烟花易冷》的歌词提到了洛阳。"
+    },
+    "baker-street-reference": {
+      "name": "贝克街",
+      "intro": "《夜的第七章》的歌词提到了贝克街。"
+    },
+    "great-wall-reference": {
+      "name": "长城",
+      "intro": "《龙拳》、《天地一斗》的歌词提到了长城。"
+    },
+    "mongolian-plateau-reference": {
+      "name": "蒙古高原",
+      "intro": "《龙拳》的歌词提到了蒙古高原。"
+    },
+    "westminster-abbey-reference": {
+      "name": "西敏寺",
+      "intro": "《夜的第七章》的歌词提到了西敏寺。"
+    },
+    "thames-london-reference": {
+      "name": "泰晤士河",
+      "intro": "《夜的第七章》的歌词提到了泰晤士河。"
+    },
+    "beidahuang-reference": {
+      "name": "北大荒",
+      "intro": "《周大侠》的歌词提到了北大荒。"
+    },
+    "maughan-library-jay-reference": {
+      "name": "莫恩图书馆",
+      "intro": "《夜的第七章》的 MV 在莫恩图书馆取景，画面中有圆形阅览室的环形书架与立柱。"
+    },
+    "tokyo-yamanote-reference": {
+      "name": "东京山手线",
+      "intro": "《忍者》的歌词提到了东京山手线。"
+    },
+    "kyoto-city-reference": {
+      "name": "京都",
+      "intro": "《忍者》的歌词提到了京都。"
+    },
+    "tcl-chinese-theatre-reference": {
+      "name": "好莱坞中国戏院",
+      "intro": "《超人不会飞》的歌词提到了好莱坞中国戏院。"
+    },
+    "mount-song-reference": {
+      "name": "嵩山",
+      "intro": "《双截棍》的歌词提到了嵩山。"
+    },
+    "dadaocheng-wharf-jay-reference": {
+      "name": "淡水河",
+      "intro": "《外婆》的歌词提到了淡水河。"
+    },
+    "changan-city-jay-reference": {
+      "name": "长安",
+      "intro": "《乱舞春秋》的歌词提到了长安。"
+    },
+    "cambridge-city-jay-reference": {
+      "name": "康桥",
+      "intro": "《最伟大的作品》的歌词提到了康桥。"
+    },
+    "florence-city-jay-reference": {
+      "name": "翡冷翠",
+      "intro": "《最伟大的作品》的歌词提到了翡冷翠，《算什么男人》的 MV 也在这座城市取景。"
+    },
+    "abbey-road-studios-jay-reference": {
+      "name": "艾比路录音室",
+      "intro": "周杰伦在艾比路录音室录制钢琴单曲《即兴曲》，MV 也记录了录音室内的画面。"
+    },
+    "villa-saporiti-jay-reference": {
+      "name": "Villa Saporiti",
+      "intro": "《西西里》的 MV 拍到了 Villa Saporiti 的金色椭圆厅室，画面中能看到双柱与壁龛雕像。"
+    },
+    "tianshan-tianchi-reference": {
+      "name": "天山",
+      "intro": "《波爷》的歌词提到了天山。"
+    },
+    "lake-pergusa-reference": {
+      "name": "佩尔古萨湖",
+      "intro": "《西西里》的歌词提到了佩尔古萨湖。"
+    },
+    "rhone-arles-reference": {
+      "name": "隆河",
+      "intro": "《太阳之子》的歌词提到了隆河。"
+    },
+    "st-patricks-cathedral-jay-reference": {
+      "name": "圣帕特里克大教堂",
+      "intro": "《恒星不忘》的 MV 拍到了墨尔本圣帕特里克大教堂的双尖塔与蓝石外墙。"
+    },
+    "melbourne-gpo-jay-reference": {
+      "name": "墨尔本旧邮政总局",
+      "intro": "墨尔本旧邮政总局的钟楼出现在《恒星不忘》的 MV 中。"
+    },
+    "ximending-american-street-jay-reference": {
+      "name": "西门町美国街",
+      "intro": "《扯》的 MV 在西门町美国街取景，画面中有巷道里的舞蹈表演。"
+    },
+    "notting-hill-bookshop-jay-reference": {
+      "name": "诺丁山书店",
+      "intro": "《大笨钟》的 MV 拍到了诺丁山书店的门面与招牌。"
+    },
+    "casa-di-giulietta-jay-reference": {
+      "name": "朱丽叶故居院落（预约进入）",
+      "intro": "《算什么男人》的 MV 在朱丽叶故居院落取景，画面中有阳台与爱情锁墙。"
+    },
+    "tamkang-high-school-jay-reference": {
+      "name": "淡江中学八角塔及长廊",
+      "intro": "《不能说的秘密》的 MV 使用了电影中的校园片段，淡江中学的八角塔与拱柱长廊出现在画面里。"
+    },
+    "fuji-lyrics-reference": {
+      "name": "富士山",
+      "intro": "《富士山下》的歌词提到了富士山。"
+    },
+    "tokyo-city-lyrics-reference": {
+      "name": "东京",
+      "intro": "《富士山下》、《和你》的歌词提到了东京。《Tokyo Flash》以东京为题。"
+    },
+    "london-city-lyrics-reference": {
+      "name": "伦敦",
+      "intro": "《Let It Be》的封面肖像摄于伦敦，《不如不见》的歌词和《London Boy》的歌名也写到了这座城市。"
+    },
+    "hongdong-county-reference": {
+      "name": "洪洞县",
+      "intro": "《Susan说》的歌词提到了洪洞县。"
+    },
+    "paris-city-playlist-reference": {
+      "name": "巴黎",
+      "intro": "《Paris》、《和你》的歌词提到了巴黎。《Paris in the Rain》以巴黎为题。"
+    },
+    "boston-city-playlist-reference": {
+      "name": "波士顿",
+      "intro": "《Boston》以波士顿为题。"
+    },
+    "san-francisco-city-playlist-reference": {
+      "name": "旧金山",
+      "intro": "《San Francisco》的歌词提到了旧金山。"
+    },
+    "vienna-city-playlist-reference": {
+      "name": "维也纳",
+      "intro": "《Vienna》的歌词提到了维也纳。"
+    },
+    "kathmandu-city-playlist-reference": {
+      "name": "加德满都",
+      "intro": "《加德满都的风铃》的歌词提到了加德满都。"
+    },
+    "lukang-town-playlist-reference": {
+      "name": "鹿港小镇",
+      "intro": "《鹿港小镇》的歌词提到了鹿港小镇。"
+    },
+    "suzhou-creek-playlist-reference": {
+      "name": "苏州河",
+      "intro": "《苏州河》以苏州河为题。"
+    },
+    "beijing-city-playlist-reference": {
+      "name": "北京",
+      "intro": "《My Love》的专辑封面在北京拍摄，《你曾是少年》的歌词也提到了这里。"
+    },
+    "guangzhou-city-playlist-reference": {
+      "name": "广州",
+      "intro": "《你曾是少年》的歌词提到了广州。"
+    },
+    "chengdu-city-playlist-reference": {
+      "name": "成都",
+      "intro": "《灰太阳》、《成都》的歌词提到了成都。"
+    },
+    "yulin-chengdu-playlist-reference": {
+      "name": "成都玉林片区",
+      "intro": "《成都》的歌词提到了玉林路。"
+    },
+    "dealey-plaza-playlist-reference": {
+      "name": "迪利广场",
+      "intro": "《Murder Most Foul》的歌词提到了迪利广场。"
+    },
+    "deep-ellum-playlist-reference": {
+      "name": "Deep Ellum",
+      "intro": "《Murder Most Foul》的歌词提到了 Deep Ellum。"
+    },
+    "gadsden-city-playlist-reference": {
+      "name": "加兹登",
+      "intro": "《AMERIICAN REQUIEM》的歌词提到了加兹登。"
+    },
+    "galveston-city-playlist-reference": {
+      "name": "加尔维斯顿",
+      "intro": "《AMERIICAN REQUIEM》的歌词提到了加尔维斯顿。"
+    },
+    "memphis-city-playlist-reference": {
+      "name": "孟菲斯",
+      "intro": "《I Remember You》的歌词提到了孟菲斯。"
+    },
+    "boulder-city-playlist-reference": {
+      "name": "博尔德",
+      "intro": "《Closer》的歌词提到了博尔德。"
+    },
+    "tucson-city-playlist-reference": {
+      "name": "图森",
+      "intro": "《Closer》的歌词提到了图森。"
+    },
+    "amsterdam-city-playlist-reference": {
+      "name": "阿姆斯特丹",
+      "intro": "《Amsterdam (feat. KnowKnow)》以阿姆斯特丹为题。"
+    },
+    "surabaya-city-playlist-reference": {
+      "name": "泗水",
+      "intro": "《Surabaya》以泗水为题。"
+    },
+    "hong-kong-city-playlist-reference": {
+      "name": "香港",
+      "intro": "《准备中》和《醒着做梦》的专辑封面都在香港拍摄，分别取景于剧场与海边石滩。"
+    },
+    "hualien-region-playlist-reference": {
+      "name": "花莲",
+      "intro": "《完美的一天》的专辑封面在花莲海岸拍摄，画面中是红发白裙的孙燕姿。"
+    },
+    "new-york-city-playlist-reference": {
+      "name": "纽约",
+      "intro": "《夜曲》的 MV 在纽约取景，拍到了市区街景与郊区墓园。"
+    },
+    "beachy-head-playlist-reference": {
+      "name": "比奇角",
+      "intro": "《怎么了》的 MV 拍到了比奇角的海崖与海上的红白灯塔。"
+    },
+    "yangmingshan-playlist-reference": {
+      "name": "阳明山",
+      "intro": "《怎么了》的 MV 中，袁咏琳在阳明山的山坡与草地取景。"
+    },
+    "yoyogi-park-playlist-reference": {
+      "name": "代代木公园",
+      "intro": "《等你下课》的官方导演版 MV 在代代木公园拍摄，周杰伦与杨瑞代一同出现在雪景中。"
+    },
+    "capitol-records-tower-reference": {
+      "name": "Capitol Records大楼",
+      "intro": "《The Capitol Vaults Jazz Series》的封面绘出了 Capitol Records 大楼，能看到层叠的圆形檐口与尖塔。"
+    },
+    "tnua-campus-playlist-reference": {
+      "name": "国立台北艺术大学",
+      "intro": "《手写的从前》的 MV 在国立台北艺术大学操场取景，画面里的玻璃屋是拍摄时搭建的。"
+    },
+    "tamsui-riverfront-playlist-reference": {
+      "name": "淡水河岸",
+      "intro": "《手写的从前》的 MV 在淡水河岸取景，周杰伦在河边旧建筑旁弹唱。"
+    },
+    "leofoo-village-playlist-reference": {
+      "name": "六福村主题游乐园",
+      "intro": "《园游会》的 MV 拍到了六福村的旋转木马，画面中有彩色穹顶与金色尖塔。"
+    },
+    "babylon-historical-playlist-reference": {
+      "name": "巴比伦",
+      "intro": "《爱在西元前》的歌词写到了古巴比伦。"
+    },
+    "tigris-baghdad-playlist-reference": {
+      "name": "底格里斯河",
+      "intro": "《爱在西元前》的歌词提到了底格里斯河。"
+    },
+    "keelung-miaokou-playlist-reference": {
+      "name": "基隆廟口夜市",
+      "intro": "《退后》的 MV 在基隆廟口夜市取景，画面里能看到成排的黄色灯笼与摊位招牌。"
+    },
+    "qingdao-polar-ocean-playlist-reference": {
+      "name": "青岛极地海洋公园",
+      "intro": "《说了再见》的 MV 使用了电影《海洋天堂》的片段，海底通道场景在青岛极地海洋公园拍摄。"
+    },
+    "cafe-colonial-prague-historical-reference": {
+      "name": "Café Colonial 历史店址",
+      "intro": "《你听得到》的 MV 拍到了 Café Colonial 的绿色玻璃门与店名招牌，这里是当年餐厅的店址。"
+    },
+    "sanzhi-district-unconditional-mv-reference": {
+      "name": "三芝",
+      "intro": "《无条件》的 MV 在三芝取景，陈奕迅站在草地上的门框前演唱。"
+    },
+    "hartford-ok-computer-cover-city-reference": {
+      "name": "哈特福德",
+      "intro": "《OK Computer》的封面拼贴使用了哈特福德高速公路立交的道路照片。"
+    },
+    "taoyuan-martyrs-shrine-playlist-reference": {
+      "name": "桃园忠烈祠暨神社文化园区",
+      "intro": "《听见下雨的声音》的官方歌词 MV 在桃园忠烈祠暨神社文化园区拍摄，画面中有园内的木造建筑。"
+    },
+    "reebok-stadium-coldplay-reference": {
+      "name": "Reebok Stadium",
+      "intro": "《Fix You》MV 的演出段落摄于 Coldplay 2005年在博尔顿 Reebok Stadium 的现场。"
+    },
+    "waterloo-bridge-coldplay-reference": {
+      "name": "滑铁卢桥",
+      "intro": "《Fix You》MV 的伦敦夜景段落拍到了滑铁卢桥。"
+    },
+    "studland-bay-coldplay-reference": {
+      "name": "Studland Bay",
+      "intro": "《Yellow》的 MV 在 Studland Bay 拍摄，画面中是克里斯·马汀沿着海滩行走。"
+    },
+    "shaoxing-road-orange-moon-cover-reference": {
+      "name": "绍兴路",
+      "intro": "方大同《橙月》的专辑封面在上海绍兴路拍摄，人物身后是虚焦的林荫街景。"
+    },
+    "cat-street-harajuku-cover-reference": {
+      "name": "Cat Street（原宿猫街）",
+      "intro": "《Comfort Chain》的单曲封面拍摄了东京原宿 Cat Street 的雪夜。"
+    }
+  }
+}

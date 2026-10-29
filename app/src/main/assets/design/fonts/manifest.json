@@ -1,0 +1,38 @@
+{
+  "fonts": [
+    {
+      "original": "SourceHanSansCN-Regular.otf",
+      "resource": "instrument_sans.otf",
+      "family": "Source Han Sans CN",
+      "version": "Version 2.005;addfeatures 5.0.0b21",
+      "bytes": 8429224,
+      "sha256": "e2bc8a2e7f37474b774fff8db758681ece40bb6947a90d571bce9dd60671a8e4",
+      "unicodeCount": 30926,
+      "license": "SIL Open Font License 1.1",
+      "modified": false
+    },
+    {
+      "original": "SourceHanSerifCN-SemiBold.otf",
+      "resource": "print_serif.otf",
+      "family": "Source Han Serif CN SemiBold",
+      "version": "Version 2.003;hotconv 1.1.1;makeotfexe 2.6.0",
+      "bytes": 11771824,
+      "sha256": "50d3f12201ce2dd840650b6bfa47ebb8572ecf767eec0e5ccb20a247b5bfa805",
+      "unicodeCount": 30930,
+      "license": "SIL Open Font License 1.1",
+      "modified": false
+    },
+    {
+      "original": "fusion-pixel-12px-proportional-zh_hans.otf",
+      "resource": "fusion_pixel.otf",
+      "family": "Fusion Pixel 12px Proportional SC",
+      "version": "2026.09.25",
+      "bytes": 4955388,
+      "license": "SIL Open Font License 1.1",
+      "source": "https://github.com/TakWolf/fusion-pixel-font/releases/tag/2026.09.25",
+      "modified": false
+    }
+  ],
+  "distribution": "APPLICATION",
+  "activeFont": "fusion_pixel.otf"
+}

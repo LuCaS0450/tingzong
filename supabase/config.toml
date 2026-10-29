@@ -1,0 +1,19 @@
+project_id = "music-pilgrimage"
+
+[auth]
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = true
+
+[auth.rate_limit]
+sign_in_sign_ups = 30
+token_refresh = 150
+
+[functions.app-api]
+verify_jwt = false
+
+[functions.pilgrimage-v2]
+verify_jwt = false
+

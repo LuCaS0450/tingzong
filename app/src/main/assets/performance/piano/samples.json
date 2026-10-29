@@ -1,0 +1,218 @@
+{
+  "name": "Salamander Grand Piano",
+  "author": "Alexander Holm",
+  "license": "CC BY 3.0",
+  "url": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+  "samples": [
+    {
+      "root": 21,
+      "sampleRate": 48000,
+      "file": "21.pcmz",
+      "sourceFile": "A0v8.flac",
+      "sourceBlob": "b287d339ba5b1935eaa15a52dd0e58a682961385"
+    },
+    {
+      "root": 24,
+      "sampleRate": 48000,
+      "file": "24.pcmz",
+      "sourceFile": "C1v8.flac",
+      "sourceBlob": "0b00306a129aae190d5f67d3711b181693a5572e"
+    },
+    {
+      "root": 27,
+      "sampleRate": 48000,
+      "file": "27.pcmz",
+      "sourceFile": "D#1v8.flac",
+      "sourceBlob": "f1fe37b4781c702ff75cf1b084b137a0ca571ef6"
+    },
+    {
+      "root": 30,
+      "sampleRate": 48000,
+      "file": "30.pcmz",
+      "sourceFile": "F#1v8.flac",
+      "sourceBlob": "3daaccc66c09a7aa3564e30b27a999c9f7fe5b0c"
+    },
+    {
+      "root": 33,
+      "sampleRate": 48000,
+      "file": "33.pcmz",
+      "sourceFile": "A1v8.flac",
+      "sourceBlob": "529ce51d5a90642ff2fc84a526564c5a971852e7"
+    },
+    {
+      "root": 36,
+      "sampleRate": 48000,
+      "file": "36.pcmz",
+      "sourceFile": "C2v8.flac",
+      "sourceBlob": "377ae98aa10f4e1698b1a0492c24a5817a9293ec"
+    },
+    {
+      "root": 39,
+      "sampleRate": 48000,
+      "file": "39.pcmz",
+      "sourceFile": "D#2v8.flac",
+      "sourceBlob": "378ef8fc0820f605b5645e4fd573bbde11350665"
+    },
+    {
+      "root": 42,
+      "sampleRate": 48000,
+      "file": "42.pcmz",
+      "sourceFile": "F#2v8.flac",
+      "sourceBlob": "ffb5fdab4db9271b211c36fa2c2da6567d2ac86a"
+    },
+    {
+      "root": 45,
+      "sampleRate": 48000,
+      "file": "45.pcmz",
+      "sourceFile": "A2v8.flac",
+      "sourceBlob": "d3859c5c2c2d54ffe7c50989bd38c39a4e0c2f05"
+    },
+    {
+      "root": 48,
+      "sampleRate": 48000,
+      "file": "48.pcmz",
+      "sourceFile": "C3v8.flac",
+      "sourceBlob": "c2d2a2019e13bf292923667a3db1df8a47ea5cfc"
+    },
+    {
+      "root": 51,
+      "sampleRate": 48000,
+      "file": "51.pcmz",
+      "sourceFile": "D#3v8.flac",
+      "sourceBlob": "39c4deeac4149cb57627669f9aa7ffe2e7cf96dc"
+    },
+    {
+      "root": 54,
+      "sampleRate": 48000,
+      "file": "54.pcmz",
+      "sourceFile": "F#3v8.flac",
+      "sourceBlob": "8b928e0affb6f03174588e8d1bce28b8d538f127"
+    },
+    {
+      "root": 57,
+      "sampleRate": 48000,
+      "file": "57.pcmz",
+      "sourceFile": "A3v8.flac",
+      "sourceBlob": "b4620f98c824e392d397866958d2e0b95db3f7ee"
+    },
+    {
+      "root": 60,
+      "sampleRate": 48000,
+      "file": "60.pcmz",
+      "sourceFile": "C4v8.flac",
+      "sourceBlob": "5d1c81dd7ee1d21cbec2fa1f2f605c098cf19679"
+    },
+    {
+      "root": 63,
+      "sampleRate": 48000,
+      "file": "63.pcmz",
+      "sourceFile": "D#4v8.flac",
+      "sourceBlob": "d29ac26013b03f46ec0c787c05e494437cdd0213"
+    },
+    {
+      "root": 66,
+      "sampleRate": 48000,
+      "file": "66.pcmz",
+      "sourceFile": "F#4v8.flac",
+      "sourceBlob": "191f7ee347d4513c8c7f0f41222239cfdbf7f497"
+    },
+    {
+      "root": 69,
+      "sampleRate": 48000,
+      "file": "69.pcmz",
+      "sourceFile": "A4v8.flac",
+      "sourceBlob": "f2d55a0077eca5782b8a70ae42bbe3230dc2cc26"
+    },
+    {
+      "root": 72,
+      "sampleRate": 48000,
+      "file": "72.pcmz",
+      "sourceFile": "C5v8.flac",
+      "sourceBlob": "8f2a4baab012730693c1b173ce463056c22e42d0"
+    },
+    {
+      "root": 75,
+      "sampleRate": 48000,
+      "file": "75.pcmz",
+      "sourceFile": "D#5v8.flac",
+      "sourceBlob": "2669ad6e47a5d17882db0960d2a05f162b2f0b1a"
+    },
+    {
+      "root": 78,
+      "sampleRate": 48000,
+      "file": "78.pcmz",
+      "sourceFile": "F#5v8.flac",
+      "sourceBlob": "1128d4579bb3a2d48ae1e53104377fd05d566463"
+    },
+    {
+      "root": 81,
+      "sampleRate": 48000,
+      "file": "81.pcmz",
+      "sourceFile": "A5v8.flac",
+      "sourceBlob": "06c2ab95dda24dfd66c6a29b2add45dca098163d"
+    },
+    {
+      "root": 84,
+      "sampleRate": 48000,
+      "file": "84.pcmz",
+      "sourceFile": "C6v8.flac",
+      "sourceBlob": "4728c69c56c82a98e54cf93a289afd282705317d"
+    },
+    {
+      "root": 87,
+      "sampleRate": 48000,
+      "file": "87.pcmz",
+      "sourceFile": "D#6v8.flac",
+      "sourceBlob": "5eec895354095719acfa86d88f08488f3939b058"
+    },
+    {
+      "root": 90,
+      "sampleRate": 48000,
+      "file": "90.pcmz",
+      "sourceFile": "F#6v8.flac",
+      "sourceBlob": "ebf05faa5b7991a848b11e53fc6cebc66e26f1c2"
+    },
+    {
+      "root": 93,
+      "sampleRate": 48000,
+      "file": "93.pcmz",
+      "sourceFile": "A6v8.flac",
+      "sourceBlob": "54c51c1bb786f7d5714d83d912f20727d9906b4c"
+    },
+    {
+      "root": 96,
+      "sampleRate": 48000,
+      "file": "96.pcmz",
+      "sourceFile": "C7v8.flac",
+      "sourceBlob": "65a6c3d80ffc3a40a3dffbf183972a10e316018e"
+    },
+    {
+      "root": 99,
+      "sampleRate": 48000,
+      "file": "99.pcmz",
+      "sourceFile": "D#7v8.flac",
+      "sourceBlob": "2abc0bba8df135f77a9697b05836ddc926d5b3da"
+    },
+    {
+      "root": 102,
+      "sampleRate": 48000,
+      "file": "102.pcmz",
+      "sourceFile": "F#7v8.flac",
+      "sourceBlob": "e19f9963d3ca10803e7612c4f601d8a42a16ef22"
+    },
+    {
+      "root": 105,
+      "sampleRate": 48000,
+      "file": "105.pcmz",
+      "sourceFile": "A7v8.flac",
+      "sourceBlob": "e6709d06167bea4717bd68e489d267346fcc893c"
+    },
+    {
+      "root": 108,
+      "sampleRate": 48000,
+      "file": "108.pcmz",
+      "sourceFile": "C8v8.flac",
+      "sourceBlob": "48ebffd513821de09968fb36560d3d0a384b689c"
+    }
+  ]
+}

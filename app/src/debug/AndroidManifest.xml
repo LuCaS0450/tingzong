@@ -1,0 +1,23 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name="cn.musicpilgrimage.app.SwissDetailReviewActivity"
+            android:exported="true" android:label="听踪 · 详情只读样本"
+            android:theme="@style/Theme.MusicPilgrimage" />
+        <activity android:name="cn.musicpilgrimage.app.MusicSpacePreviewActivity"
+            android:exported="true" android:label="听踪 · 音乐空间预览"
+            android:windowSoftInputMode="adjustResize|stateAlwaysHidden"
+            android:theme="@style/Theme.MusicPilgrimage" />
+        <activity android:name="cn.musicpilgrimage.app.piano.PianoPilotActivity"
+            android:exported="true" android:label="听踪 · 钢琴试奏"
+            android:theme="@style/Theme.MusicPilgrimage" android:icon="@drawable/ic_launcher">
+        </activity>
+        <activity android:name="cn.musicpilgrimage.app.performance.RhythmComparisonActivity"
+            android:exported="true" android:label="听踪 · 节奏体验"
+            android:theme="@style/Theme.MusicPilgrimage" android:icon="@drawable/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

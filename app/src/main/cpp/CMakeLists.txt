@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(tingzong_piano LANGUAGES CXX)
+find_package(oboe REQUIRED CONFIG)
+add_library(tingzong_piano SHARED PianoEngine.cpp)
+target_compile_features(tingzong_piano PRIVATE cxx_std_17)
+target_compile_options(tingzong_piano PRIVATE -Wall -Wextra -Werror=return-type)
+target_link_libraries(tingzong_piano PRIVATE oboe::oboe android log)
