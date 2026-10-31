@@ -91,7 +91,7 @@ def path_problem(path):
     assets = 'app/src/main/assets/'
     if path.startswith(assets) and not path.startswith((
         assets + 'design/fonts/', assets + 'design/map-labels/',
-        assets + 'design/swiss-details/', assets + 'performance/piano/',
+        assets + 'design/swiss-details/', assets + 'design/swiss-world/', assets + 'performance/piano/',
     )):
         return 'unreviewed runtime asset'
     if path.startswith(assets + 'design/swiss-details/media/'):

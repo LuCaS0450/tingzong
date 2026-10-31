@@ -52,6 +52,10 @@ class RepositoryControlsTest(unittest.TestCase):
         self.assertFalse(scan_content(b'eyJhbGciOiJIUzI1NiJ9.W10.' + b'x' * 32))
 
     def test_public_paths_exclude_materials_and_unapproved_media(self):
+        self.assertIsNone(path_problem('app/src/main/assets/design/swiss-world/world.js'))
+        self.assertIsNone(path_problem('app/src/main/assets/design/swiss-world/vendor/LICENSE.txt'))
+        self.assertIsNotNone(path_problem('app/src/main/assets/design/swiss-world/earth/0/0/0.jpg'))
+        self.assertIsNotNone(path_problem('app/src/main/assets/design/swiss-world/wall.webp'))
         self.assertIsNotNone(path_problem('.private/materials.git/config'))
         self.assertIsNotNone(path_problem('content/design/reference.png'))
         self.assertIsNotNone(path_problem('app/src/main/assets/performance/secret/song.json'))

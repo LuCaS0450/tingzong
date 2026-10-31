@@ -35,6 +35,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.max
 import kotlin.math.min
+import org.json.JSONObject
 
 internal val SwissRed=RoomColors.Red
 internal val SwissInk=RoomColors.Ink
@@ -50,6 +51,12 @@ internal val SwissInk=RoomColors.Ink
     var streetCamera by mutableStateOf(prefs.getString("street-camera",null)?.split(',')?.mapNotNull(String::toDoubleOrNull)?.takeIf{it.size==3&&it.all(Double::isFinite)}); private set
     var playIndex=prefs.getInt("play-index",0); private set
     var playOffset=prefs.getInt("play-offset",0); private set
+    var worldState:WorldCameraSnapshot?=runCatching{WorldCameraSnapshot.parse(JSONObject(prefs.getString("world-camera-v1",null)?:"{}"))}.getOrNull(); private set
+    var worldScene:WorldScene?=null
+    private var worldFocus:String?=null
+    fun world(value:WorldCameraSnapshot){if(worldState==value)return;worldState=value;prefs.edit().putString("world-camera-v1",value.json().toString()).apply()}
+    fun focusWorld(id:String){worldFocus=id}
+    fun takeWorldFocus():String?=worldFocus.also{worldFocus=null}
     fun page(value:Int){shelfPage=value.coerceAtLeast(0);prefs.edit().putInt("shelf-page",shelfPage).apply()}
     fun sawHint(){hintSeen=true;prefs.edit().putBoolean("shelf-hint",true).apply()}
     fun globe(value:GlobeCamera){globe=value.bounded();prefs.edit().putFloat("longitude",globe.longitude).putFloat("latitude",globe.latitude).putFloat("globe-zoom",globe.zoom).apply()}

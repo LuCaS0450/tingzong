@@ -177,7 +177,8 @@ try {
     $taskResolved=Invoke-TaskAdb -Arguments @('-s',$taskSerial,'shell','cmd','package','resolve-activity','--brief','-n',"$taskPackage/$taskActivity") -AllowFailure
     if($taskResolved.Text -notmatch [regex]::Escape($taskActivity)) {
         $taskApk=if($taskIsMusicSpace){
-            $taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-swiss-unified-private.apk'
+            $taskMusicApk=Join-Path $taskRoot 'artifacts\world-opus\Tingzong-world-opus-private.apk'
+            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-swiss-unified-private.apk'}
             if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-three-walls-private.apk'}
             if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-home-furniture-private.apk'}
             if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-shelf-refinement-private.apk'}

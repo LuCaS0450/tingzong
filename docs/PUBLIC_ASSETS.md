@@ -8,6 +8,8 @@
 | Source Han Serif CN | `app/src/main/res/font/print_serif.otf` | [Adobe Source Han Serif](https://github.com/adobe-fonts/source-han-serif/blob/release/LICENSE.txt)，SIL OFL 1.1；保留 `design/fonts/LICENSE-serif.txt`。 |
 | Fusion Pixel | `app/src/main/res/font/fusion_pixel.otf` | [TakWolf Fusion Pixel](https://github.com/TakWolf/fusion-pixel-font)，SIL OFL 1.1；原始署名和上游许可位于 `design/fonts/`。 |
 | 详情页 Source Han Sans Web 字体 | `app/src/main/assets/design/swiss-details/fonts/` | 保留该目录 `OFL.txt`；项目使用的 Web 字体形式，沿用原字体许可。 |
+| MapLibre GL JS 5.24.0 | `app/src/main/assets/design/swiss-world/vendor/` | [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js/tree/v5.24.0)，BSD 3-Clause；仅保留发行包 JS、CSS 和原始 `LICENSE.txt`。世界舞台源码可公开；Opus 设计原件、加工纹理、墙面与作品图片仍在本机素材仓库。 |
+| Natural Earth 国家轮廓 | `app/src/main/assets/design/swiss-world/countries.json` | 复用既有 Natural Earth 1:110m 国家边界与简体中文名称，按 [Natural Earth 条款](https://www.naturalearthdata.com/about/terms-of-use/) 属于公有领域；仅裁出层级路径用的多边形与名称，不参与地点坐标、到访或认证判定。 |
 | OpenCC 简繁字词字典 | `app/src/main/assets/design/map-labels/` | [OpenCC ver.1.1.9](https://github.com/BYVoid/OpenCC/tree/ver.1.1.9/data/dictionary)，Apache 2.0；保留 LICENSE 和原来源说明。 |
 | Salamander Grand Piano 采样 | `app/src/main/assets/performance/piano/` | [Alexander Holm，Salamander Grand Piano](https://github.com/sfzinstruments/SalamanderGrandPiano)，[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)；保留 LICENSE 与 `samples.json` 中的作者和来源。项目取一组力度层，转为单声道、裁剪起始静音与最长时长，并编码为 gzip 容器中的浮点 PCM。这不是商业歌曲录音。 |
 

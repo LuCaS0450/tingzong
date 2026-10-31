@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self' blob:; img-src 'self' data: blob:; frame-src 'none'; object-src 'none'; base-uri 'none'">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>听踪 · 世界</title>
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="world.css">
+  <script defer src="vendor/maplibre-gl.js"></script>
+  <script defer src="gestures.js"></script>
+  <script defer src="preview.js"></script>
+  <script defer src="world.js"></script>
+</head>
+<body>
+<main id="world" data-testid="world-wall">
+  <header id="header">
+    <div class="heading"><p class="kicker"><span>02</span><span class="full-only"> / WORLD</span></p><h1>地图与旅行</h1></div>
+    <div id="meta" class="full-only"><span id="count"></span></div>
+    <nav id="crumb" aria-label="地图层级"><button data-zoom="0.5">世界</button><span id="region"></span><span id="city"></span></nav>
+    <button id="list" class="text-button" aria-label="地点列表"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M3 6h1M3 12h1M3 18h1"/></svg>地点</button>
+    <button id="search" class="icon-button" aria-label="搜索歌曲与地点"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m14.5 14.5 5.5 5.5"/></svg></button>
+  </header>
+  <div id="stage">
+    <div id="shadow"></div><div id="halo"></div><canvas id="globe-preview" width="608" height="608" aria-hidden="true"></canvas>
+    <div id="map" role="application" aria-label="音乐地点地图，可拖动旋转、双指缩放；也可使用缩放尺和地点列表"></div>
+    <div id="light"></div>
+    <button id="mini" aria-label="以当前位置回到完整地球"><img src="globe-mini.png" alt=""><i></i></button>
+    <p id="hint">拖动旋转 · 双指或双击放大</p>
+    <div id="loading" role="status" aria-live="polite" hidden><i></i><button id="retry">正在加载街道</button></div>
+    <div id="progress" hidden></div>
+    <div id="scale" aria-hidden="true"><span></span><i></i></div>
+    <div id="dock"><button id="trips">我的行程</button><button id="footprints">我的足迹</button></div>
+    <div id="rail" aria-label="缩放尺">
+      <button id="plus" aria-label="放大一级"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <div class="track"><button data-zoom="15" aria-label="缩放到街道"><i></i></button><button data-zoom="11" aria-label="缩放到城市"><i></i></button><button data-zoom="5" aria-label="缩放到国家"><i></i></button><button data-zoom="0.5" aria-label="缩放到地球"><i></i></button><b id="level">地球</b></div>
+      <button id="minus" aria-label="缩小一级"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    </div>
+  </div>
+  <section id="summary" aria-label="选点摘要" hidden>
+    <div class="handle" aria-hidden="true"></div>
+    <button id="close" class="icon-button" aria-label="收起地点摘要"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    <p id="kind" class="kicker"></p><h2 id="place-name"></h2><p id="place-city"></p>
+    <div id="work"><img id="art" alt=""><div><strong id="work-title"></strong><p id="work-credit"></p></div></div>
+    <div id="actions"><button id="favorite" class="outline" aria-label="收藏地点"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg></button><button id="around" class="outline">查看周边</button><button id="add" class="outline">＋ 加入行程</button><button id="detail">查看详情 <span>→</span></button></div>
+  </section>
+  <dialog id="chooser"><div class="sheet-head"><h2 id="chooser-title">音乐地点</h2><button id="chooser-close" class="icon-button" aria-label="关闭地点列表">×</button></div><input id="filter" type="search" placeholder="搜索地点、城市、作品" aria-label="搜索地点、城市、作品"><div id="options"></div></dialog>
+  <dialog id="prototype-detail"><button id="detail-back" class="text-button">← 返回地图</button><div id="detail-content"></div><p class="prototype-note">原型详情预览 · Android 中接入现有地点档案</p></dialog>
+  <div id="toast" role="status" hidden></div>
+  <div id="map-accessibility" class="sr-only"></div>
+</main>
+</body></html>

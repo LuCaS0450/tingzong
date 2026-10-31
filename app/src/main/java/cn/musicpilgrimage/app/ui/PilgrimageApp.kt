@@ -67,6 +67,7 @@ import org.json.JSONObject
    val focus=LocalFocusManager.current;val keyboard=LocalSoftwareKeyboardController.current
    val context=LocalContext.current
    val wallBrowse=remember(context){RoomBrowseState(context)}
+   DisposableEffect(wallBrowse){onDispose{wallBrowse.worldScene?.destroy();wallBrowse.worldScene=null}}
    val scope=rememberCoroutineScope()
    val preferences=remember(context){AppPreferences(context)}
    val pref by preferences.changes.collectAsStateWithLifecycle(AppPreferencesState())
@@ -186,7 +187,7 @@ import org.json.JSONObject
    Scaffold(containerColor=Color.Transparent,contentWindowInsets=WindowInsets(0,0,0,0),
     modifier=if(spaceOpen)Modifier.clearAndSetSemantics{} else Modifier,
     bottomBar={if(wallSection!=null)SwissWallTabs(wallSection,chooseModule)},
-    topBar={if(wallSection!=null)SwissWallHeader(wallSection,{navigate("search")},openSpace,{spaceOrigin=it})else if(roomTitle!=null&&!webDetailRoute)RoomHeader(if(route=="room")"唱片架" else roomTitle,if(route in listOf("room","me"))null else back,
+    topBar={if(wallSection!=null&&wallSection!=1)SwissWallHeader(wallSection,{navigate("search")},openSpace,{spaceOrigin=it})else if(wallSection==null&&roomTitle!=null&&!webDetailRoute)RoomHeader(if(route=="room")"唱片架" else roomTitle,if(route in listOf("room","me"))null else back,
        if(route in listOf("room","catalogue")){ {navigate("search")} }else null,
        openSpace,{spaceOrigin=it},enabled=!(route=="edit-profile"&&draft.saving)&&!recordSaving,
        onTitleClick=if(route=="room"){ {navigate("catalogue")} }else null)}) {padding->
@@ -211,7 +212,7 @@ import org.json.JSONObject
       RoomSong(work,musicCatalog.releases.find{it.id==work.releaseId}?.title.orEmpty(),work.id in musicFavorites.songs,{music.toggleFavorite(work.id)},
        {navigate("place/${Uri.encode(it)}")},play?.let{song->{navigate("perform/${Uri.encode(song.id)}")}},onBack=back,onRelease={navigate("album/${Uri.encode(work.releaseId)}")})
      }}
-     composable("explore"){SwissWorldWall(sourceCatalog,wallBrowse,archiveState.places.toSet(),archiveState.loading,{navigate("place/${Uri.encode(it)}")},togglePlace,openTrips,{navigate("archive/footprints")},addToTrip)}
+     composable("explore",enterTransition={EnterTransition.None},exitTransition={ExitTransition.None},popEnterTransition={EnterTransition.None},popExitTransition={ExitTransition.None}){SwissWorldWall(sourceCatalog,wallBrowse,archiveState.places.toSet(),archiveState.loading,{navigate("place/${Uri.encode(it)}")},togglePlace,openTrips,{navigate("archive/footprints")},addToTrip,{navigate("search")},back,archiveState.visits.map{it.location}.toSet())}
      composable("performance"){SwissPlayWall(performanceEntries,performanceArtwork,performanceLibraryUi.loaded,wallBrowse,performanceLibraryUi.downloads,{navigate("perform/${Uri.encode(it)}")},{performanceLibrary.prepareAll(retry=true)})}
      composable("perform/{song}"){e->
       val performanceEntry=performanceEntries.find{it.song.id==e.arguments?.getString("song")}
@@ -259,7 +260,7 @@ import org.json.JSONObject
       RoomMyAccount(p,owner!=null,session.services.accountEmail(owner),session.services.accountAvatar(owner),placeCount?.plus(musicFavorites.songs.size+musicFavorites.releases.size),visitCount,results.map{it.songId}.distinct().size,login,{navigate("edit-profile")},navigate,if(owner!=null)sessionError else null,{session.reloadProfile()})
      }
      composable("place/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->
-      RoomPlaceDetail(place,mapWork,viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,archive::deleteVisitContent,{navigate("place-community/${Uri.encode(place.id)}")},{addToTrip(place)},onBack=back,onMap={wallBrowse.select(place.id);wallBrowse.street(true);navigate("explore")})
+      RoomPlaceDetail(place,mapWork,viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,archive::deleteVisitContent,{navigate("place-community/${Uri.encode(place.id)}")},{addToTrip(place)},onBack=back,onMap={wallBrowse.focusWorld(place.id);navigate("explore")})
      }?:Text("这个地点暂未收录，请返回重试。",Modifier.padding(24.dp))}
      composable("place-community/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->RoomPlaceCommunity(place,viewModel(key="community-$owner-${place.id}"),session,login,openForm,openProfile){navigate("mine/visit")}}}
      composable("trips"){if(owner==null)LaunchedEffect(Unit){login()}else key(libraryOwner){RoomTripList(tripState,libraryOwner,tripCities,trips){navigate("trip/${Uri.encode(it)}")}}}
