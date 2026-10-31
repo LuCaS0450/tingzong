@@ -17,7 +17,7 @@ internal data class WorldCameraSnapshot(
             val lat = value.optDouble("latitude", Double.NaN)
             val zoom = value.optDouble("zoom", Double.NaN)
             if (!lon.isFinite() || !lat.isFinite() || !zoom.isFinite() ||
-                lon !in -180.0..180.0 || lat !in -85.051129..85.051129 || zoom !in 0.0..18.0) return null
+                lon !in -180.0..180.0 || lat !in -85.051129..85.051129 || zoom !in -3.0..18.0) return null
             val selected = value.optString("selected").takeIf { it.length <= 180 } ?: return null
             return WorldCameraSnapshot(lon, lat, zoom, selected, value.optBoolean("summaryOpen") && selected.isNotBlank())
         }

@@ -192,6 +192,7 @@ private class WorldResources(private val context: Context, private val media: Ma
         return runCatching {
             when {
                 path == "map-style.json" -> remote("https://api.maptiler.com/maps/streets-v2/style.json?key=" + Uri.encode(BuildConfig.MAPTILER_KEY.trim()))
+                path.startsWith("earth-hd/") -> earthTile(path)
                 path.startsWith("provider/") -> remote("https://api.maptiler.com/" + path.removePrefix("provider/") + (uri.encodedQuery?.let { "?$it" } ?: ""))
                 path.startsWith("media/") -> image(media[path.removePrefix("media/")] ?: return unavailable())
                 path == "font.woff2" -> asset("design/swiss-details/fonts/swiss-sans.woff2", "font/woff2")
@@ -211,9 +212,19 @@ private class WorldResources(private val context: Context, private val media: Ma
         else -> unavailable()
     }
     private fun asset(path: String, type: String) = response(type, context.assets.open(path))
-    private fun remote(url: String): WebResourceResponse {
+    private fun earthTile(path: String): WebResourceResponse {
+        val parts = Regex("earth-hd/(\\d+)/(\\d+)/(\\d+)\\.jpg").matchEntire(path)?.groupValues ?: return unavailable()
+        val z = parts[1].toIntOrNull() ?: return unavailable()
+        val x = parts[2].toIntOrNull() ?: return unavailable()
+        val y = parts[3].toIntOrNull() ?: return unavailable()
+        if (z !in 3..9 || x !in 0 until (1 shl z) || y !in 0 until (1 shl z)) return unavailable()
+        return remote("https://api.maptiler.com/tiles/satellite-v2/$z/$x/$y.jpg?key=" + Uri.encode(BuildConfig.MAPTILER_KEY.trim()), preferCached = true)
+    }
+    private fun remote(url: String, preferCached: Boolean = false): WebResourceResponse {
         val request = Request.Builder().url(url).header("User-Agent", "cn.musicpilgrimage.app/${BuildConfig.VERSION_NAME} (${BuildConfig.APPLICATION_ID}; MapLibre Android)").build()
-        val result = client.newCall(request).execute()
+        // Satellite imagery is not live data. Retain the existing bounded cache for offline revisits.
+        val cached = if (preferCached) client.newCall(request.newBuilder().cacheControl(okhttp3.CacheControl.FORCE_CACHE).build()).execute() else null
+        val result = if (cached?.isSuccessful == true) cached else { cached?.close(); client.newCall(request).execute() }
         val body = result.body
         if (!result.isSuccessful || body == null) { result.close(); return unavailable() }
         val stream = object : FilterInputStream(body.byteStream()) { override fun close() { try { super.close() } finally { result.close() } } }

@@ -9,6 +9,9 @@ class WorldCameraSnapshotTest {
     @Test fun streetDetailsRoundTripPreservesTheExactCameraAndSelection() {
         val state = WorldCameraSnapshot(2.373333, 48.84298768033648, 15.125, "le-train-bleu", true)
         assertEquals(state, WorldCameraSnapshot.parse(JSONObject(state.json().toString())))
+        // MapLibre's latitude-relative globe camera needs a negative engine zoom near the poles.
+        val polar = WorldCameraSnapshot(12.3,77.0,-1.45)
+        assertEquals(polar,WorldCameraSnapshot.parse(polar.json()))
     }
 
     @Test fun arbitraryStreetDoesNotRequireASelectedMusicPlace() {
@@ -20,7 +23,7 @@ class WorldCameraSnapshotTest {
     @Test fun corruptAndOutOfRangePersistedCamerasAreRejected() {
         assertNull(WorldCameraSnapshot.parse(JSONObject()))
         val valid = WorldCameraSnapshot(2.37, 48.84, 15.0).json()
-        for ((field, value) in listOf("longitude" to 181.0, "latitude" to 90.0, "zoom" to 18.1, "zoom" to -1.0)) {
+        for ((field, value) in listOf("longitude" to 181.0, "latitude" to 90.0, "zoom" to 18.1, "zoom" to -3.1)) {
             assertNull(WorldCameraSnapshot.parse(JSONObject(valid.toString()).put(field, value)))
         }
         assertNull(WorldCameraSnapshot.parse(JSONObject(valid.toString()).put("zoom", "NaN")))

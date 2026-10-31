@@ -49,21 +49,35 @@ class WorldGestureInputTest {
         repeat(80) { if (!result.optBoolean("moving")) return result; SystemClock.sleep(30); result = evaluate(web, "worldDiagnostics()") }
         error("World camera did not settle")
     }
-    private fun event(down: Long, action: Int, points: List<Pair<Float, Float>>) {
+    private fun event(down: Long, action: Int, points: List<Pair<Float, Float>>, wait: Boolean = true) {
         val props = Array(points.size) { i -> MotionEvent.PointerProperties().apply { id = i; toolType = MotionEvent.TOOL_TYPE_FINGER } }
         val coords = Array(points.size) { i -> MotionEvent.PointerCoords().apply { x = points[i].first; y = points[i].second; pressure = 1f; size = .08f } }
         val e = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, points.size, props, coords, 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
-        check(instrumentation.uiAutomation.injectInputEvent(e, true)) { "Touch injection failed" }
+        check(instrumentation.uiAutomation.injectInputEvent(e, wait)) { "Touch injection failed" }
         e.recycle()
     }
-    private fun pinch(x: Float, y: Float, from: Float, to: Float) {
+    private fun pinch(x: Float, y: Float, from: Float, to: Float, hold: Boolean = true) {
         val down = SystemClock.uptimeMillis()
         event(down, MotionEvent.ACTION_DOWN, listOf(x-from to y))
         event(down, MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), listOf(x-from to y, x+from to y))
-        for (i in 1..24) { val half = from + (to-from)*i/24; event(down, MotionEvent.ACTION_MOVE, listOf(x-half to y, x+half to y)); SystemClock.sleep(16) }
-        repeat(5) { event(down, MotionEvent.ACTION_MOVE, listOf(x-to to y, x+to to y)); SystemClock.sleep(20) }
-        event(down, MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), listOf(x-to to y, x+to to y))
-        event(down, MotionEvent.ACTION_UP, listOf(x-to to y))
+        for (i in 1..24) { val half = from + (to-from)*i/24; event(down, MotionEvent.ACTION_MOVE, listOf(x-half to y, x+half to y),wait=hold||i<21); SystemClock.sleep(16) }
+        if (hold) repeat(5) { event(down, MotionEvent.ACTION_MOVE, listOf(x-to to y, x+to to y)); SystemClock.sleep(20) }
+        event(down, MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), listOf(x-to to y, x+to to y),wait=hold)
+        event(down, MotionEvent.ACTION_UP, listOf(x-to to y),wait=hold)
+    }
+
+    private fun panStopsOnRelease(web: WebView, x: Float, y: Float): JSONObject {
+        val down = SystemClock.uptimeMillis()
+        event(down, MotionEvent.ACTION_DOWN, listOf(x to y))
+        for (i in 1..12) { event(down, MotionEvent.ACTION_MOVE, listOf(x+100*i/12 to y+20*i/12)); SystemClock.sleep(12) }
+        event(down, MotionEvent.ACTION_UP, listOf(x+100 to y+20))
+        SystemClock.sleep(80)
+        val atRelease = evaluate(web, "worldDiagnostics()")
+        SystemClock.sleep(300)
+        val later = evaluate(web, "worldDiagnostics()")
+        assertFalse("Panning must stop immediately after release",atRelease.getBoolean("moving"))
+        assertEquals("Globe and street pans must have no inertia",atRelease.getJSONObject("state").toString(),later.getJSONObject("state").toString())
+        return JSONObject().put("atRelease",atRelease.getJSONObject("state")).put("later",later.getJSONObject("state"))
     }
 
     @Test fun physicalPinchLocksFocusAndReverseKeepsTheBrowseState() {
@@ -76,10 +90,15 @@ class WorldGestureInputTest {
             if (!ready) { ready = runCatching { evaluate(web, "worldDiagnostics()").optBoolean("ready") }.getOrDefault(false); if (!ready) SystemClock.sleep(100) }
         }
         check(ready)
-        // The saved location may be arbitrary; use the visible globe control, preserving that location.
+        // Seed a representative latitude through the real place list. At the ±80° limit
+        // a north-up globe intentionally constrains otherwise impossible grab positions.
+        evaluate(web,"(()=>{document.getElementById('list').click();const b=[...document.querySelectorAll('#options button')].find(b=>b.firstElementChild.textContent==='蓝色列车餐厅');if(!b)throw Error('Review place missing');b.click();return {ok:true};})()")
+        idle(web)
+        evaluate(web,"(()=>{if(!document.getElementById('summary').hidden)document.getElementById('close').click();return {ok:true};})()")
+        // The globe control retains this center; subsequent zooms focus an arbitrary map coordinate.
         evaluate(web, "(()=>{document.querySelector('[data-zoom=\"0.5\"]').click();return {ok:true};})()")
         idle(web)
-        val geometry = evaluate(web, "(()=>{const e=document.getElementById('map'),r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height*.42,localX:e.clientWidth/2,localY:e.clientHeight*.42,logicalWidth:e.clientWidth,width:innerWidth};})()")
+        val geometry = evaluate(web, "(()=>{const e=document.getElementById('map'),r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height*.55,localX:e.clientWidth/2,localY:e.clientHeight*.55,logicalWidth:e.clientWidth,width:innerWidth};})()")
         val location = IntArray(2)
         var width = 0
         instrumentation.runOnMainSync { web.getLocationOnScreen(location); width = web.width }
@@ -89,6 +108,9 @@ class WorldGestureInputTest {
         val localX = geometry.getDouble("localX"); val localY = geometry.getDouble("localY")
         val grabbed = evaluate(web,"worldDiagnostics([$localX,$localY])").getJSONObject("point")
         val logicalScale = width/geometry.getDouble("logicalWidth")
+        val dragBefore=evaluate(web,"worldDiagnostics()")
+        var focused=false
+        instrumentation.runOnMainSync{focused=web.hasWindowFocus()}
         val down=SystemClock.uptimeMillis()
         event(down,MotionEvent.ACTION_DOWN,listOf(x to y))
         for(i in 1..40){event(down,MotionEvent.ACTION_MOVE,listOf((x+80*logicalScale*i/40).toFloat() to (y+12*logicalScale*i/40).toFloat()));SystemClock.sleep(16)}
@@ -97,7 +119,7 @@ class WorldGestureInputTest {
         val dragDrift=hypot(dragged.getDouble("x")-localX-80,dragged.getDouble("y")-localY-12)
         event(down,MotionEvent.ACTION_UP,listOf((x+80*logicalScale).toFloat() to (y+12*logicalScale).toFloat()))
         idle(web)
-        File(instrumentation.targetContext.filesDir,"world-gesture-review.json").writeText(JSONObject().put("dragFocusDriftPx",dragDrift).toString())
+        File(instrumentation.targetContext.filesDir,"world-gesture-review.json").writeText(JSONObject().put("dragFocusDriftPx",dragDrift).put("beforeDrag",dragBefore).put("afterDrag",evaluate(web,"worldDiagnostics()")).put("geometry",geometry).put("screenX",x).put("screenY",y).put("webTop",location[1]).put("focused",focused).toString(2))
         assertTrue("Grabbed globe coordinate must follow the finger: $dragDrift",dragDrift<3.0)
         val before = evaluate(web, "worldDiagnostics([$localX,$localY])")
         assertTrue("Globe control must be operational before gestures", before.getJSONObject("state").getDouble("zoom") < 1.5)
@@ -132,5 +154,22 @@ class WorldGestureInputTest {
         assertTrue("Inverse pinch must return to globe", reverse.getJSONObject("state").getDouble("zoom") < 1.5)
         assertTrue("Reverse focus drift: $reverseDrift logical pixels",reverseDrift<3.0)
         assertEquals(before.getJSONObject("state").getString("selected"),reverse.getJSONObject("state").getString("selected"))
+        record.put("globePanStop",panStopsOnRelease(web,x,y))
+        evaluate(web,"(()=>{document.querySelector('[data-zoom=\"15\"]').click();return {ok:true};})()")
+        idle(web)
+        record.put("streetPanStop",panStopsOnRelease(web,x,y))
+        val inertiaAnchor=evaluate(web,"worldDiagnostics([$localX,$localY])").getJSONObject("point")
+        pinch(x,y,45f,165f,hold=false)
+        SystemClock.sleep(40)
+        val releasedZoom=evaluate(web,"worldDiagnostics()").getJSONObject("state").getDouble("zoom")
+        SystemClock.sleep(260)
+        val zoomTail=evaluate(web,"worldDiagnostics(null,[${inertiaAnchor.getDouble("lng")},${inertiaAnchor.getDouble("lat")}])")
+        val continuedZoom=zoomTail.getJSONObject("state").getDouble("zoom")-releasedZoom
+        val tailPoint=zoomTail.getJSONObject("anchoredPoint")
+        val tailDrift=hypot(tailPoint.getDouble("x")-localX,tailPoint.getDouble("y")-localY)
+        record.put("zoomInertiaDelta",continuedZoom).put("zoomInertiaFocusDriftPx",tailDrift).put("zoomTail",zoomTail)
+        File(instrumentation.targetContext.filesDir,"world-gesture-review.json").writeText(record.toString(2))
+        assertTrue("Two-finger zoom inertia remains enabled",continuedZoom>.02)
+        assertTrue("Zoom inertia must keep its geographic focus",tailDrift<3)
     }
 }
