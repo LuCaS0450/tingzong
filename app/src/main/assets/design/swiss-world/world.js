@@ -10,11 +10,11 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const wrap = v => ((v + 180) % 360 + 360) % 360 - 180;
   const radians = x => x * Math.PI / 180;
-  let map, gestures, earthPreview, earthTiles, focusLayer, morph, places = [], byId = new Map(), selected = '', summaryOpen = false;
+  let map, gestures, earthPreview, earthTiles, focusLayer, selectedPin, places = [], byId = new Map(), selected = '', summaryOpen = false;
   let favorites = new Set(), visits = new Set(), favoriteBusy = false;
   let initialized = false, controlsReady = false, vectorsReady = false, vectorError = false, earthError=false, loadingSince = 0;
   let frame = 0, layoutCompact = false, moving = false, chooserOptions = [];
-  let styleRequest = null, saveTimer = 0, pulseFrame = 0, hdError=false;
+  let styleRequest = null, saveTimer = 0, hdError=false;
   let lastRender = 0, frameGaps = [], measuring = false, inputMoves = 0;
   let lastCamera = null;
   let countries=[];
@@ -74,7 +74,7 @@
   }
 
   function makeImage(kind, count) {
-    if(kind==='selected')return morph.image();
+    if(kind==='selected')return selectedPin.image();
     const scale = 2, w = kind === 'pin' || kind === 'visited' ? 24 : 48;
     const h = kind === 'pin' || kind === 'visited' ? 32 : 48;
     const canvas = document.createElement('canvas'); canvas.width=w*scale; canvas.height=h*scale;
@@ -84,15 +84,7 @@
     if (kind === 'pin' || kind === 'visited') {
       c.shadowColor='rgba(36,43,39,.30)';c.shadowBlur=1.5;c.shadowOffsetY=1;
       const p=new Path2D('M12 30.6C12 30.6 2.6 19.8 2.6 12a9.4 9.4 0 0 1 18.8 0c0 7.8-9.4 18.6-9.4 18.6z');
-      c.fillStyle=gradient;c.strokeStyle='#f7f6f2';c.lineWidth=2;c.lineJoin='round';c.fill(p);c.stroke(p);
-    } else if (kind === 'selected') {
-      c.beginPath();c.arc(24,24,22,0,Math.PI*2);c.fillStyle='rgba(189,56,43,.10)';c.fill();c.strokeStyle='rgba(189,56,43,.44)';c.lineWidth=1.2;c.stroke();
-      c.strokeStyle='#bd382b';c.lineWidth=1.4;c.beginPath();c.moveTo(24,2);c.lineTo(24,6.5);c.moveTo(24,41.5);c.lineTo(24,46);c.moveTo(2,24);c.lineTo(6.5,24);c.moveTo(41.5,24);c.lineTo(46,24);c.stroke();
-      c.shadowColor='rgba(36,43,39,.26)';c.shadowBlur=3.5;c.shadowOffsetY=1.5;
-      c.beginPath();c.arc(24,24,13,0,Math.PI*2);c.fillStyle='#bd382b';c.fill();c.shadowColor='transparent';
-      c.beginPath();c.arc(24,24,11.5,0,Math.PI*2);c.fillStyle='#f7f6f2';c.fill();
-      const g=c.createRadialGradient(21,21,0,24,24,12);g.addColorStop(0,'#d85242');g.addColorStop(.85,'#a82e22');
-      c.beginPath();c.arc(24,24,9,0,Math.PI*2);c.fillStyle=g;c.fill();
+      c.fillStyle=gradient;c.strokeStyle='#f7f6f2';c.lineWidth=1;c.lineJoin='round';c.fill(p);c.stroke(p);
     } else {
       const r=count>=10?15:13;
       c.shadowColor='rgba(36,43,39,.2)';c.shadowBlur=1.5;c.shadowOffsetY=1;
@@ -128,7 +120,6 @@
         {id:'graticule',type:'line',source:'grid',maxzoom:5,paint:{'line-color':'#ffffff','line-width':.5,'line-opacity':['interpolate',['linear'],['zoom'],0,.16,3,.16,5,0]}},
         {id:'clusters',type:'symbol',source:'places',filter:['has','point_count'],layout:{'icon-image':['concat','cluster-',['to-string',['get','point_count']]],'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':['interpolate',['linear'],['zoom'],0,.84,5,1]}},
         {id:'pins',type:'symbol',source:'places',filter:['!',['has','point_count']],layout:{'icon-image':['case',['get','visited'],'visited','pin'],'icon-size':['interpolate',['linear'],['zoom'],0,.60,3,.60,7,.75],'icon-anchor':'bottom','icon-offset':[0,1],'icon-allow-overlap':true,'icon-ignore-placement':true}},
-        {id:'selection-pulse',type:'circle',source:'selection',paint:{'circle-radius':22,'circle-color':'#bd382b','circle-opacity':0,'circle-stroke-color':'#bd382b','circle-stroke-width':1,'circle-stroke-opacity':0}},
         {id:'selected',type:'symbol',source:'selection',layout:{'icon-image':'selected','icon-size':1,'icon-anchor':'center','icon-allow-overlap':true,'icon-ignore-placement':true}}
       ]};
   }
@@ -293,20 +284,9 @@
     if(p.image){$('art').src=p.image;$('art').alt=p.work?`${p.work} · ${p.artist||''}`:p.name;}else{$('art').removeAttribute('src');}
     refreshFavorite();
   }
-  function pulse() {
-    cancelAnimationFrame(pulseFrame);if(reduced)return;
-    const started=performance.now();
-    const tick=now=>{const t=clamp((now-started)/1400,0,1);if(!map.getLayer('selection-pulse'))return;
-      map.setPaintProperty('selection-pulse','circle-radius',22+9*t);
-      map.setPaintProperty('selection-pulse','circle-stroke-opacity',.32*(1-t));
-      if(t<1)pulseFrame=requestAnimationFrame(tick);
-    };pulseFrame=requestAnimationFrame(tick);
-  }
   function selectPlace(id,adjust=true) {
     const p=byId.get(id);if(!p)return;
-    const changed=selected!==id;
     gestures?.cancel();map.stop();selected=id;summaryOpen=true;refreshSources();renderSummary();
-    if(changed)morph.start(map,.60+.15*clamp((map.getZoom()-3)/4,0,1),reduced);pulse();
     if(adjust){
       const targetY=($('stage').clientHeight-$('summary').offsetHeight)/2;
       const centerY=map.transform.centerPoint.y;
@@ -396,7 +376,7 @@
     const cityCount=new Set(places.map(p=>`${p.country}/${p.city}`)).size;
     $('count').textContent=`${cityCount} 座城市 / ${places.length} 个地点`;
     layoutCompact=Number(saved.zoom)>=3;root.classList.toggle('compact',layoutCompact);
-    earthTiles=TingzongEarthTiles();focusLayer=TingzongFocusLayer();morph=TingzongMarkerMorph();morph.prepare(.6);morph.prepare(.75);
+    earthTiles=TingzongEarthTiles();focusLayer=TingzongFocusLayer();selectedPin=TingzongSelectedPin();
     maplibregl.setWorkerCount(2);
     const bottomPadding=Math.max(0,$('stage').clientHeight-2*($('stage').clientWidth*352/360-64));
     map=new maplibregl.Map({container:'map',style:baseStyle(),center:[Number.isFinite(saved.longitude)?saved.longitude:35,Number.isFinite(saved.latitude)?clamp(saved.latitude,-80,80):24],
@@ -440,10 +420,10 @@
 
   window.updateNativeWorld=applyNative;
   window.saveWorld=()=>{persist();return state();};
-  window.pauseWorld=()=>{gestures?.cancel();if(map){map.stop();morph?.finish(map);}persist();};
+  window.pauseWorld=()=>{gestures?.cancel();if(map)map.stop();persist();};
   window.worldBack=()=>{gestures?.cancel();if($('chooser').open){$('chooser').close();return true;}if(summaryOpen){closeSummary();return true;}if(map&&map.getZoom()>1){goGlobe();return true;}return false;};
   // Read-only diagnostics plus opt-in sampling; nothing is uploaded.
-  window.worldDiagnostics=(point,coordinate)=>({engine:'MapLibre GL JS 5.24.0',ready:controlsReady,state:state(),moving,vectorsReady,vectorError,gesture:gestures?.diagnostics(),earth:earthTiles?.diagnostics(),focus:focusLayer?.diagnostics(),morph:morph?.diagnostics(),sourceLoaded:map&&vectorsReady?map.isSourceLoaded('streets'):false,canvas:map?{width:map.getCanvas().width,height:map.getCanvas().height}:null,point:point&&map?map.unproject(point):null,anchoredPoint:coordinate&&map?map.project(coordinate):null,selectedPoint:map&&byId.has(selected)?map.project([byId.get(selected).lon,byId.get(selected).lat]):null,places:places.length,images:imageNames.size,frameGaps:frameGaps.slice(),inputMoves,messages:messages.slice(-6)});
+  window.worldDiagnostics=(point,coordinate)=>({engine:'MapLibre GL JS 5.24.0',ready:controlsReady,state:state(),moving,vectorsReady,vectorError,gesture:gestures?.diagnostics(),earth:earthTiles?.diagnostics(),focus:focusLayer?.diagnostics(),selectedMarker:selectedPin?.diagnostics(),sourceLoaded:map&&vectorsReady?map.isSourceLoaded('streets'):false,canvas:map?{width:map.getCanvas().width,height:map.getCanvas().height}:null,point:point&&map?map.unproject(point):null,anchoredPoint:coordinate&&map?map.project(coordinate):null,selectedPoint:map&&byId.has(selected)?map.project([byId.get(selected).lon,byId.get(selected).lat]):null,places:places.length,images:imageNames.size,frameGaps:frameGaps.slice(),inputMoves,messages:messages.slice(-6)});
   window.beginWorldMeasurement=()=>{frameGaps=[];lastRender=0;inputMoves=0;measuring=true;};
   window.endWorldMeasurement=()=>{measuring=false;return window.worldDiagnostics();};
   if(!native){
