@@ -39,6 +39,7 @@ import org.json.JSONObject
 
 internal val SwissRed=RoomColors.Red
 internal val SwissInk=RoomColors.Ink
+internal val SwissWallMuted=Color(0xFF5C625C)
 
 /** Browsing memory is independent of navigation: cold launches still start at Music. */
 @Stable internal class RoomBrowseState(context:Context) {
@@ -89,7 +90,7 @@ internal val SwissInk=RoomColors.Ink
         Row(Modifier.fillMaxWidth()) {listOf("音乐","世界","演奏","我的").forEachIndexed{index,label->
             Box(Modifier.weight(1f).height(58.dp).semantics{selected=index==section}.testTag("wall-tab-$index")
                 .clickable(role=Role.Tab){if(index!=section)onChoose(listOf("room","explore","performance","me")[index])},contentAlignment=Alignment.Center) {
-                Text(label,color=if(index==section)SwissInk else Color(0xFF647266),fontSize=16.sp,fontWeight=if(index==section)FontWeight.Bold else FontWeight.Normal)
+                Text(label,color=if(index==section)SwissInk else SwissWallMuted,fontSize=16.sp,fontWeight=if(index==section)FontWeight.Bold else FontWeight.Normal)
             }
         }}
     }
@@ -117,7 +118,7 @@ internal val SwissInk=RoomColors.Ink
             }
         }
         Column(Modifier.fillMaxWidth().height(39.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
-            if(showHint&&count>1)Text("左右滑动查看更多",fontSize=11.sp,color=RoomColors.Muted,letterSpacing=1.sp,modifier=Modifier.padding(bottom=9.dp).testTag("shelf-swipe-hint"))
+            if(showHint&&count>1)Text("左右滑动查看更多",fontSize=11.sp,color=SwissWallMuted,letterSpacing=1.sp,modifier=Modifier.padding(bottom=9.dp).testTag("shelf-swipe-hint"))
             Canvas(Modifier.width(66.dp).height(2.dp).testTag("shelf-progress")) {
                 drawLine(RoomColors.Line,Offset.Zero,Offset(size.width,0f),size.height)
                 val segment=size.width/count
@@ -148,9 +149,9 @@ internal val SwissInk=RoomColors.Ink
                     RoomCover(artwork(entry.song),entry.song.title,Modifier.size(62.dp))
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                         Text(entry.song.title,color=SwissInk,fontSize=17.sp,fontWeight=FontWeight.Medium,maxLines=1,overflow=TextOverflow.Ellipsis)
-                        Text(entry.song.artist,color=RoomColors.Muted,fontSize=12.sp)
+                        Text(entry.song.artist,color=SwissWallMuted,fontSize=12.sp)
                         val duration="${entry.song.durationUs/60_000_000}:${(entry.song.durationUs/1_000_000%60).toString().padStart(2,'0')}"
-                        Text(if(entry.audioReady)"$duration · 离线就绪" else status?.label?:"$duration · 等待自动准备",color=if(status?.failed==true)SwissRed else RoomColors.Muted,fontSize=11.sp,maxLines=1)
+                        Text(if(entry.audioReady)"$duration · 离线就绪" else status?.label?:"$duration · 等待自动准备",color=if(status?.failed==true)SwissRed else SwissWallMuted,fontSize=11.sp,maxLines=1)
                     }
                     Icon(Icons.Outlined.PlayArrow,"演奏${entry.song.title}",Modifier.size(22.dp),tint=SwissInk)
                 }

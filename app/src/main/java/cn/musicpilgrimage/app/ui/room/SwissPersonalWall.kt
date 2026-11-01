@@ -40,7 +40,7 @@ import org.json.JSONObject
                 RoomAccountAvatar(avatar,Modifier.size(49.dp))
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                     Text(if(signedIn)profile?.optString("nickname")?.takeIf(String::isNotBlank)?:"音乐旅人" else "欢迎来到听踪",fontSize=19.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink,maxLines=1,overflow=TextOverflow.Ellipsis)
-                    Text(if(signedIn)"收藏音乐，也收藏旅途。" else "登录，带上你的收藏与旅途。",fontSize=11.sp,color=RoomColors.Muted)
+                    Text(if(signedIn)"收藏音乐，也收藏旅途。" else "登录，带上你的收藏与旅途。",fontSize=11.sp,color=SwissWallMuted)
                 }
                 Icon(Icons.Outlined.ChevronRight,if(signedIn)"查看个人资料" else "登录",tint=RoomColors.Ink)
             }
@@ -72,7 +72,7 @@ import org.json.JSONObject
 @Composable private fun PersonalLink(label:String,last:Boolean=false,onClick:()->Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min=51.dp).clickable(role=Role.Button,onClick=onClick),verticalAlignment=Alignment.CenterVertically) {
         Text(label,Modifier.weight(1f),fontSize=14.sp,color=RoomColors.Ink)
-        Icon(Icons.Outlined.ChevronRight,null,Modifier.size(18.dp),tint=RoomColors.Muted)
+        Icon(Icons.Outlined.ChevronRight,null,Modifier.size(18.dp),tint=SwissWallMuted)
     }
     if(!last)HorizontalDivider(color=RoomColors.Line,thickness=.5.dp)
 }

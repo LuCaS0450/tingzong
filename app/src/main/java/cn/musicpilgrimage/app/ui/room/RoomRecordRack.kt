@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BlurMaskFilter
+import android.graphics.Matrix
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -27,29 +27,31 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 private object RackImages {
     private val images=mutableMapOf<String,ImageBitmap>()
-    @Synchronized fun load(context:Context,name:String):ImageBitmap = images.getOrPut(name) {
-        requireNotNull(context.assets.open("design/music-space/$name").use{BitmapFactory.decodeStream(it)}).asImageBitmap()
+    fun load(context:Context,name:String):ImageBitmap = loadAsset(context,"design/music-space/$name")
+    @Synchronized fun loadAsset(context:Context,path:String):ImageBitmap = images.getOrPut(path) {
+        requireNotNull(context.assets.open(path).use{BitmapFactory.decodeStream(it)}).asImageBitmap()
     }
 }
 
-/** Only the wall retains acrylic brushwork; soften the heading's right side locally. */
+/** Approved A canvas: match the world's 480 CSS-pixel tile and 60% warm-white coat. */
 @Composable internal fun RoomShelfWall(modifier:Modifier,content:@Composable BoxScope.()->Unit={}) {
     val context=LocalContext.current
-    val wall=remember(context){ShaderBrush(ImageShader(RackImages.load(context,"wall.webp"),TileMode.Repeated,TileMode.Repeated))}
-    Box(modifier.drawBehind {
-        val u=size.width/360f
-        drawRect(RoomColors.Wall)
-        drawRect(wall,alpha=.68f)
-        drawRect(Brush.verticalGradient(listOf(RoomColors.Wall.copy(alpha=.53f),Color.Transparent),endY=54f*u))
-        for(x in listOf(.54f,.87f))drawRect(Brush.radialGradient(
-            listOf(RoomColors.Wall.copy(alpha=.72f),Color.Transparent),
-            center=Offset(size.width*x,47f*u),radius=130f*u
-        ),topLeft=Offset(size.width*.34f,0f),size=Size(size.width*.66f,115f*u))
+    val image=remember(context){RackImages.loadAsset(context,"design/swiss-world/canvas-warm-white.webp")}
+    val shader=remember(image){ImageShader(image,TileMode.Repeated,TileMode.Repeated)}
+    val wall=remember(shader){ShaderBrush(shader)}
+    Box(modifier.drawWithCache {
+        val tile=480.dp.toPx()
+        shader.setLocalMatrix(Matrix().apply{setScale(tile/image.width,tile/image.height)})
+        onDrawBehind {
+            drawRect(wall)
+            drawRect(Color(0xFFEEEDE7),alpha=.6f)
+        }
     },content=content)
 }
 
