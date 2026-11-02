@@ -21,6 +21,7 @@ object CatalogSearch {
 }
 
 object ArrivalRules {
+    const val locationUpdateMessage = "地点位置资料更新中，暂无法验证到访。已有记录仍可查看。"
     fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val dLat = Math.toRadians(lat2 - lat1); val dLon = Math.toRadians(lon2 - lon1)
         val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLon / 2).pow(2)
@@ -28,6 +29,7 @@ object ArrivalRules {
     }
     fun rejection(place: Place, fix: LocationFix): String? = when {
         !place.verified -> "此地点尚待核实，暂不开放到达认证"
+        place.arrivalLocationPendingSync -> locationUpdateMessage
         !fix.latitude.isFinite() || !fix.longitude.isFinite() || fix.latitude !in -90.0..90.0 || fix.longitude !in -180.0..180.0 -> "定位数据无效，请重新定位"
         fix.isMock -> "不能使用模拟位置进行认证"
         !fix.accuracy.isFinite() || fix.accuracy <= 0 || fix.accuracy > 100 -> "定位精度不足，请到开阔处重新定位"

@@ -280,7 +280,7 @@
     root.classList.toggle('selected',summaryOpen);$('summary').hidden=!summaryOpen;
     if(!summaryOpen)return;
     $('place-name').textContent=p.name;$('place-city').textContent=`${p.city} · ${p.country}`;
-    $('kind').textContent=p.kind==='mv'?'MV 取景':p.mediaLabel||'音乐地点';
+    $('kind').textContent=p.associationLabel||(p.kind==='mv'?'MV 取景':p.mediaLabel||'音乐地点');
     $('work-title').textContent=p.work?`《${p.work}》`:'';
     const timestamp=Number.isFinite(p.timestamp)?`${Math.floor(p.timestamp/60).toString().padStart(2,'0')}:${(p.timestamp%60).toString().padStart(2,'0')}`:'';
     $('work-credit').textContent=[p.artist,p.mediaLabel, timestamp].filter(Boolean).join(' · ');

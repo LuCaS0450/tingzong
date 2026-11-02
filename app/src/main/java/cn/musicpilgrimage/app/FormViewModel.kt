@@ -122,9 +122,10 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
   val local=payload.stringOrNull("local_photo")
   payload.remove("media_id")
   if(RecordDraftRules.requiresLocation(kind,editing!=null,local!=null)) {
+   val place=services.catalog.value.places.find{if(kind=="visit")it.id==target else it.scenes.any{s->s.id==target}} ?: error("地点不存在")
+   check(!place.arrivalLocationPendingSync){ArrivalRules.locationUpdateMessage}
    notice.value="正在获取本次现场位置…"
    val fix=services.location.locate()
-   val place=services.catalog.value.places.find{if(kind=="visit")it.id==target else it.scenes.any{s->s.id==target}} ?: error("地点不存在")
    ArrivalRules.rejection(place,fix)?.let{error(it)}
    payload.put("fix",fix.json())
   }

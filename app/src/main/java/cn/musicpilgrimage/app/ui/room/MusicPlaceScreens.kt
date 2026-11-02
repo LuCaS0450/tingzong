@@ -67,6 +67,7 @@ import cn.musicpilgrimage.app.ui.ViewModelStatus
                     if(credit.isNotBlank())Text(credit,fontSize=12.sp,lineHeight=20.sp,color=RoomColors.Muted)
                     if(scene.sourceUrl.startsWith("http"))RoomSourceLink("查看作品来源",scene.sourceUrl)
                     if(scene.canonicalWorkUrl.startsWith("http")&&scene.canonicalWorkUrl!=scene.sourceUrl)RoomSourceLink("查看原作版本",scene.canonicalWorkUrl)
+                    if(scene.associationSourceUrl.startsWith("https://"))RoomSourceLink("查看地点关联依据",scene.associationSourceUrl)
                 }}
                 if(hero?.canRecreate==true)item{SwissOutlinedButton({sources=false;if(owner==null)onLogin()else onForm("recreation",hero.id,own.find{it.kind=="recreation"&&it.sceneId==hero.id})},enabled=imageReady&&!busy,modifier=Modifier.fillMaxWidth()){Text(if(imageReady)"复刻这个镜头"else "正在加载原作…")}}
                 item{SwissTextButton({sources=false;if(owner==null)onLogin()else onForm("correction",place.id,null)}){Text("补充地点信息")}}

@@ -79,7 +79,7 @@ internal fun roomRecordTitle(kind:String)=when(kind){"message"->"地点留言";"
     val onsite=RecordDraftRules.requiresLocation(kind,editing!=null,local!=null)
     val scope=rememberCoroutineScope()
     var locating by remember(kind,target){mutableStateOf(false)}
-    var locationStatus by remember(kind,target){mutableStateOf("尚未定位")}
+    var locationStatus by remember(kind,target,place?.arrivalLocationPendingSync){mutableStateOf(if(place?.arrivalLocationPendingSync==true)ArrivalRules.locationUpdateMessage else "尚未定位")}
     val locate:()->Unit={if(!locating&&place!=null){scope.launch {
         locating=true;locationStatus="正在查看当前位置…"
         try {
@@ -87,6 +87,7 @@ internal fun roomRecordTitle(kind:String)=when(kind){"message"->"地点留言";"
             val distance=ArrivalRules.distanceMeters(fix.latitude,fix.longitude,place.latitude,place.longitude).roundToInt()
             val problem=ArrivalRules.rejection(place,fix)
             locationStatus=when {
+                place.arrivalLocationPendingSync->problem.orEmpty()
                 problem==null->"距离这里 ${distance} 米 · 已在打卡范围内"
                 distance>place.radiusMeters&&!fix.isMock&&fix.accuracy<=100&&fix.ageMillis<=120_000->"距离这里 ${distance} 米 · 还需靠近一些"
                 else->problem?:"暂时无法定位，请稍后再试"
@@ -102,9 +103,10 @@ internal fun roomRecordTitle(kind:String)=when(kind){"message"->"地点留言";"
         RecordDraftRules.hasPhoto(fields,editing?.mediaId),original,busy,ready,error,onsite,
         vm::set,{album.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))},
         {if(kind=="recreation"&&editing==null)onCamera(target)else if(ContextCompat.checkSelfPermission(context,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)beginCapture()else cameraPermission.launch(Manifest.permission.CAMERA)},
-        {vm.removePhoto()},{if(onsite)permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))else vm.submit(onSaved)},onBack,editing=editing!=null,
+        {vm.removePhoto()},{if(onsite&&place?.arrivalLocationPendingSync!=true)permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))else vm.submit(onSaved)},onBack,editing=editing!=null,
         visitRadius=place?.radiusMeters,locationStatus=locationStatus,locationBusy=locating,onLocate={
-            if(ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)locate()
+            if(place?.arrivalLocationPendingSync==true)locationStatus=ArrivalRules.locationUpdateMessage
+            else if(ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)locate()
             else locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))
         })
     if(leave!=null)RoomRecordDiscardDialog(busy,{leave=null},{vm.discard{val action=leave;leave=null;action?.invoke()}},error)

@@ -14,24 +14,24 @@ data class Scene(val id:String,val artistId:String,val artistName:String,val wor
  val referenceKind:String = "mv_frame",val releaseYear:Int? = null,val releaseType:String? = null,
  val associationPrecision:String = "unverified",val arrivalAnchorNote:String = "",val associationExcerpt:String = "",
  val canonicalWorkUrl:String = "",val verificationStatus:String = "pending",val overlayEligible:Boolean = false,
- val imageWidth:Int? = null,val imageHeight:Int? = null,val thumbnailUrl:String? = null,val aliases:List<String> = emptyList(),val displayArtwork:ReleaseArtwork? = null,val sourceVersionTitle:String = "") {
+ val imageWidth:Int? = null,val imageHeight:Int? = null,val thumbnailUrl:String? = null,val aliases:List<String> = emptyList(),val displayArtwork:ReleaseArtwork? = null,val sourceVersionTitle:String = "",val associationSourceUrl:String = "") {
  val imageApproved get()=imageStatus=="approved" && !imageUrl.isNullOrBlank() && imageWidth!=null && imageHeight!=null && imageWidth>0 && imageHeight>0
  val publiclyVisible get()=verificationStatus=="verified" && imageStatus=="approved"
  val canRecreate get()=imageApproved && verificationStatus=="verified" && overlayEligible && kind in setOf("mv","album") && associationPrecision !in setOf("city","region","unverified")
  val aspectRatio get()=if(imageWidth!=null&&imageHeight!=null&&imageWidth>0&&imageHeight>0)imageWidth.toFloat()/imageHeight else if(referenceKind=="release_cover")1f else 16f/9f
- val kindLabel get()=(if(referenceKind=="film_frame")"电影取景" else if(kind=="mv" && Regex("\\bLIVE\\b|现场|現場|演唱会|演唱會",RegexOption.IGNORE_CASE).containsMatchIn(sourceVersionTitle))"官方现场" else associationLabel(kind)) +
+ val kindLabel get()=(if(kind=="movie_soundtrack")associationLabel(kind) else if(referenceKind=="film_frame")"电影取景" else if(kind=="mv" && Regex("\\bLIVE\\b|现场|現場|演唱会|演唱會",RegexOption.IGNORE_CASE).containsMatchIn(sourceVersionTitle))"官方现场" else associationLabel(kind)) +
   when(associationPrecision){"city"->" · 城市参考";"region"->" · 区域参考";else->""}
  // Older catalogs already carry approved covers as reference images. Preserve those
  // during migration, but never use an MV frame as a release-artwork fallback.
  val displayCover get()=displayArtwork ?: if(referenceKind=="release_cover" && imageApproved)
   ReleaseArtwork("reference-cover-$id",work,releaseYear,releaseType?:"album",imageUrl,thumbnailUrl,imageStatus,imageWidth,imageHeight,sourceUrl,imageCredit.orEmpty()) else null
 }
-fun associationLabel(kind:String)=when(kind){"mv"->"MV取景";"album"->"封面 / 专辑取景";"song_title"->"歌名关联";"lyric"->"歌词提及";else->"关联类型待核实"}
+fun associationLabel(kind:String)=when(kind){"mv"->"MV取景";"album"->"封面 / 专辑取景";"song_title"->"歌名关联";"lyric"->"歌词提及";"movie_soundtrack"->"电影原声关联";else->"关联类型待核实"}
 fun Place.primaryScene():Scene?=scenes.filter {it.publiclyVisible && it.imageApproved}.sortedBy {if(it.referenceKind=="release_cover")0 else 1}.firstOrNull()
 fun Place.displayScene():Scene?=scenes.filter {it.publiclyVisible && it.displayCover?.approved==true}.sortedBy {if(it.referenceKind=="release_cover")0 else 1}.firstOrNull()
 fun Place.displayCover():ReleaseArtwork?=displayScene()?.displayCover
 fun Place.associationLabels()=scenes.filter {it.publiclyVisible}.map{it.kindLabel}.distinct().joinToString(" · ")
-data class Place(val id:String,val name:String,val city:String,val country:String,val latitude:Double,val longitude:Double,val radiusMeters:Int = 200,val precision:String = "landmark",val description:String = "",val coordinateSource:String = "",val verified:Boolean = true,val scenes:List<Scene> = emptyList(),val address:String = "")
+data class Place(val id:String,val name:String,val city:String,val country:String,val latitude:Double,val longitude:Double,val radiusMeters:Int = 200,val precision:String = "landmark",val description:String = "",val coordinateSource:String = "",val verified:Boolean = true,val scenes:List<Scene> = emptyList(),val address:String = "",val arrivalLocationPendingSync:Boolean = false,val localCorrectionApplied:Boolean = false)
 data class LocationFix(val latitude:Double,val longitude:Double,val accuracy:Float,val capturedAt:Long,val ageMillis:Long,val isMock:Boolean = false) {
  fun json() = JSONObject().put("latitude",latitude).put("longitude",longitude).put("accuracy",accuracy.toDouble())
   .put("capturedAt",java.time.Instant.ofEpochMilli(capturedAt).toString()).put("ageMillis",ageMillis).put("mock",isMock)
