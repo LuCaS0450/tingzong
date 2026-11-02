@@ -24,7 +24,15 @@ $env:JAVA_HOME = "$env:ProgramFiles\Android\Android Studio\jbr"
 .\gradlew.bat :app:assembleDebug '-Pkotlin.compiler.execution.strategy=in-process' --console=plain
 ```
 
-独立模拟器入口为 `scripts/start-standalone-preview.ps1`，需已有对应 SDK、AVD 和安装包。缺失的历史预览素材需自行补齐；本轮建库不改变现有应用、云端服务或模拟器状态。
+日常独立试玩和帧耗时检查使用关闭调试开销的本机预览包，保留原 `.review` 包名、预览入口和调试签名，可覆盖安装并保留数据：
+
+```powershell
+.\gradlew.bat -PtingzongReview=true -PtingzongProfile=true -PisolatedBuild :app:assembleDebug
+```
+
+APK 输出到 `artifacts/gradle-build/outputs/apk/debug/app-debug.apk`。需要调试器或 `run-as` 的开发和测试仍省略 `-PtingzongProfile=true`；调试包的帧耗时不能直接当作日常试玩性能。
+
+独立模拟器入口为 `scripts/start-standalone-preview.ps1`，需已有对应 SDK、AVD 和安装包；保持720×1616、density 280、host GPU，桌面窗口缩放单独调整。缺失的历史预览素材需自行补齐。
 
 ## 开发与版本管理
 

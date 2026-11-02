@@ -49,6 +49,10 @@ android {
         if (providers.gradleProperty("tingzongReview").orNull == "true") {
             getByName("debug") { applicationIdSuffix = ".review"; versionNameSuffix = "-review" }
         }
+        if (providers.gradleProperty("tingzongProfile").orNull == "true") {
+            require(providers.gradleProperty("tingzongReview").orNull == "true") { "Performance preview requires the private review package" }
+            getByName("debug") { isDebuggable = false; isJniDebuggable = false }
+        }
         release {
         isMinifyEnabled = false
         if(signingSettings.isNotEmpty()) signingConfig = signingConfigs.getByName("pilgrimageRelease")
