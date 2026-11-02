@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -104,7 +106,8 @@ internal val SwissWallMuted=Color(0xFF5C625C)
     LaunchedEffect(pager){snapshotFlow{pager.settledPage}.distinctUntilChanged().collect{page->if(page!=browse.shelfPage)showHint=false;browse.page(page)}}
     Column(Modifier.fillMaxSize().testTag("room-catalogue")) {
         HorizontalPager(pager,Modifier.fillMaxWidth().weight(1f).testTag("shelf-pager"),key={it},beyondViewportPageCount=1) {page->
-            BoxWithConstraints(Modifier.fillMaxSize()) {
+            // Reuse a rendered page during horizontal motion; preserve the rack/cover movement together.
+            BoxWithConstraints(Modifier.fillMaxSize().graphicsLayer { compositingStrategy=CompositingStrategy.Offscreen }) {
                 val u=min(maxWidth.value/360f,(maxHeight.value-8f)/542f).dp
                 Box(Modifier.width(u*360f).height(u*539f).align(Alignment.Center)) {
                     RoomRecordRack(Modifier.offset(x=u*11f).width(u*338f).height(u*539f),listOf(151f,336f,521f))
