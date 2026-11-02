@@ -15,7 +15,7 @@
   let initialized = false, controlsReady = false, vectorsReady = false, vectorError = false, earthError=false, loadingSince = 0;
   let frame = 0, layoutCompact = false, moving = false, chooserOptions = [];
   let styleRequest = null, saveTimer = 0, hdError=false;
-  let lastRender = 0, frameGaps = [], measuring = false, inputMoves = 0;
+  let lastRender = 0, frameGaps = [], projectionFrames = [], measuring = false, inputMoves = 0;
   let lastCamera = null;
   let countries=[];
   const empty = { type:'FeatureCollection', features:[] };
@@ -108,13 +108,16 @@
   }
   function baseStyle() {
     return {version:8,projection:{type:'globe'},
-      sources:{earth:{type:'raster',tiles:[new URL('earth/{z}/{x}/{y}.jpg?v=2',location.href).href.replaceAll('%7B','{').replaceAll('%7D','}')],tileSize:512,minzoom:0,maxzoom:3},
+      // A resident z0 tile covers the whole sphere while the detail source changes LOD.
+      sources:{'earth-base':{type:'raster',tiles:[new URL('earth/0/0/0.jpg?v=2',location.href).href],tileSize:512,minzoom:0,maxzoom:0},
+        earth:{type:'raster',tiles:[new URL('earth/{z}/{x}/{y}.jpg?v=2',location.href).href.replaceAll('%7B','{').replaceAll('%7D','}')],tileSize:512,minzoom:0,maxzoom:3},
         'earth-hd':{type:'raster',tiles:['opus-earth://{z}/{x}/{y}'],tileSize:256,minzoom:3,maxzoom:9},
         grid:{type:'geojson',data:graticule()},
         places:{type:'geojson',data:featureSet(places.filter(p=>p.id!==selected)),cluster:true,clusterRadius:32,clusterMaxZoom:17,clusterMinPoints:2},
         selection:{type:'geojson',data:byId.has(selected)?featureSet([byId.get(selected)]):empty}},
       layers:[
         {id:'ground',type:'background',paint:{'background-color':'#ecebe4','background-opacity':['interpolate',['linear'],['zoom'],4,0,7,1]}},
+        {id:'earth-base',type:'raster',source:'earth-base',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],5,1,8,0],'raster-fade-duration':0,'raster-resampling':'linear'}},
         {id:'earth',type:'raster',source:'earth',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
         {id:'earth-hd',type:'raster',source:'earth-hd',minzoom:1.25,maxzoom:8,paint:{'raster-opacity':['interpolate',['linear'],['zoom'],1.25,0,1.75,1,5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
         {id:'graticule',type:'line',source:'grid',maxzoom:5,paint:{'line-color':'#ffffff','line-width':.5,'line-opacity':['interpolate',['linear'],['zoom'],0,.16,3,.16,5,0]}},
@@ -392,7 +395,9 @@
     gestures=TingzongWorldGestures(map,{reducedMotion:reduced,minimumZoom:globeZoom,onFocus:p=>focusLayer.focus(p),onStart:()=>{moving=true;},onEnd:()=>{moving=false;updateVisual();updateContext();persist();}});
     const initialCamera={center:[Number.isFinite(saved.longitude)?saved.longitude:35,Number.isFinite(saved.latitude)?saved.latitude:24],zoom:Number.isFinite(saved.zoom)?saved.zoom:globeZoom(saved.latitude),padding:{top:0,bottom:bottomPadding,left:0,right:0}};
     map.once('style.load',()=>{
-      map.setProjection({type:['interpolate',['linear'],['zoom'],5,'globe',6,'mercator']});
+      // "globe" is a preset, not an interpolatable endpoint in the pinned engine.
+      // Use the primitive projection so rendering and gesture solving both use 6 - zoom.
+      map.setProjection({type:['interpolate',['linear'],['zoom'],5,'vertical-perspective',6,'mercator']});
       map.jumpTo(initialCamera);
       map.addLayer(focusLayer,'graticule');
       ['pin','visited','selected'].forEach(addImage);
@@ -414,7 +419,16 @@
     map.on('zoom',()=>focusLayer.zoomed());
     map.on('sourcedata',e=>{if(e.sourceId==='streets'||e.sourceId==='earth-hd')updateLoading();});
     map.on('error',e=>{if(e.sourceId==='earth'||String(e.error?.message).includes('/earth/'))earthError=true;if(e.sourceId==='earth-hd'){hdError=true;updateLoading();}if(e.sourceId==='streets'){vectorError=true;updateLoading();}});
-    map.on('render',()=>{if(earthPreview&&!earthPreview.hidden&&(map.getZoom()>=5||(!earthError&&map.isSourceLoaded('earth'))))earthPreview.hide();if(measuring){const now=performance.now();if(lastRender)frameGaps.push(now-lastRender);lastRender=now;}});
+    map.on('render',()=>{
+      if(earthPreview&&!earthPreview.hidden&&(map.getZoom()>=5||map.isSourceLoaded('earth-base')||(!earthError&&map.isSourceLoaded('earth'))))earthPreview.hide();
+      if(!measuring)return;
+      const now=performance.now();if(lastRender)frameGaps.push(now-lastRender);lastRender=now;
+      if(projectionFrames.length<600){
+        const p=map.style.placement?.transform;
+        projectionFrames.push({time:now,zoom:map.getZoom(),style:map.style.projection?.transitionState,
+          transform:map.transform._globeness,placement:p?{zoom:p.zoom,globe:p._globeness}:null});
+      }
+    });
     setInterval(updateLoading,350);
   }
 
@@ -423,8 +437,8 @@
   window.pauseWorld=()=>{gestures?.cancel();if(map)map.stop();persist();};
   window.worldBack=()=>{gestures?.cancel();if($('chooser').open){$('chooser').close();return true;}if(summaryOpen){closeSummary();return true;}if(map&&map.getZoom()>1){goGlobe();return true;}return false;};
   // Read-only diagnostics plus opt-in sampling; nothing is uploaded.
-  window.worldDiagnostics=(point,coordinate)=>({engine:'MapLibre GL JS 5.24.0',ready:controlsReady,state:state(),moving,vectorsReady,vectorError,gesture:gestures?.diagnostics(),earth:earthTiles?.diagnostics(),focus:focusLayer?.diagnostics(),selectedMarker:selectedPin?.diagnostics(),sourceLoaded:map&&vectorsReady?map.isSourceLoaded('streets'):false,canvas:map?{width:map.getCanvas().width,height:map.getCanvas().height}:null,point:point&&map?map.unproject(point):null,anchoredPoint:coordinate&&map?map.project(coordinate):null,selectedPoint:map&&byId.has(selected)?map.project([byId.get(selected).lon,byId.get(selected).lat]):null,places:places.length,images:imageNames.size,frameGaps:frameGaps.slice(),inputMoves,messages:messages.slice(-6)});
-  window.beginWorldMeasurement=()=>{frameGaps=[];lastRender=0;inputMoves=0;measuring=true;};
+  window.worldDiagnostics=(point,coordinate)=>({engine:'MapLibre GL JS 5.24.0',ready:controlsReady,state:state(),moving,vectorsReady,vectorError,gesture:gestures?.diagnostics(),earth:earthTiles?.diagnostics(),focus:focusLayer?.diagnostics(),selectedMarker:selectedPin?.diagnostics(),baseLoaded:map?.getSource('earth-base')?map.isSourceLoaded('earth-base'):false,projection:map?{style:map.style.projection?.transitionState,transform:map.transform._globeness,placement:map.style.placement?.transform?._globeness}:null,sourceLoaded:map&&vectorsReady?map.isSourceLoaded('streets'):false,canvas:map?{width:map.getCanvas().width,height:map.getCanvas().height}:null,point:point&&map?map.unproject(point):null,anchoredPoint:coordinate&&map?map.project(coordinate):null,selectedPoint:map&&byId.has(selected)?map.project([byId.get(selected).lon,byId.get(selected).lat]):null,places:places.length,images:imageNames.size,frameGaps:frameGaps.slice(),projectionFrames:projectionFrames.slice(),inputMoves,messages:messages.slice(-6)});
+  window.beginWorldMeasurement=()=>{frameGaps=[];projectionFrames=[];lastRender=0;inputMoves=0;measuring=true;};
   window.endWorldMeasurement=()=>{measuring=false;return window.worldDiagnostics();};
   if(!native){
     document.body.classList.add('prototype');

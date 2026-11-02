@@ -16,11 +16,11 @@ window.TingzongEarthPreview=function(canvas,getCamera){
       const z=Math.sqrt(1-rr),lat=Math.asin(Math.max(-1,Math.min(1,y*cl+z*sl))),lon=lon0+Math.atan2(x,z*cl-y*sl);
       const u=((lon/(2*Math.PI)+.5)%1+1)%1,v=.5-lat/Math.PI;
       const at=(Math.min(height-1,Math.max(0,Math.floor(v*height)))*width+Math.min(width-1,Math.floor(u*width)))*4;
-      const light=.80+.27*Math.max(0,x*lx+y*ly+z*lz),rim=.55*Math.pow(1-z,2.4);
+      const light=.80+.27*Math.max(0,x*lx+y*ly+z*lz);
       const target=(row*n+col)*4;
-      dst[target]=pixels[at]*light*(1-rim)+232*rim;
-      dst[target+1]=pixels[at+1]*light*(1-rim)+242*rim;
-      dst[target+2]=pixels[at+2]*light*(1-rim)+244*rim;
+      dst[target]=pixels[at]*light;
+      dst[target+1]=pixels[at+1]*light;
+      dst[target+2]=pixels[at+2]*light;
       dst[target+3]=Math.min(255,Math.max(0,(1-Math.sqrt(rr))*n/2)*255);
     }
     ctx.putImageData(out,0,0);
