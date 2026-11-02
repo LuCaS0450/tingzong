@@ -91,7 +91,7 @@ internal class SwissDetailMedia(private val context:Context) {
         reviewed.optString(scene.id).takeIf{it.isNotBlank()}?.let{return it}
         if(scene.referenceKind=="release_cover")scene.displayCover?.takeIf{it.approved}?.let{return artwork(it)}
         val source=scene.imageUrl.orEmpty()
-        BundledCovers.model(context,"reference-${scene.id}",source)?.takeIf{it!=source}?.let{fallbacks.put(source,it)}
+        BundledCovers.model(context,"reference-${scene.id}",source)?.takeIf{it!=source}?.let{return it}
         return source
     }
     fun place(place:Place,scene:Scene?=place.mapScene()):JSONObject=JSONObject()
@@ -100,7 +100,7 @@ internal class SwissDetailMedia(private val context:Context) {
         .put("artist",scene?.artistName.orEmpty()).put("kind",scene?.kind.orEmpty())
         .put("source",scene?.sourceUrl.orEmpty()).put("credit",scene?.imageCredit.orEmpty())
         .put("timestamp",scene?.timestampSeconds?:JSONObject.NULL).put("arrivalNote","")
-        .put("mediaLabel",when {scene?.referenceKind=="release_cover"->"正式发行封面";scene?.referenceKind=="album_photo"->"专辑内页";scene?.kindLabel?.startsWith("官方现场")==true->"官方现场画面";else->"MV 画面"})
+        .put("mediaLabel",when {scene?.referenceKind=="film_frame"->"电影原片";scene?.referenceKind=="release_cover"->"正式发行封面";scene?.referenceKind=="album_photo"->"专辑内页";scene?.kindLabel?.startsWith("官方现场")==true->"官方现场画面";else->"MV 画面"})
 }
 
 internal fun swissDetailData(page:String,id:String)=JSONObject().put("page",page).put("identity","$page:$id")

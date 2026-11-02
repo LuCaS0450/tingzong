@@ -11,8 +11,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
+
+/** Share immutable blurs across the covers and adjacent pages of the record rack. */
+internal object RoomShadowCache {
+    private val images = object : android.util.LruCache<String, ImageBitmap>(8 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
+    }
+    @Synchronized fun image(key: String, create: () -> ImageBitmap): ImageBitmap =
+        images.get(key) ?: create().also { images.put(key, it) }
+}
 
 /** One upper-left light source, with a broad cast shadow and a tighter contact shadow. */
 internal fun Modifier.coverShadow(): Modifier = drawWithCache {
@@ -21,6 +31,7 @@ internal fun Modifier.coverShadow(): Modifier = drawWithCache {
     val dx = (if (small) 1.5.dp else 2.8.dp).toPx()
     val dy = (if (small) 2.1.dp else 3.8.dp).toPx()
     val pad = ceil(blur * 2 + dy + 2.dp.toPx()).toInt()
+    val image = RoomShadowCache.image("cover:$size:$density") {
     val bitmap = Bitmap.createBitmap(
         ceil(size.width).toInt().coerceAtLeast(1) + pad * 2,
         ceil(size.height).toInt().coerceAtLeast(1) + pad * 2,
@@ -35,7 +46,8 @@ internal fun Modifier.coverShadow(): Modifier = drawWithCache {
     }
     layer(dx,dy,blur,if(small)65 else 76)
     layer(.8.dp.toPx(),1.1.dp.toPx(),1.2.dp.toPx(),if(small)69 else 92)
-    val image = bitmap.asImageBitmap()
+    bitmap.asImageBitmap()
+    }
     onDrawBehind { drawImage(image, topLeft = Offset(-pad.toFloat(), -pad.toFloat())) }
 }
 
@@ -44,9 +56,10 @@ internal fun Modifier.coverSleeve(): Modifier = drawWithCache {
     val u=size.width/141f
     val edge=2.6f*u
     val rim=.65f*u
+    val paperEdge=Brush.horizontalGradient(listOf(Color(0xFFF1EBDD),Color(0xFFD0C6B4),Color(0xFFA89D89)),startX=size.width,endX=size.width+edge)
     onDrawWithContent {
         drawRect(Color(0xFFDDD5C6),topLeft=Offset(edge,edge*.55f),size=size)
-        drawRect(Brush.horizontalGradient(listOf(Color(0xFFF1EBDD),Color(0xFFD0C6B4),Color(0xFFA89D89)),startX=size.width,endX=size.width+edge),
+        drawRect(paperEdge,
             topLeft=Offset(size.width,edge*.55f),size=Size(edge,size.height))
         drawLine(Color(0xFFF8F2E4),Offset(size.width+edge*.42f,edge*.55f),Offset(size.width+edge*.42f,size.height+edge*.55f),.45f*u)
         drawLine(Color(0xFF756B59),Offset(size.width+edge,edge*.55f),Offset(size.width+edge,size.height+edge*.55f),.45f*u)

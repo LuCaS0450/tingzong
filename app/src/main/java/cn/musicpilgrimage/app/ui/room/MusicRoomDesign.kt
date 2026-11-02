@@ -86,7 +86,7 @@ internal object BundledCovers {
 @Composable internal fun RoomCover(artwork:ReleaseArtwork?, title:String, modifier:Modifier=Modifier, sleeve:Boolean=false, shadow:Boolean=true) {
     val context=LocalContext.current
     val model=remember(artwork){artwork?.let{BundledCovers.model(context,it.id,it.thumbnailUrl?:it.imageUrl)}}
-    var failed by remember(artwork?.imageUrl) { mutableStateOf(false) }
+    var failed by remember(model) { mutableStateOf(false) }
     BoxWithConstraints(modifier.then(if(shadow)Modifier.coverShadow()else Modifier).then(if(sleeve)Modifier.coverSleeve()else Modifier).clip(RectangleShape).background(RoomColors.Paper),contentAlignment=Alignment.Center) {
         // A 282px wall cover was reused in a 281px rack slot. Keep each actual pixel target
         // in its own cache entry so repeated visits do not add a second resampling pass.

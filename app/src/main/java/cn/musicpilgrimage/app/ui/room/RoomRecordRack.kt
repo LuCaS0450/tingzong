@@ -62,6 +62,7 @@ private object RackImages {
     val shadows=Modifier.drawWithCache {
         val u=size.width/338f
         val pad=ceil(24f*u).toInt()
+        val image=RoomShadowCache.image("rack:$size:$bearings") {
         val bitmap=Bitmap.createBitmap(ceil(size.width).toInt()+pad*2,ceil(size.height).toInt()+pad*2,Bitmap.Config.ARGB_8888)
         val canvas=AndroidCanvas(bitmap)
         val paint=Paint(Paint.ANTI_ALIAS_FLAG)
@@ -74,7 +75,8 @@ private object RackImages {
             paint.maskFilter=BlurMaskFilter(6f*u,BlurMaskFilter.Blur.NORMAL)
             canvas.drawRect(2f*u,(bearing+5f)*u,size.width+2f*u,(bearing+19f)*u,paint)
         }
-        val image=bitmap.asImageBitmap()
+        bitmap.asImageBitmap()
+        }
         onDrawBehind {drawImage(image,topLeft=Offset(-pad.toFloat(),-pad.toFloat()))}
     }
     Canvas(modifier.then(shadows)) {

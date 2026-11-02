@@ -133,9 +133,13 @@ try {
     if(!(Test-Path -LiteralPath $taskEmulator) -or !(Test-Path -LiteralPath $taskConfig)){throw 'Android emulator or Pixel_10a configuration was not found.'}
     $taskSerial=@(Get-TaskDevices) | Select-Object -First 1
     $taskProcesses=Get-TaskEmulatorProcesses
-    if($taskProcesses | Where-Object {$_.CommandLine -match '-qt-hide-window|-no-window'}) {
+    $taskColdBootRequested=$ColdBoot -and [bool]$taskSerial
+    if($taskColdBootRequested) {
+        Write-TaskLog "Cold boot requested for $taskSerial; user data will be retained."
+    }
+    if($taskColdBootRequested -or ($taskProcesses | Where-Object {$_.CommandLine -match '-qt-hide-window|-no-window'})) {
         if(!$taskSerial){throw 'The embedded emulator is still starting. Try again after Android has booted.'}
-        Write-TaskLog "Stopping embedded/background emulator $taskSerial gracefully."
+        Write-TaskLog "Stopping emulator $taskSerial gracefully."
         Invoke-TaskAdb -Arguments @('-s',$taskSerial,'shell','input','keyevent','KEYCODE_HOME') | Out-Null
         Invoke-TaskAdb -Arguments @('-s',$taskSerial,'emu','kill') | Out-Null
         $taskDeadline=[DateTime]::UtcNow.AddSeconds(60)

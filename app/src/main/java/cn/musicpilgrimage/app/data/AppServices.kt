@@ -41,7 +41,8 @@ class AppServices(context:Context) {
  private val authMutation=Mutex()
  val changed=MutableStateFlow(0)
  val recovery=MutableStateFlow(false)
- val catalog=MutableStateFlow(catalogFromJson(JSONObject(app.assets.open("catalog.json").bufferedReader().use { it.readText() })))
+ private val bundledMedia=BundledCatalogMedia(app)
+ val catalog=MutableStateFlow(bundledMedia.apply(catalogFromJson(JSONObject(app.assets.open("catalog.json").bufferedReader().use { it.readText() }))))
  val cloudCatalog=MutableStateFlow(false)
  val client=if(BuildConfig.SUPABASE_URL.isNotBlank() && BuildConfig.SUPABASE_ANON_KEY.isNotBlank()) createSupabaseClient(BuildConfig.SUPABASE_URL,BuildConfig.SUPABASE_ANON_KEY) {
   install(Auth) {
@@ -105,7 +106,7 @@ class AppServices(context:Context) {
   val result=call(action,payload,expectedOwner);changed.update { it+1 };return result
  }
  suspend fun refreshCatalog() {
-  catalog.value=catalogFromJson(call("catalog") as JSONObject);cloudCatalog.value=true
+  catalog.value=bundledMedia.apply(catalogFromJson(call("catalog") as JSONObject));cloudCatalog.value=true
  }
  suspend fun signIn(email:String,password:String) {
   authMutation.withLock {

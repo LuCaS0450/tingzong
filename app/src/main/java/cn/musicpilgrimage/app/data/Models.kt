@@ -5,7 +5,8 @@ data class Artist(val id:String,val name:String,val aliases:List<String> = empty
 /** Release identity artwork is independent of evidence that a place appeared in a work. */
 data class ReleaseArtwork(val id:String,val releaseTitle:String,val releaseYear:Int?,val releaseType:String,
  val imageUrl:String?,val thumbnailUrl:String? = null,val imageStatus:String = "missing",
- val imageWidth:Int? = null,val imageHeight:Int? = null,val sourceUrl:String = "",val imageCredit:String = "") {
+ val imageWidth:Int? = null,val imageHeight:Int? = null,val sourceUrl:String = "",val imageCredit:String = "",
+ val browsingKey:String? = null) {
  val approved get()=imageStatus=="approved" && !imageUrl.isNullOrBlank() && imageWidth!=null && imageHeight!=null && imageWidth>0 && imageHeight>0
  val aspectRatio get()=if(imageWidth!=null&&imageHeight!=null&&imageWidth>0&&imageHeight>0)imageWidth.toFloat()/imageHeight else 1f
 }
@@ -18,7 +19,7 @@ data class Scene(val id:String,val artistId:String,val artistName:String,val wor
  val publiclyVisible get()=verificationStatus=="verified" && imageStatus=="approved"
  val canRecreate get()=imageApproved && verificationStatus=="verified" && overlayEligible && kind in setOf("mv","album") && associationPrecision !in setOf("city","region","unverified")
  val aspectRatio get()=if(imageWidth!=null&&imageHeight!=null&&imageWidth>0&&imageHeight>0)imageWidth.toFloat()/imageHeight else if(referenceKind=="release_cover")1f else 16f/9f
- val kindLabel get()=(if(kind=="mv" && Regex("\\bLIVE\\b|现场|現場|演唱会|演唱會",RegexOption.IGNORE_CASE).containsMatchIn(sourceVersionTitle))"官方现场" else associationLabel(kind)) +
+ val kindLabel get()=(if(referenceKind=="film_frame")"电影取景" else if(kind=="mv" && Regex("\\bLIVE\\b|现场|現場|演唱会|演唱會",RegexOption.IGNORE_CASE).containsMatchIn(sourceVersionTitle))"官方现场" else associationLabel(kind)) +
   when(associationPrecision){"city"->" · 城市参考";"region"->" · 区域参考";else->""}
  // Older catalogs already carry approved covers as reference images. Preserve those
  // during migration, but never use an MV frame as a release-artwork fallback.

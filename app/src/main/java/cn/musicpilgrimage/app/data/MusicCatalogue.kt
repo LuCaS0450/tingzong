@@ -37,12 +37,12 @@ data class MusicCatalogue(val releases: List<MusicRelease>, val works: List<Musi
                 val art = group.firstNotNullOfOrNull { it.second.displayCover?.takeIf(ReleaseArtwork::approved) }
                 // An album cover association alone does not invent a song with the album's name.
                 if (group.all { it.second.kind == "album" && it.second.referenceKind == "release_cover" } && art?.releaseType == "album") return@mapNotNull null
-                val releaseId = "${scene.artistId}|${art?.id ?: "work:${musicTerm(scene.work)}"}"
+                val releaseId = "${scene.artistId}|${art?.let { it.browsingKey ?: it.id } ?: "work:${musicTerm(scene.work)}"}"
                 MusicWork(id, scene.work, scene.artistId, scene.artistName, releaseId, art,
                     group.groupBy { it.first.id }.values.map { rows -> MusicPlaceLink(rows.first().first, rows.map { it.second }.distinctBy(Scene::id)) },
                     (group.flatMap { it.second.aliases } + visible.artists.find { it.id == scene.artistId }?.aliases.orEmpty()).distinct())
             }
-            val releaseGroups = entries.groupBy { (_, scene) -> "${scene.artistId}|${scene.displayCover?.takeIf(ReleaseArtwork::approved)?.id ?: "work:${musicTerm(scene.work)}"}" }
+            val releaseGroups = entries.groupBy { (_, scene) -> "${scene.artistId}|${scene.displayCover?.takeIf(ReleaseArtwork::approved)?.let { it.browsingKey ?: it.id } ?: "work:${musicTerm(scene.work)}"}" }
             val releases = releaseGroups.map { (id, group) ->
                 val scene = group.first().second
                 val art = group.firstNotNullOfOrNull { it.second.displayCover?.takeIf(ReleaseArtwork::approved) }
@@ -55,5 +55,5 @@ data class MusicCatalogue(val releases: List<MusicRelease>, val works: List<Musi
     }
 }
 
-private fun musicTerm(value: String) = Normalizer.normalize(value, Normalizer.Form.NFKC)
+internal fun musicTerm(value: String) = Normalizer.normalize(value, Normalizer.Form.NFKC)
     .lowercase(Locale.ROOT).replace("《", "").replace("》", "").trim()
