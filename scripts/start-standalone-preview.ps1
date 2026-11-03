@@ -181,29 +181,7 @@ try {
     $taskResolved=Invoke-TaskAdb -Arguments @('-s',$taskSerial,'shell','cmd','package','resolve-activity','--brief','-n',"$taskPackage/$taskActivity") -AllowFailure
     if($taskResolved.Text -notmatch [regex]::Escape($taskActivity)) {
         $taskApk=if($taskIsMusicSpace){
-            $taskMusicApk=Join-Path $taskRoot 'artifacts\world-opus\Tingzong-world-opus-private.apk'
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-swiss-unified-private.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-three-walls-private.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-home-furniture-private.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-shelf-refinement-private.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\performance\Tingzong-performance-fixes-private.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\performance\Tingzong-fifteen-tracks-private.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-visual-fixes-private.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\performance\Tingzong-three-tracks-private.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-music-space-stage8-acceptance.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-music-space-stage8.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-music-space-stage7.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-music-space-stage6.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-music-space-stage5.apk'}
-            if(!(Test-Path -LiteralPath $taskMusicApk)){$taskMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-music-space-stage4.apk'}
-            if(Test-Path -LiteralPath $taskMusicApk){$taskMusicApk}else{
-                $taskPreviousMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-music-space-stage3.apk'
-                if(Test-Path -LiteralPath $taskPreviousMusicApk){$taskPreviousMusicApk}else{
-                    $taskActivity='cn.musicpilgrimage.app.MainActivity'
-                    $taskOlderMusicApk=Join-Path $taskRoot 'artifacts\music-space\Tingzong-music-space-stage2.apk'
-                    if(Test-Path -LiteralPath $taskOlderMusicApk){$taskOlderMusicApk}else{Join-Path $taskRoot 'artifacts\music-space\Tingzong-music-space-stage1.apk'}
-                }
-            }
+            Join-Path $taskRoot 'artifacts\world-opus\Tingzong-world-opus-private.apk'
         }else{Join-Path $taskRoot 'artifacts\performance\Tingzong-rhythm-comparison-private.apk'}
         if(!(Test-Path -LiteralPath $taskApk)){throw 'The requested preview APK has not been built yet.'}
         Write-TaskLog 'Installing the existing private preview APK.'
