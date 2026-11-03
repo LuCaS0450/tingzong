@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONObject
 
 /** Local, reviewed amendments. Never writes catalog or personal data to the server. */
-internal data class LocalCatalogCorrection(val before: Place, val after: Place) {
+internal data class LocalCatalogCorrection(val before: Place, val after: Place, val acceptedOriginalKinds: Set<String> = emptySet()) {
     init {
         require(before.id == after.id && before.scenes.size == 1 && after.scenes.size == 1)
         val old = before.scenes.single()
@@ -14,6 +14,7 @@ internal data class LocalCatalogCorrection(val before: Place, val after: Place) 
         require(after.latitude.isFinite() && after.latitude in -90.0..90.0)
         require(after.longitude.isFinite() && after.longitude in -180.0..180.0)
         require(before.radiusMeters == after.radiusMeters)
+        require(acceptedOriginalKinds.all { it in setOf("mv", "album", "lyric", "song_title", "movie_soundtrack") })
     }
 }
 
@@ -31,7 +32,7 @@ internal fun Catalog.withLocalCorrections(corrections: List<LocalCatalogCorrecti
         val correctedPosition = place.latitude == after.latitude && place.longitude == after.longitude
         if (!place.verified || !scene.publiclyVisible || (!originalPosition && !correctedPosition) ||
             scene.artistId != old.artistId || scene.work != old.work || scene.imageUrl != old.imageUrl ||
-            scene.kind !in setOf(old.kind, revised.kind) || scene.overlayEligible != old.overlayEligible ||
+            scene.kind !in (setOf(old.kind, revised.kind) + correction.acceptedOriginalKinds) || scene.overlayEligible != old.overlayEligible ||
             scene.canonicalWorkUrl !in setOf(old.canonicalWorkUrl, revised.canonicalWorkUrl)) return@map place
         val moved = before.latitude != after.latitude || before.longitude != after.longitude
         place.copy(name = after.name, latitude = after.latitude, longitude = after.longitude,
@@ -52,7 +53,8 @@ internal class BundledCatalogCorrections(context: Context) {
         val data = JSONObject(context.assets.open("design/music-space/catalog-local-corrections.json")
             .bufferedReader().use { it.readText() })
         data.getJSONArray("corrections").objects().map {
-            LocalCatalogCorrection(placeFromJson(it.getJSONObject("before")), placeFromJson(it.getJSONObject("after")))
+            LocalCatalogCorrection(placeFromJson(it.getJSONObject("before")), placeFromJson(it.getJSONObject("after")),
+                it.optJSONArray("acceptedOriginalKinds")?.strings()?.toSet().orEmpty())
         }
     }.getOrDefault(emptyList())
 

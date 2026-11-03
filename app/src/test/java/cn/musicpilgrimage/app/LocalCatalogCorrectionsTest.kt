@@ -59,4 +59,16 @@ class LocalCatalogCorrectionsTest {
         assertEquals("电影原声关联", scene.copy(kind = "movie_soundtrack", referenceKind = "film_frame").kindLabel)
         assertEquals("歌词提及", scene.copy(kind = "lyric", referenceKind = "lyric_mv_frame").kindLabel)
     }
+
+    @Test fun reviewedLegacyKindReceivesCorrectionButUnrelatedKindDoesNot() {
+        val bundledBefore = before.copy(scenes = listOf(scene.copy(kind = "movie_soundtrack")))
+        val amendment = LocalCatalogCorrection(bundledBefore, after, setOf("mv"))
+        val rawCloud = after.copy(scenes = listOf(scene))
+        val result = Catalog(listOf(rawCloud)).withLocalCorrections(listOf(amendment), true).places.single()
+        assertTrue(result.localCorrectionApplied)
+        assertFalse(result.arrivalLocationPendingSync)
+        assertEquals("movie_soundtrack", result.scenes.single().kind)
+        val unrelated = rawCloud.copy(scenes = listOf(scene.copy(kind = "album")))
+        assertEquals(unrelated, Catalog(listOf(unrelated)).withLocalCorrections(listOf(amendment), true).places.single())
+    }
 }

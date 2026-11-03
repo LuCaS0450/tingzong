@@ -40,7 +40,14 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
    }
    fields.value=RecordDraftRules.normalize(type,fields.value,item?.mediaId)
    initialized.value=true
+   if(type in setOf("visit","recreation"))try { refreshPendingLocation() }
+   catch(cancel:CancellationException){throw cancel}
+   catch(_:Exception){notice.value=ArrivalRules.locationUpdateMessage}
   }
+ }
+ private suspend fun refreshPendingLocation() {
+  val place=services.catalog.value.places.find{if(kind=="visit")it.id==target else it.scenes.any{s->s.id==target}}
+  if(place?.arrivalLocationPendingSync==true)services.refreshCatalog()
  }
  fun set(key:String,value:Any) {
   fields.value=RecordDraftRules.normalize(kind,JSONObject(fields.value.toString()).put(key,value),editing?.mediaId)
@@ -122,6 +129,7 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
   val local=payload.stringOrNull("local_photo")
   payload.remove("media_id")
   if(RecordDraftRules.requiresLocation(kind,editing!=null,local!=null)) {
+   refreshPendingLocation()
    val place=services.catalog.value.places.find{if(kind=="visit")it.id==target else it.scenes.any{s->s.id==target}} ?: error("地点不存在")
    check(!place.arrivalLocationPendingSync){ArrivalRules.locationUpdateMessage}
    notice.value="正在获取本次现场位置…"

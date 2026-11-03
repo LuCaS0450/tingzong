@@ -10,6 +10,26 @@ import java.time.LocalDate
 
 /** Exercises the real private asset pipeline without network calls or personal-store writes. */
 class LocalCatalogAssetsTest {
+    @Test fun actualCatalogPayloadClearsMovedArrivalGuards() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val encoded = InstrumentationRegistry.getArguments().getString("catalogBase64")
+        org.junit.Assume.assumeTrue("Requires the reviewed current catalog payload", encoded != null)
+        val raw = JSONObject(String(android.util.Base64.decode(requireNotNull(encoded), android.util.Base64.DEFAULT), Charsets.UTF_8))
+        if (!raw.has("artists")) raw.put("artists", org.json.JSONArray())
+        val catalog = BundledCatalogCorrections(context).apply(catalogFromJson(raw), fromCloud = true)
+        assertEquals(3, catalog.places.size)
+        assertTrue(catalog.places.all { it.localCorrectionApplied && !it.arrivalLocationPendingSync })
+        val manifest = JSONObject(context.assets.open("design/music-space/catalog-local-corrections.json").bufferedReader().use { it.readText() })
+        val expected = manifest.getJSONArray("corrections").objects().associate { row -> placeFromJson(row.getJSONObject("after")).let { it.id to it } }
+        catalog.places.forEach { place ->
+            val revised = expected.getValue(place.id)
+            assertEquals(revised.latitude, place.latitude, 0.0)
+            assertEquals(revised.longitude, place.longitude, 0.0)
+            assertEquals(revised.radiusMeters, place.radiusMeters)
+            assertNull(ArrivalRules.rejection(place, LocationFix(place.latitude, place.longitude, 10f, 1000, 0)))
+        }
+    }
+
     @Test fun reviewedCorrectionsAndAllReferenceImagesLoadWithoutChangingSavedIdentities() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         fun json(path: String) = JSONObject(context.assets.open(path).bufferedReader().use { it.readText() })
