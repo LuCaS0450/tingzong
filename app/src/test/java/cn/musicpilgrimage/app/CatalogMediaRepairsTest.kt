@@ -34,6 +34,13 @@ class CatalogMediaRepairsTest {
             .forEach { value -> assertEquals(catalog(value), catalog(value).withMediaRepairs(listOf(repair))) }
     }
 
+    @Test fun publishedPreviewStillDoesNotInventAPlaybackTime() {
+        val still = reference.copy(timestampSeconds = null, referenceKind = "film_preview")
+        val result = catalog().withMediaRepairs(listOf(repair.copy(reference = still))).places.single().scenes.single()
+        assertNull(result.timestampSeconds)
+        assertEquals("film_preview", result.referenceKind)
+    }
+
     @Test fun pendingScenesAndExplicitArtworkDecisionsStayAuthoritative() {
         val pending = scene.copy(verificationStatus = "pending")
         assertEquals(catalog(pending), catalog(pending).withMediaRepairs(listOf(repair)))

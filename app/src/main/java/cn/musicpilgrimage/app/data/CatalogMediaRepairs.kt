@@ -11,7 +11,7 @@ internal data class CatalogMediaRepair(
 
 internal data class SceneReferenceRepair(
     val imageUrl: String, val width: Int, val height: Int,
-    val sourceUrl: String, val timestampSeconds: Int, val credit: String, val referenceKind: String = "mv_frame"
+    val sourceUrl: String, val timestampSeconds: Int?, val credit: String, val referenceKind: String = "mv_frame"
 )
 
 internal fun Catalog.withMediaRepairs(repairs: List<CatalogMediaRepair>): Catalog {
@@ -47,8 +47,8 @@ internal class BundledCatalogMedia(context: Context) {
                 val path = "design/music-space/covers/$file"
                 context.assets.open(path).use { }
                 SceneReferenceRepair("file:///android_asset/$path", ref.getInt("width"), ref.getInt("height"),
-                    ref.getString("sourceUrl"), ref.getInt("timestampSeconds"), ref.getString("credit"), ref.optString("referenceKind", "mv_frame"))
-                    .also { require(it.width > 0 && it.height > 0 && it.timestampSeconds >= 0 && it.sourceUrl.startsWith("https://")) }
+                    ref.getString("sourceUrl"), if(ref.isNull("timestampSeconds"))null else ref.getInt("timestampSeconds"), ref.getString("credit"), ref.optString("referenceKind", "mv_frame"))
+                    .also { require(it.width > 0 && it.height > 0 && (it.timestampSeconds == null || it.timestampSeconds >= 0) && it.sourceUrl.startsWith("https://")) }
             }
             CatalogMediaRepair(row.getString("id"), row.getString("artistId"), row.getString("work"),
                 row.getString("originalImageUrl"), row.optJSONObject("artwork")?.let(::releaseArtworkFromJson), reference)

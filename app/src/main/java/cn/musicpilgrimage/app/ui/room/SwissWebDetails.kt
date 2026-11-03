@@ -100,7 +100,7 @@ internal class SwissDetailMedia(private val context:Context) {
         .put("artist",scene?.artistName.orEmpty()).put("kind",scene?.kind.orEmpty()).put("associationLabel",scene?.kindLabel.orEmpty())
         .put("source",scene?.sourceUrl.orEmpty()).put("credit",scene?.imageCredit.orEmpty())
         .put("timestamp",scene?.timestampSeconds?:JSONObject.NULL).put("arrivalNote","")
-        .put("mediaLabel",when {scene?.referenceKind=="soundtrack_mv_frame"->"原声曲目 MV · 非此地取景";scene?.referenceKind=="lyric_mv_frame"->"歌词关联 · MV 画面";scene?.referenceKind=="film_frame"->"电影原片";scene?.referenceKind=="release_cover"->"正式发行封面";scene?.referenceKind=="album_photo"->"专辑内页";scene?.kindLabel?.startsWith("官方现场")==true->"官方现场画面";else->"MV 画面"})
+        .put("mediaLabel",when {scene?.referenceKind=="film_preview"->"电影片段公开预览图";scene?.referenceKind=="soundtrack_mv_frame"->"原声曲目 MV · 非此地取景";scene?.referenceKind=="lyric_mv_frame"->"歌词关联 · MV 画面";scene?.referenceKind=="film_frame"->"电影原片";scene?.referenceKind=="release_cover"->"正式发行封面";scene?.referenceKind=="album_photo"->"专辑内页";scene?.kindLabel?.startsWith("官方现场")==true->"官方现场画面";else->"MV 画面"})
 }
 
 internal fun swissDetailData(page:String,id:String)=JSONObject().put("page",page).put("identity","$page:$id")
