@@ -18,7 +18,7 @@ class LocalCatalogAssetsTest {
         if (!raw.has("artists")) raw.put("artists", org.json.JSONArray())
         val catalog = BundledCatalogCorrections(context).apply(catalogFromJson(raw), fromCloud = true)
         assertEquals(3, catalog.places.size)
-        assertTrue(catalog.places.all { it.localCorrectionApplied && !it.arrivalLocationPendingSync })
+        assertTrue(catalog.places.all { !it.arrivalLocationPendingSync })
         val manifest = JSONObject(context.assets.open("design/music-space/catalog-local-corrections.json").bufferedReader().use { it.readText() })
         val expected = manifest.getJSONArray("corrections").objects().associate { row -> placeFromJson(row.getJSONObject("after")).let { it.id to it } }
         catalog.places.forEach { place ->

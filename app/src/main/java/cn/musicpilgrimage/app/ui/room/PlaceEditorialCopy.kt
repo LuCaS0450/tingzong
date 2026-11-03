@@ -2,6 +2,7 @@ package cn.musicpilgrimage.app.ui.room
 
 import android.content.Context
 import cn.musicpilgrimage.app.data.Place
+import cn.musicpilgrimage.app.data.Scene
 import cn.musicpilgrimage.app.data.heading
 import org.json.JSONObject
 
@@ -13,7 +14,7 @@ internal object PlaceEditorialCopy {
         return all.optJSONObject(id)
     }
     fun name(context:Context,place:Place)=if(place.localCorrectionApplied)place.heading().title else row(context,place.id)?.optString("name")?.takeIf{it.isNotBlank()}?:place.heading().title
-    fun intro(context:Context,place:Place):String = if(place.localCorrectionApplied)place.description else row(context,place.id)?.optString("intro")?.takeIf{it.isNotBlank()}?:run {
+    fun intro(context:Context,place:Place,scene:Scene?=null):String = if(scene?.publiclyVisible==true&&scene.editorialIntro.isNotBlank())scene.editorialIntro else if(place.localCorrectionApplied)place.description else row(context,place.id)?.optString("intro")?.takeIf{it.isNotBlank()}?:run {
         val scene=place.scenes.firstOrNull{it.publiclyVisible}
         if(scene==null)""else when(scene.kind){"lyric"->"《${scene.work}》的歌词提到了${name(context,place)}。";"song_title"->"《${scene.work}》以${name(context,place)}为题。";"album"->"《${scene.work}》的发行封面与这里有关。";"movie_soundtrack"->"《${scene.work}》通过电影原声与这里关联。";else->"《${scene.work}》的影像在这里取景。"}
     }

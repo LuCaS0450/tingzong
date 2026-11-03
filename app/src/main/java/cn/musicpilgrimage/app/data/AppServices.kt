@@ -43,7 +43,8 @@ class AppServices(context:Context) {
  val recovery=MutableStateFlow(false)
  private val bundledMedia=BundledCatalogMedia(app)
  private val bundledCorrections=BundledCatalogCorrections(app)
- val catalog=MutableStateFlow(bundledMedia.apply(bundledCorrections.apply(catalogFromJson(JSONObject(app.assets.open("catalog.json").bufferedReader().use { it.readText() })))))
+ private val bundledCatalog=bundledMedia.apply(bundledCorrections.apply(catalogFromJson(JSONObject(app.assets.open("catalog.json").bufferedReader().use { it.readText() }))))
+ val catalog=MutableStateFlow(bundledCatalog)
  val cloudCatalog=MutableStateFlow(false)
  val client=if(BuildConfig.SUPABASE_URL.isNotBlank() && BuildConfig.SUPABASE_ANON_KEY.isNotBlank()) createSupabaseClient(BuildConfig.SUPABASE_URL,BuildConfig.SUPABASE_ANON_KEY) {
   install(Auth) {
@@ -107,7 +108,9 @@ class AppServices(context:Context) {
   val result=call(action,payload,expectedOwner);changed.update { it+1 };return result
  }
  suspend fun refreshCatalog() {
-  catalog.value=bundledMedia.apply(bundledCorrections.apply(catalogFromJson(call("catalog") as JSONObject),fromCloud=true));cloudCatalog.value=true
+  val response=call("catalog") as JSONObject
+  val refreshed=withContext(Dispatchers.Default){bundledMedia.apply(bundledCorrections.apply(catalogFromJson(response),fromCloud=true)).inBundledOrder(bundledCatalog)}
+  catalog.value=refreshed;cloudCatalog.value=true
  }
  suspend fun signIn(email:String,password:String) {
   authMutation.withLock {

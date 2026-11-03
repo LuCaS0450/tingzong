@@ -11,6 +11,7 @@ import cn.musicpilgrimage.app.data.RemovedMusicFavorite
 import cn.musicpilgrimage.app.performance.LibraryDatabase
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 data class MusicFavoriteUndo(val token: Long, val label: String)
 
 class MusicSpaceViewModel(private val app: Application) : AndroidViewModel(app) {
@@ -32,6 +33,12 @@ class MusicSpaceViewModel(private val app: Application) : AndroidViewModel(app) 
     private var removed: RemovedMusicFavorite? = null
     private var sequence = 0L
     init {
+        viewModelScope.launch {
+            services.authReady.first { it }
+            try { services.repositories.catalog.refresh() }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { /* Keep the bundled reviewed catalog when offline. */ }
+        }
         viewModelScope.launch { services.userId.collect { favoriteState.value = readFavorites();recentMutable.value=contextPreferences.getString("${ownerKey()}:work",null);removed=null;undoState.value=null } }
         viewModelScope.launch {services.library.changes.collect{favoriteState.value=readFavorites()}}
     }

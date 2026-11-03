@@ -41,6 +41,22 @@ class CatalogMediaRepairsTest {
         assertEquals("film_preview", result.referenceKind)
     }
 
+    @Test fun databaseOrderingDoesNotMoveThePreviouslyVisibleShelfAlbums() {
+        val first = catalog().places.single().copy(scenes = listOf(scene, scene.copy(id = "second", work = "第二首")))
+        val last = first.copy(id = "last", scenes = listOf(scene.copy(id = "third", work = "第三首")))
+        val bundled = Catalog(listOf(first, last))
+        val remote = bundled.copy(places = listOf(last, first.copy(scenes = first.scenes.reversed())))
+        val arranged = remote.inBundledOrder(bundled)
+        assertEquals(MusicCatalogue.from(bundled).releases.map { it.id }, MusicCatalogue.from(arranged).releases.map { it.id })
+    }
+
+    @Test fun stableOrderingDoesNotRestoreWithdrawnRowsOrDropNewRows() {
+        val bundled = catalog()
+        val newPlace = bundled.places.single().copy(id = "new", scenes = listOf(scene.copy(id = "new-scene")))
+        val remote = Catalog(listOf(newPlace))
+        assertEquals(remote, remote.inBundledOrder(bundled))
+    }
+
     @Test fun pendingScenesAndExplicitArtworkDecisionsStayAuthoritative() {
         val pending = scene.copy(verificationStatus = "pending")
         assertEquals(catalog(pending), catalog(pending).withMediaRepairs(listOf(repair)))

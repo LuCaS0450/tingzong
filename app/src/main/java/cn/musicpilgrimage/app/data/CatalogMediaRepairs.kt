@@ -3,6 +3,15 @@ package cn.musicpilgrimage.app.data
 import android.content.Context
 import org.json.JSONObject
 
+/** Preserve the approved shelf arrangement when the API returns rows ordered by database ID. */
+internal fun Catalog.inBundledOrder(bundled: Catalog): Catalog {
+    val placesByOrder = bundled.places.mapIndexed { index, place -> place.id to index }.toMap()
+    val scenesByOrder = bundled.places.flatMap { it.scenes }.mapIndexed { index, scene -> scene.id to index }.toMap()
+    return copy(places = places.sortedBy { placesByOrder[it.id] ?: Int.MAX_VALUE }.map { place ->
+        place.copy(scenes = place.scenes.sortedBy { scenesByOrder[it.id] ?: Int.MAX_VALUE })
+    })
+}
+
 /** Reviewed local media repairs; cloud visibility and geographic/business data stay authoritative. */
 internal data class CatalogMediaRepair(
     val sceneId: String, val artistId: String, val work: String, val originalImageUrl: String,

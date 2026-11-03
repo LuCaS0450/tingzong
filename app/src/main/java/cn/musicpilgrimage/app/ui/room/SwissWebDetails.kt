@@ -96,7 +96,7 @@ internal class SwissDetailMedia(private val context:Context) {
     }
     fun place(place:Place,scene:Scene?=place.mapScene()):JSONObject=JSONObject()
         .put("id",place.id).put("name",PlaceEditorialCopy.name(context,place)).put("city",place.city).put("country",place.country)
-        .put("description",PlaceEditorialCopy.intro(context,place)).put("image",scene(scene)).put("work",scene?.work.orEmpty())
+        .put("description",PlaceEditorialCopy.intro(context,place,scene)).put("image",scene(scene)).put("work",scene?.work.orEmpty())
         .put("artist",scene?.artistName.orEmpty()).put("kind",scene?.kind.orEmpty()).put("associationLabel",scene?.kindLabel.orEmpty())
         .put("source",scene?.sourceUrl.orEmpty()).put("credit",scene?.imageCredit.orEmpty())
         .put("timestamp",scene?.timestampSeconds?:JSONObject.NULL).put("arrivalNote","")

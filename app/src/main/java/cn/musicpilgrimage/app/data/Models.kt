@@ -14,7 +14,7 @@ data class Scene(val id:String,val artistId:String,val artistName:String,val wor
  val referenceKind:String = "mv_frame",val releaseYear:Int? = null,val releaseType:String? = null,
  val associationPrecision:String = "unverified",val arrivalAnchorNote:String = "",val associationExcerpt:String = "",
  val canonicalWorkUrl:String = "",val verificationStatus:String = "pending",val overlayEligible:Boolean = false,
- val imageWidth:Int? = null,val imageHeight:Int? = null,val thumbnailUrl:String? = null,val aliases:List<String> = emptyList(),val displayArtwork:ReleaseArtwork? = null,val sourceVersionTitle:String = "",val associationSourceUrl:String = "") {
+ val imageWidth:Int? = null,val imageHeight:Int? = null,val thumbnailUrl:String? = null,val aliases:List<String> = emptyList(),val displayArtwork:ReleaseArtwork? = null,val sourceVersionTitle:String = "",val associationSourceUrl:String = "",val editorialIntro:String = "") {
  val imageApproved get()=imageStatus=="approved" && !imageUrl.isNullOrBlank() && imageWidth!=null && imageHeight!=null && imageWidth>0 && imageHeight>0
  val publiclyVisible get()=verificationStatus=="verified" && imageStatus=="approved"
  val canRecreate get()=imageApproved && verificationStatus=="verified" && overlayEligible && kind in setOf("mv","album") && associationPrecision !in setOf("city","region","unverified")
