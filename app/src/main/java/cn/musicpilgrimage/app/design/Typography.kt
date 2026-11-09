@@ -1,23 +1,28 @@
 package cn.musicpilgrimage.app.design
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.R
 
-/** Retain the legacy resource for compatibility; every active interface uses a sans serif face. */
-internal val PixelFont=FontFamily(Font(R.font.fusion_pixel,FontWeight.Normal))
-internal val InstrumentFont=FontFamily.SansSerif
-internal val PrintFont=FontFamily.SansSerif
+// Android supplies locale-appropriate CJK and other glyphs outside Inter's coverage.
+@OptIn(ExperimentalTextApi::class)
+private val SwissFont = FontFamily(
+    listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { weight ->
+        Font(R.font.inter_variable, weight, variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)))
+    }
+)
 
 internal fun physicalTypography():Typography {
     val base=Typography()
-    fun androidx.compose.ui.text.TextStyle.pixel()=copy(fontFamily=FontFamily.SansSerif,fontWeight=FontWeight.Normal,
+    fun TextStyle.swiss()=copy(fontFamily=SwissFont,fontWeight=FontWeight.Normal,
         fontSynthesis=FontSynthesis.None,letterSpacing=0.sp)
     return Typography(
-        displayLarge=base.displayLarge.pixel(),displayMedium=base.displayMedium.pixel(),displaySmall=base.displaySmall.pixel(),
-        headlineLarge=base.headlineLarge.pixel(),headlineMedium=base.headlineMedium.pixel(),headlineSmall=base.headlineSmall.pixel(),
-        titleLarge=base.titleLarge.pixel(),titleMedium=base.titleMedium.pixel(),titleSmall=base.titleSmall.pixel(),
-        bodyLarge=base.bodyLarge.pixel(),bodyMedium=base.bodyMedium.pixel(),bodySmall=base.bodySmall.pixel(),
-        labelLarge=base.labelLarge.pixel(),labelMedium=base.labelMedium.pixel(),labelSmall=base.labelSmall.pixel())
+        displayLarge=base.displayLarge.swiss(),displayMedium=base.displayMedium.swiss(),displaySmall=base.displaySmall.swiss(),
+        headlineLarge=base.headlineLarge.swiss(),headlineMedium=base.headlineMedium.swiss(),headlineSmall=base.headlineSmall.swiss(),
+        titleLarge=base.titleLarge.swiss(),titleMedium=base.titleMedium.swiss(),titleSmall=base.titleSmall.swiss(),
+        bodyLarge=base.bodyLarge.swiss(),bodyMedium=base.bodyMedium.swiss(),bodySmall=base.bodySmall.swiss(),
+        labelLarge=base.labelLarge.swiss(),labelMedium=base.labelMedium.swiss(),labelSmall=base.labelSmall.swiss())
 }

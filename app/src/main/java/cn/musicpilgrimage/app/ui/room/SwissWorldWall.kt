@@ -196,6 +196,7 @@ private class WorldResources(private val context: Context, private val media: Ma
                 path.startsWith("provider/") -> remote("https://api.maptiler.com/" + path.removePrefix("provider/") + (uri.encodedQuery?.let { "?$it" } ?: ""))
                 path.startsWith("media/") -> image(media[path.removePrefix("media/")] ?: return unavailable())
                 path == "font.woff2" -> asset("design/swiss-details/fonts/swiss-sans.woff2", "font/woff2")
+                path == "inter-variable.woff2" -> asset("design/swiss-details/fonts/inter-variable.woff2", "font/woff2")
                 else -> asset("design/swiss-world/$path", mime(path))
             }
         }.getOrElse { unavailable() }

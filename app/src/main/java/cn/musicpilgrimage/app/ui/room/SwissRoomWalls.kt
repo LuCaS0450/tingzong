@@ -77,7 +77,7 @@ internal val SwissWallMuted=Color(0xFF5C625C)
     Row(Modifier.fillMaxWidth().height(112.dp).padding(start=26.dp,end=16.dp),verticalAlignment=Alignment.CenterVertically) {
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(9.dp)) {
             Text(listOf("01 / MUSIC","02 / WORLD","03 / PLAY","04 / PERSONAL")[section],color=SwissRed,fontSize=11.sp,letterSpacing=1.8.sp,fontWeight=FontWeight.Medium)
-            Text(listOf("唱片架","地图与旅行","演奏","我的空间")[section],fontSize=32.sp,lineHeight=38.sp,fontWeight=FontWeight.Bold,color=SwissInk)
+            Text(listOf("唱片架","地图与旅行","演奏","我的空间")[section],fontSize=32.sp,lineHeight=38.sp,fontWeight=FontWeight.Bold,letterSpacing=(-.45).sp,color=SwissInk)
         }
         IconButton(onSearch,Modifier.size(48.dp).testTag("room-search-button")){Icon(Icons.Outlined.Search,"搜索歌曲",Modifier.size(24.dp),tint=RoomColors.Ink)}
     }
@@ -151,10 +151,11 @@ internal val SwissWallMuted=Color(0xFF5C625C)
                 Row(Modifier.fillMaxWidth().padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
                     RoomCover(artwork(entry.song),entry.song.title,Modifier.size(62.dp))
                     Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                        Text(entry.song.title,color=SwissInk,fontSize=17.sp,fontWeight=FontWeight.Medium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        Text(entry.song.title,color=SwissInk,fontSize=17.sp,lineHeight=21.sp,fontWeight=FontWeight.SemiBold,
+                            letterSpacing=(-.2).sp,maxLines=2,overflow=TextOverflow.Ellipsis)
                         Text(entry.song.artist,color=SwissWallMuted,fontSize=12.sp)
                         val duration="${entry.song.durationUs/60_000_000}:${(entry.song.durationUs/1_000_000%60).toString().padStart(2,'0')}"
-                        Text(if(entry.audioReady)"$duration · 离线就绪" else status?.label?:"$duration · 等待自动准备",color=if(status?.failed==true)SwissRed else SwissWallMuted,fontSize=11.sp,maxLines=1)
+                        Text(if(entry.audioReady)"$duration · 离线就绪" else status?.label?:"$duration · 等待自动准备",color=if(status?.failed==true)SwissRed else SwissWallMuted,fontSize=11.sp,letterSpacing=.15.sp,maxLines=1)
                     }
                     Icon(Icons.Outlined.PlayArrow,"演奏${entry.song.title}",Modifier.size(22.dp),tint=SwissInk)
                 }

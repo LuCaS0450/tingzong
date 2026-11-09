@@ -29,7 +29,9 @@ FONTS = {
     'app/src/main/res/font/instrument_sans.otf',
     'app/src/main/res/font/print_serif.otf',
     'app/src/main/res/font/fusion_pixel.otf',
+    'app/src/main/res/font/inter_variable.ttf',
     'app/src/main/assets/design/swiss-details/fonts/swiss-sans.woff2',
+    'app/src/main/assets/design/swiss-details/fonts/inter-variable.woff2',
 }
 LAUNCHER_ARTWORK = {
     'app/src/main/design/launcher/tingzong-pin-note.svg',

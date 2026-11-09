@@ -9,6 +9,7 @@ import android.webkit.WebViewClient
 import android.webkit.WebChromeClient
 import android.webkit.ConsoleMessage
 import android.webkit.WebResourceError
+import android.webkit.WebResourceResponse
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.*
 import org.json.JSONArray
 import org.json.JSONObject
+
+private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
 
 /** The approved HTML/CSS is the rendering source of truth; data and actions remain native. */
 @SuppressLint("SetJavaScriptEnabled")
@@ -55,6 +58,17 @@ import org.json.JSONObject
             }
         },"TingzongDetail")
         webViewClient=object:WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                // The file-backed document needs a CORS-enabled origin for bundled web fonts.
+                val name = when (request.url.toString()) {
+                    DetailFontOrigin + "inter-variable.woff2" -> "inter-variable.woff2"
+                    DetailFontOrigin + "swiss-sans.woff2" -> "swiss-sans.woff2"
+                    else -> return null
+                }
+                return WebResourceResponse("font/woff2", null, 200, "OK",
+                    mapOf("Access-Control-Allow-Origin" to "*"), context.assets.open("design/swiss-details/fonts/$name"))
+            }
+
             override fun onPageFinished(view:WebView,url:String) {
                 if(url!="file:///android_asset/design/swiss-details/index.html")return
                 android.util.Log.d("SwissDetail","Approved local page ready")

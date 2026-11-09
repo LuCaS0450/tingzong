@@ -1,6 +1,7 @@
+@font-face{font-family:Inter;src:url('inter-variable.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:swap}
 /* Opus 2026-10-30 tokens and geometry. Android owns safe areas and bottom tabs. */
 @font-face{font-family:Swiss;src:url('font.woff2') format('woff2');font-display:swap}
-:root{--paper:#f7f6f2;--wall:#eeede7;--wall-surface:linear-gradient(#eeede799,#eeede799),url('canvas-warm-white.webp') 0 0/480px var(--wall);--ink:#242b27;--muted:#5c625c;--faint:#9a9e95;--line:#d8d8d0;--red:#bd382b;--ocean:#76acc2;--ground:#ecebe4;font-family:Swiss,'Noto Sans SC',sans-serif;color:var(--ink);font-synthesis:none}
+:root{--paper:#f7f6f2;--wall:#eeede7;--wall-surface:linear-gradient(#eeede799,#eeede799),url('canvas-warm-white.webp') 0 0/480px var(--wall);--ink:#242b27;--muted:#5c625c;--faint:#9a9e95;--line:#d8d8d0;--red:#bd382b;--ocean:#76acc2;--ground:#ecebe4;font-family:Inter,Swiss,'Noto Sans SC',sans-serif;color:var(--ink);font-synthesis:none}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}button,input{font:inherit;color:inherit}button{border:0;background:none;cursor:pointer;padding:0;touch-action:manipulation}button:active{opacity:.64}button:focus-visible{outline:2px solid var(--red);outline-offset:2px}button:disabled{opacity:.38}svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:square;stroke-linejoin:miter;display:block}[hidden]{display:none!important}
 #world{width:100%;height:100%;position:relative;overflow:hidden;isolation:isolate;background:var(--wall-surface)}
 #header{height:128px;position:absolute;inset:0 0 auto;padding:22px 22px 0;z-index:8;pointer-events:none;background:var(--wall-surface)}

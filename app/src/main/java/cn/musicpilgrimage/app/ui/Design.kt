@@ -51,8 +51,8 @@ internal val Line=Color(0xFFD8D8D0)
   onSurfaceVariant=Muted,outline=Line,outlineVariant=Line,error=Color(0xFF932119),surfaceTint=Color.Transparent),
   shapes=Shapes(RoundedCornerShape(0.dp),RoundedCornerShape(0.dp),RoundedCornerShape(0.dp),RoundedCornerShape(0.dp),RoundedCornerShape(0.dp)),
   typography=physicalTypography().let { t -> t.copy(
-   headlineLarge=t.headlineLarge.copy(fontSize=27.sp,lineHeight=35.sp,fontWeight=FontWeight.SemiBold),
-   titleLarge=t.titleLarge.copy(fontSize=21.sp,lineHeight=28.sp),
+   headlineLarge=t.headlineLarge.copy(fontSize=27.sp,lineHeight=35.sp,fontWeight=FontWeight.SemiBold,letterSpacing=(-.4).sp),
+   titleLarge=t.titleLarge.copy(fontSize=21.sp,lineHeight=28.sp,fontWeight=FontWeight.Medium,letterSpacing=(-.2).sp),
    bodyLarge=t.bodyLarge.copy(fontSize=16.sp,lineHeight=24.sp),bodyMedium=t.bodyMedium.copy(fontSize=16.sp,lineHeight=24.sp),
    bodySmall=t.bodySmall.copy(fontSize=13.sp,lineHeight=20.sp)) },content=content)
  }
@@ -143,7 +143,7 @@ internal val Line=Color(0xFFD8D8D0)
  IconButton(onClick,enabled=enabled){Icon(icon,description,tint=if(selected)Acid else Muted)}
 }
 @Composable internal fun Avatar(name:String,id:String,modifier:Modifier=Modifier) {
-  BauhausPanel(modifier.size(52.dp)) {Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Text(name.take(1).ifBlank{"听"},fontFamily=PrintFont,fontWeight=FontWeight.SemiBold,color=Ink)}}
+  BauhausPanel(modifier.size(52.dp)) {Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Text(name.take(1).ifBlank{"听"},fontWeight=FontWeight.SemiBold,color=Ink)}}
 }
 @Composable internal fun ExternalLink(label:String,url:String) {
  val context=LocalContext.current
