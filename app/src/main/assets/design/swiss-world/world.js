@@ -88,7 +88,8 @@
     } else {
       const r=count>=10?15:13;
       c.shadowColor='rgba(36,43,39,.2)';c.shadowBlur=1.5;c.shadowOffsetY=1;
-      c.beginPath();c.arc(24,24,r,0,Math.PI*2);c.fillStyle=gradient;c.fill();c.strokeStyle='#f7f6f2';c.lineWidth=2;c.stroke();c.shadowColor='transparent';
+      // Cluster sprites are scaled up relative to pins. Match their visible edge thickness.
+      c.beginPath();c.arc(24,24,r,0,Math.PI*2);c.fillStyle=gradient;c.fill();c.strokeStyle='#f7f6f2';c.lineWidth=.7;c.stroke();c.shadowColor='transparent';
       c.font=`600 ${count>=100?11:12}px Swiss, sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillStyle='#f7f6f2';c.fillText(String(count),24,24.5);
       const half=r+4;
       return c.getImageData((24-half)*scale,(24-half)*scale,2*half*scale,2*half*scale);
@@ -102,19 +103,12 @@
     if (!['pin','visited','selected','cluster'].includes(kind) || (kind==='cluster' && !(count>=2 && count<=places.length))) return;
     map.addImage(id,makeImage(kind,count),{pixelRatio:2});imageNames.add(id);
   }
-  function graticule() {
-    const features=[];
-    for(let lon=-180;lon<180;lon+=15){const coordinates=[];for(let lat=-80;lat<=80;lat+=2)coordinates.push([lon,lat]);features.push({type:'Feature',geometry:{type:'LineString',coordinates},properties:{}});}
-    for(let lat=-75;lat<=75;lat+=15){const coordinates=[];for(let lon=-180;lon<=180;lon+=2)coordinates.push([lon,lat]);features.push({type:'Feature',geometry:{type:'LineString',coordinates},properties:{}});}
-    return {type:'FeatureCollection',features};
-  }
   function baseStyle() {
     return {version:8,projection:{type:'globe'},
       // A resident z0 tile covers the whole sphere while the detail source changes LOD.
       sources:{'earth-base':{type:'raster',tiles:[new URL('earth/0/0/0.jpg?v=2',location.href).href],tileSize:512,minzoom:0,maxzoom:0},
         earth:{type:'raster',tiles:[new URL('earth/{z}/{x}/{y}.jpg?v=2',location.href).href.replaceAll('%7B','{').replaceAll('%7D','}')],tileSize:512,minzoom:0,maxzoom:3},
         'earth-hd':{type:'raster',tiles:['opus-earth://{z}/{x}/{y}'],tileSize:256,minzoom:3,maxzoom:9},
-        grid:{type:'geojson',data:graticule()},
         places:{type:'geojson',data:featureSet(places.filter(p=>p.id!==selected)),cluster:true,clusterRadius:32,clusterMaxZoom:17,clusterMinPoints:2},
         selection:{type:'geojson',data:byId.has(selected)?featureSet([byId.get(selected)]):empty}},
       layers:[
@@ -122,7 +116,6 @@
         {id:'earth-base',type:'raster',source:'earth-base',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],5,1,8,0],'raster-fade-duration':0,'raster-resampling':'linear'}},
         {id:'earth',type:'raster',source:'earth',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
         {id:'earth-hd',type:'raster',source:'earth-hd',minzoom:1.25,maxzoom:8,paint:{'raster-opacity':['interpolate',['linear'],['zoom'],1.25,0,1.75,1,5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
-        {id:'graticule',type:'line',source:'grid',maxzoom:5,paint:{'line-color':'#ffffff','line-width':.5,'line-opacity':['interpolate',['linear'],['zoom'],0,.16,3,.16,5,0]}},
         // MapLibre places these layers in reverse order. Only the selected pin reserves space.
         {id:'clusters',type:'symbol',source:'places',filter:['has','point_count'],layout:{'icon-image':['concat','cluster-',['to-string',['get','point_count']]],'icon-padding':[0],'icon-ignore-placement':true,'icon-size':['interpolate',['linear'],['zoom'],0,.84,5,1]}},
         {id:'pins',type:'symbol',source:'places',filter:['!',['has','point_count']],layout:{'icon-image':['case',['get','visited'],'visited','pin'],'icon-size':['interpolate',['linear'],['zoom'],0,.60,3,.60,7,.75],'icon-anchor':'bottom','icon-offset':[0,1],'icon-padding':[0],'icon-ignore-placement':true}},
@@ -243,7 +236,6 @@
   function globeBounds() {
     // Project tangent endpoints to determine the exact renderer sphere bounds (not a second pin projection).
     const tr=map.transform;
-    const width=$('stage').clientWidth,height=$('stage').clientHeight;
     const R=tr.worldSize/(2*Math.PI*Math.max(.087,Math.cos(radians(map.getCenter().lat))));
     const radius=R/Math.sqrt(1+2*R/tr.cameraToCenterDistance);
     return {x:tr.centerPoint.x,y:tr.centerPoint.y,r:radius};
@@ -259,9 +251,10 @@
     const name=z>=13?'街道':z>=7?'城市':z>=3?'国家':'地球';
     $('level').textContent=name;
     $('level').style.top=`${clamp((15-z)/14.5,0,1)*72+4}px`;
-    for(const id of ['halo','light','shadow'])$(id).hidden=z>=4;
+    $('halo').hidden=$('shadow').hidden=z>=4;
     if(z<4){const g=globeBounds();
-      for(const id of ['halo','light']){const e=$(id);e.style.width=`${g.r*2}px`;e.style.height=`${g.r*2}px`;e.style.left=`${g.x-g.r}px`;e.style.top=`${g.y-g.r}px`;e.style.opacity=String(clamp(1-(z-2)/2,0,1));}
+      const halo=$('halo');
+      halo.style.width=halo.style.height=`${g.r*2}px`;halo.style.left=`${g.x-g.r}px`;halo.style.top=`${g.y-g.r}px`;halo.style.opacity=String(clamp(1-(z-2)/2,0,1));
       $('shadow').style.top=`${g.y+g.r+14}px`;$('shadow').style.opacity=String(clamp(1-z/3,0,1));
     }
     if(earthPreview&&!earthPreview.hidden&&z<4){const g=globeBounds(),p=$('globe-preview');p.style.width=`${g.r*2}px`;p.style.height=`${g.r*2}px`;p.style.left=`${g.x-g.r}px`;p.style.top=`${g.y-g.r}px`;earthPreview.draw();}
@@ -397,7 +390,7 @@
     const cityCount=new Set(places.map(p=>`${p.country}/${p.city}`)).size;
     $('count').textContent=`${cityCount} 座城市 / ${places.length} 个地点`;
     layoutCompact=Number(saved.zoom)>=3;root.classList.toggle('compact',layoutCompact);
-    earthTiles=TingzongEarthTiles();focusLayer=TingzongFocusLayer();selectedPin=TingzongSelectedPin();
+    earthTiles=TingzongEarthTiles();focusLayer=TingzongFocusLayer(globeBounds);selectedPin=TingzongSelectedPin();
     maplibregl.setWorkerCount(2);
     const bottomPadding=Math.max(0,$('stage').clientHeight-2*($('stage').clientWidth*352/360-64));
     map=new maplibregl.Map({container:'map',style:baseStyle(),center:[Number.isFinite(saved.longitude)?saved.longitude:35,Number.isFinite(saved.latitude)?clamp(saved.latitude,-80,80):24],
@@ -417,7 +410,7 @@
       // Use the primitive projection so rendering and gesture solving both use 6 - zoom.
       map.setProjection({type:['interpolate',['linear'],['zoom'],5,'vertical-perspective',6,'mercator']});
       map.jumpTo(initialCamera);
-      map.addLayer(focusLayer,'graticule');
+      map.addLayer(focusLayer,'clusters');
       ['pin','visited','selected'].forEach(addImage);
       for(let count=2;count<=Math.min(20,places.length);count++)addImage(`cluster-${count}`);
       renderSummary();wireControls();controlsReady=true;updateVisual();
