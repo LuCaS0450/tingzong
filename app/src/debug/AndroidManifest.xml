@@ -9,11 +9,11 @@
             android:theme="@style/Theme.MusicPilgrimage" />
         <activity android:name="cn.musicpilgrimage.app.piano.PianoPilotActivity"
             android:exported="true" android:label="听踪 · 钢琴试奏"
-            android:theme="@style/Theme.MusicPilgrimage" android:icon="@drawable/ic_launcher">
+            android:theme="@style/Theme.MusicPilgrimage">
         </activity>
         <activity android:name="cn.musicpilgrimage.app.performance.RhythmComparisonActivity"
             android:exported="true" android:label="听踪 · 节奏体验"
-            android:theme="@style/Theme.MusicPilgrimage" android:icon="@drawable/ic_launcher">
+            android:theme="@style/Theme.MusicPilgrimage">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

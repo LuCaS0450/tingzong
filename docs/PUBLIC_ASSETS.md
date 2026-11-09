@@ -12,6 +12,7 @@
 | Natural Earth 国家轮廓 | `app/src/main/assets/design/swiss-world/countries.json` | 复用既有 Natural Earth 1:110m 国家边界与简体中文名称，按 [Natural Earth 条款](https://www.naturalearthdata.com/about/terms-of-use/) 属于公有领域；仅裁出层级路径用的多边形与名称，不参与地点坐标、到访或认证判定。 |
 | OpenCC 简繁字词字典 | `app/src/main/assets/design/map-labels/` | [OpenCC ver.1.1.9](https://github.com/BYVoid/OpenCC/tree/ver.1.1.9/data/dictionary)，Apache 2.0；保留 LICENSE 和原来源说明。 |
 | Salamander Grand Piano 采样 | `app/src/main/assets/performance/piano/` | [Alexander Holm，Salamander Grand Piano](https://github.com/sfzinstruments/SalamanderGrandPiano)，[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/)；保留 LICENSE 与 `samples.json` 中的作者和来源。项目取一组力度层，转为单声道、裁剪起始静音与最长时长，并编码为 gzip 容器中的浮点 PCM。这不是商业歌曲录音。 |
+| 听踪启动图标 | `app/src/main/design/launcher/tingzong-pin-note.svg`、`app/src/main/res/drawable-xxxhdpi/launcher_{background,foreground}.png` | 项目自有图标，按用户确认的音符与定位点方案矢量重绘。Android 的前景与背景均由该 SVG 渲染。使用 `resvg-py==0.5.0` 运行 `python app/src/main/design/launcher/render.py` 可重新生成两层。 |
 
 字体 manifest 位于 `app/src/main/assets/design/fonts/manifest.json`。完整第三方许可证随对应目录保存，本说明不替换原文。
 

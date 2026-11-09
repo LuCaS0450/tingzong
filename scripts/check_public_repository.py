@@ -31,6 +31,11 @@ FONTS = {
     'app/src/main/res/font/fusion_pixel.otf',
     'app/src/main/assets/design/swiss-details/fonts/swiss-sans.woff2',
 }
+LAUNCHER_ARTWORK = {
+    'app/src/main/design/launcher/tingzong-pin-note.svg',
+    'app/src/main/res/drawable-xxxhdpi/launcher_background.png',
+    'app/src/main/res/drawable-xxxhdpi/launcher_foreground.png',
+}
 TEXT = {'.md', '.py', '.ps1', '.js', '.mjs', '.ts', '.kt', '.kts', '.txt',
         '.json', '.toml', '.pro', '.xml', '.sh', '.bat', '.cmd', '.properties',
         '.html', '.css', '.sql', '.h', '.hpp', '.c', '.cpp', '.yml', '.yaml'}
@@ -97,7 +102,7 @@ def path_problem(path):
     if path.startswith(assets + 'design/swiss-details/media/'):
         return 'private photograph'
     suffix = PurePosixPath(path).suffix.lower()
-    if suffix in MEDIA and not (path in FONTS or
+    if suffix in MEDIA and not (path in FONTS or path in LAUNCHER_ARTWORK or
             path.startswith(assets + 'performance/piano/') and suffix == '.pcmz'):
         return 'media without approved distribution record'
     if suffix == '.jar' and path != 'gradle/wrapper/gradle-wrapper.jar':
