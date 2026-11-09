@@ -162,7 +162,24 @@ try {
         Set-TaskPreviewWindow
         # Restoring an older snapshot can hang before ADB is online. Cold boot keeps user data.
         $taskArguments=@('-avd',$Avd,'-gpu','host','-port','5580','-no-snapshot-load')
-        $taskProcess=Start-Process -FilePath $taskEmulator -ArgumentList $taskArguments -WindowStyle Normal -PassThru -RedirectStandardOutput (Join-Path $taskRoot 'artifacts\standalone-emulator.log') -RedirectStandardError (Join-Path $taskRoot 'artifacts\standalone-emulator-error.log')
+        $taskAudioOverrides=@()
+        try {
+            if($Avd -eq 'Pixel_10a') {
+                # Let virtio-snd deliver its next PCM period before QEMU drains it.
+                # Keep the output at the guest mixer's rate and allow enough DirectSound lead time.
+                $taskAudioDefaults=@{QEMU_AUDIO_TIMER_PERIOD='80';QEMU_AUDIO_DAC_FIXED_FREQ='48000';QEMU_DSOUND_LATENCY_MILLIS='40'}
+                foreach($taskAudioSetting in $taskAudioDefaults.GetEnumerator()) {
+                    if($null -eq [Environment]::GetEnvironmentVariable($taskAudioSetting.Key,'Process')) {
+                        [Environment]::SetEnvironmentVariable($taskAudioSetting.Key,$taskAudioSetting.Value,'Process')
+                        $taskAudioOverrides+=$taskAudioSetting.Key
+                    }
+                }
+                Write-TaskLog "Pixel_10a audio: $env:QEMU_AUDIO_TIMER_PERIOD Hz mixer, $env:QEMU_AUDIO_DAC_FIXED_FREQ Hz output, $env:QEMU_DSOUND_LATENCY_MILLIS ms DirectSound lead."
+            }
+            $taskProcess=Start-Process -FilePath $taskEmulator -ArgumentList $taskArguments -WindowStyle Normal -PassThru -RedirectStandardOutput (Join-Path $taskRoot 'artifacts\standalone-emulator.log') -RedirectStandardError (Join-Path $taskRoot 'artifacts\standalone-emulator-error.log')
+        } finally {
+            foreach($taskAudioKey in $taskAudioOverrides){[Environment]::SetEnvironmentVariable($taskAudioKey,$null,'Process')}
+        }
         Write-TaskLog "Standalone visible emulator started (PID $($taskProcess.Id))."
     }
     $taskDeadline=[DateTime]::UtcNow.AddSeconds(180)
