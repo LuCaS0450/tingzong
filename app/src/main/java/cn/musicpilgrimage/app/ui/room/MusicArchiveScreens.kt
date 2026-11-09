@@ -252,7 +252,7 @@ private fun visitDate(item:ContentItem)=item.raw.optString("verified_at").takeIf
 }
 
 @Composable internal fun RoomUndoNotice(message:String,token:Long,onUndo:()->Unit,onDismiss:()->Unit,modifier:Modifier=Modifier) {
-    LaunchedEffect(token){delay(5500);onDismiss()}
+    LaunchedEffect(token){delay(3500);onDismiss()}
     Surface(modifier.testTag("archive-undo-notice").semantics{liveRegion=LiveRegionMode.Polite},color=RoomColors.Navy,shape=androidx.compose.ui.graphics.RectangleShape,shadowElevation=6.dp) {
         Row(Modifier.padding(start=16.dp,end=8.dp,top=7.dp,bottom=7.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
             Text(message,Modifier.weight(1f),color=RoomColors.Paper,fontSize=14.sp)
