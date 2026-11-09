@@ -90,6 +90,8 @@
       c.shadowColor='rgba(36,43,39,.2)';c.shadowBlur=1.5;c.shadowOffsetY=1;
       c.beginPath();c.arc(24,24,r,0,Math.PI*2);c.fillStyle=gradient;c.fill();c.strokeStyle='#f7f6f2';c.lineWidth=2;c.stroke();c.shadowColor='transparent';
       c.font=`600 ${count>=100?11:12}px Swiss, sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillStyle='#f7f6f2';c.fillText(String(count),24,24.5);
+      const half=r+4;
+      return c.getImageData((24-half)*scale,(24-half)*scale,2*half*scale,2*half*scale);
     }
     return c.getImageData(0,0,canvas.width,canvas.height);
   }
@@ -121,9 +123,10 @@
         {id:'earth',type:'raster',source:'earth',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
         {id:'earth-hd',type:'raster',source:'earth-hd',minzoom:1.25,maxzoom:8,paint:{'raster-opacity':['interpolate',['linear'],['zoom'],1.25,0,1.75,1,5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
         {id:'graticule',type:'line',source:'grid',maxzoom:5,paint:{'line-color':'#ffffff','line-width':.5,'line-opacity':['interpolate',['linear'],['zoom'],0,.16,3,.16,5,0]}},
-        {id:'clusters',type:'symbol',source:'places',filter:['has','point_count'],layout:{'icon-image':['concat','cluster-',['to-string',['get','point_count']]],'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':['interpolate',['linear'],['zoom'],0,.84,5,1]}},
-        {id:'pins',type:'symbol',source:'places',filter:['!',['has','point_count']],layout:{'icon-image':['case',['get','visited'],'visited','pin'],'icon-size':['interpolate',['linear'],['zoom'],0,.60,3,.60,7,.75],'icon-anchor':'bottom','icon-offset':[0,1],'icon-allow-overlap':true,'icon-ignore-placement':true}},
-        {id:'selected',type:'symbol',source:'selection',layout:{'icon-image':'selected','icon-size':1,'icon-anchor':'center','icon-allow-overlap':true,'icon-ignore-placement':true}}
+        // MapLibre places these layers in reverse order. Only the selected pin reserves space.
+        {id:'clusters',type:'symbol',source:'places',filter:['has','point_count'],layout:{'icon-image':['concat','cluster-',['to-string',['get','point_count']]],'icon-padding':[0],'icon-ignore-placement':true,'icon-size':['interpolate',['linear'],['zoom'],0,.84,5,1]}},
+        {id:'pins',type:'symbol',source:'places',filter:['!',['has','point_count']],layout:{'icon-image':['case',['get','visited'],'visited','pin'],'icon-size':['interpolate',['linear'],['zoom'],0,.60,3,.60,7,.75],'icon-anchor':'bottom','icon-offset':[0,1],'icon-padding':[0],'icon-ignore-placement':true}},
+        {id:'selected',type:'symbol',source:'selection',layout:{'icon-image':'selected','icon-size':1,'icon-anchor':'bottom','icon-offset':selectedPin.anchorOffset,'icon-padding':[0],'icon-allow-overlap':true}}
       ]};
   }
 
@@ -227,6 +230,8 @@
     if(visibleCity&&near.degrees<.2)country=near.place.country;
     if(country&&z>=3){const b=document.createElement('button');b.textContent=country;b.onclick=()=>zoomTo(5);$('region').append(b);}
     if(visibleCity){const b=document.createElement('button');b.textContent=near.place.city;b.onclick=()=>zoomTo(11);$('city').append(b);}
+  }
+  function updateAccessibleMarkers() {
     const visible=map.queryRenderedFeatures({layers:['pins','clusters','selected']});
     const accessible=$('map-accessibility');accessible.replaceChildren();
     const seen=new Set();
@@ -310,10 +315,23 @@
     }catch(_){}
   }
   function mapClick(e) {
-    const features=map.queryRenderedFeatures([[e.point.x-24,e.point.y-24],[e.point.x+24,e.point.y+24]],{layers:['selected','pins','clusters']});
+    const {x,y}=e.point, reach=24;
+    const features=map.queryRenderedFeatures([[x-reach,y-reach],[x+reach,y+reach]],{layers:['selected','pins','clusters']});
     const f=features.find(f=>f.layer.id==='selected')||features.find(f=>f.layer.id==='pins')||features[0];
     if(!f){if(summaryOpen)closeSummary();return;}
-    if(map.getZoom()>=17.8){const list=[...new Set(features.map(f=>f.properties.id).filter(Boolean))].map(id=>byId.get(id)).filter(Boolean);if(list.length>1){openChooser(list,false,`此处 ${list.length} 个地点`);return;}}
+    if(map.getZoom()>=17.8){
+      const ids=new Set(features.map(f=>f.properties.id).filter(Boolean));
+      if(f.layer.id==='selected'){
+        // Keep the nearby-place chooser usable when a coincident pin is hidden.
+        for(const pin of map.querySourceFeatures('places',{filter:['!',['has','point_count']]})){
+          const point=map.project(pin.geometry.coordinates);
+          // At street zoom, the ordinary pin is 18 by 24 pixels with a bottom anchor.
+          if(Math.abs(point.x-x)<=reach+9 && point.y+.75>=y-reach && point.y-23.25<=y+reach)ids.add(pin.properties.id);
+        }
+      }
+      const list=[...ids].map(id=>byId.get(id)).filter(Boolean);
+      if(list.length>1){openChooser(list,false,`此处 ${list.length} 个地点`);return;}
+    }
     if(f.properties.point_count)expandCluster(f);else selectPlace(f.properties.id);
   }
 
@@ -385,7 +403,7 @@
     map=new maplibregl.Map({container:'map',style:baseStyle(),center:[Number.isFinite(saved.longitude)?saved.longitude:35,Number.isFinite(saved.latitude)?clamp(saved.latitude,-80,80):24],
       zoom:Number.isFinite(saved.zoom)?clamp(saved.zoom,-3,18):globeZoom(saved.latitude),minZoom:-3,maxZoom:18,pitch:0,bearing:0,
       attributionControl:false,dragRotate:false,pitchWithRotate:false,touchPitch:false,renderWorldCopies:false,
-      canvasContextAttributes:{antialias:true,preserveDrawingBuffer:false},fadeDuration:260,
+      canvasContextAttributes:{antialias:true,preserveDrawingBuffer:false},fadeDuration:0,
       transformConstrain:(center,zoom)=>({center:new maplibregl.LngLat(wrap(center.lng),clamp(center.lat,-80,80)),zoom:clamp(zoom,-3,18)}),
       maxTileCacheSize:128,refreshExpiredTiles:true,trackResize:false,pixelRatio:devicePixelRatio*sceneScale,padding:{top:0,bottom:bottomPadding,left:0,right:0},
       transformRequest:url=>{const u=new URL(url,location.href);return {url:u.hostname==='api.maptiler.com'?new URL('provider'+u.pathname+u.search,location.href).href:url};}});
@@ -415,6 +433,7 @@
     map.on('move',scheduleVisual);
     map.on('movestart',()=>{moving=true;});
     map.on('moveend',()=>{if(gestures?.active)return;moving=false;updateVisual();updateContext();persist();});
+    map.on('idle',updateAccessibleMarkers);
     map.on('click',mapClick);
     map.on('zoom',()=>focusLayer.zoomed());
     map.on('sourcedata',e=>{if(e.sourceId==='streets'||e.sourceId==='earth-hd')updateLoading();});

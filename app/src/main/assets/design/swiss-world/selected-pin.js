@@ -1,5 +1,5 @@
 /* Approved A: the original solid pin, slightly larger, with a thin paper edge.
- * The tip stays at the same projected coordinate; the canvas center is its anchor.
+ * The cropped image keeps four pixels below the tip for its shadow.
  */
 window.TingzongSelectedPin=function(){
   let bitmap=null;
@@ -12,7 +12,7 @@ window.TingzongSelectedPin=function(){
     const pin=new Path2D('M12 30.6C12 30.6 2.6 19.8 2.6 12a9.4 9.4 0 0 1 18.8 0c0 7.8-9.4 18.6-9.4 18.6z');
     c.shadowColor='rgba(36,43,39,.30)';c.shadowBlur=1.5;c.shadowOffsetY=1;
     c.fillStyle=gradient;c.strokeStyle='#f7f6f2';c.lineWidth=1;c.lineJoin='round';c.fill(pin);c.stroke(pin);
-    bitmap=c.getImageData(0,0,96,128);return bitmap;
+    bitmap=c.getImageData(22,8,52,64);return bitmap;
   }
-  return {image,diagnostics:()=>({style:'a',nominalWidth:22,whiteEdge:1,anchor:'tip'})};
+  return {image,anchorOffset:[0,4],diagnostics:()=>({style:'a',nominalWidth:22,whiteEdge:1,anchor:'tip'})};
 };
