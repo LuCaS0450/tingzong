@@ -3,7 +3,7 @@
  */
 window.TingzongEarthPreview=function(canvas,getCamera){
   let pixels=null,width=0,height=0,last='',hidden=false;
-  const image=new Image();image.src='earth-1024.jpg';
+  const image=new Image();image.src='earth-1024.jpg?v=3';
   image.onload=()=>{if(hidden)return;const source=document.createElement('canvas');source.width=image.width;source.height=image.height;const c=source.getContext('2d',{willReadFrequently:true});c.drawImage(image,0,0);pixels=c.getImageData(0,0,source.width,source.height).data;width=source.width;height=source.height;draw();};
   function draw(){
     if(!pixels||hidden)return;

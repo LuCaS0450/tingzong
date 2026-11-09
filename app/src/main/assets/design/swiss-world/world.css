@@ -21,5 +21,6 @@ body.prototype{background:#e4e3dc;display:grid;place-items:center}body.prototype
 #globe-preview{position:absolute;pointer-events:none;z-index:0;border-radius:50%;transition:opacity .2s}#light{mix-blend-mode:normal}
 
 .compact #stage{background:var(--ground)}
+.satellite-scale #scale{background:#f7f6f2e6;padding:4px 6px}
 
 .compact .heading{animation:world-header-in .24s ease-out}.compact #crumb{animation:world-header-in .24s ease-out}@keyframes world-header-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}

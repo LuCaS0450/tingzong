@@ -217,6 +217,7 @@ import org.json.JSONObject
             cn.musicpilgrimage.app.ui.ExternalLink("地图数据许可说明","https://www.openstreetmap.org/copyright")
             Spacer(Modifier.height(12.dp))
             Text("地球影像：NASA Earth Observatory · Blue Marble Next Generation",fontSize=12.sp,color=RoomColors.Muted)
+            cn.musicpilgrimage.app.ui.ExternalLink("海洋水深数据 · NOAA NCEI ETOPO 2022","https://www.ncei.noaa.gov/products/etopo-global-relief-model")
             cn.musicpilgrimage.app.ui.ExternalLink("地球影像来源与说明","https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/")
         }}
     }

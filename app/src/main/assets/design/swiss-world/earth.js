@@ -5,7 +5,7 @@ window.TingzongEarthTiles=function(){
   const workers=Array.from({length:2},()=>({worker:new Worker('earth-worker.js'),job:null}));
   function pump(){for(const slot of workers){
     if(slot.job)continue;let job;while(queue.length&&!job){const next=queue.shift();if(jobs.has(next.id))job=next;}
-    if(job){slot.job=job;slot.worker.postMessage({id:job.id,url:job.url});}
+    if(job){slot.job=job;slot.worker.postMessage({id:job.id,url:job.url,z:job.z,x:job.x,y:job.y});}
   }}
   for(const slot of workers)slot.worker.onmessage=({data})=>{
     const job=slot.job;if(!job||job.id!==data.id)return;slot.job=null;
@@ -21,7 +21,7 @@ window.TingzongEarthTiles=function(){
     if(!match){reject(Error('Invalid earth tile'));return;}
     const [z,x,y]=match.slice(1).map(Number);
     if(z<3||z>9||x>=2**z||y>=2**z){reject(Error('Earth tile outside range'));return;}
-    const job={id:++sequence,z,url:new URL(`earth-hd/${z}/${x}/${y}.jpg`,location.href).href,resolve,reject,signal:controller.signal};
+    const job={id:++sequence,z,x,y,url:new URL(`earth-hd/${z}/${x}/${y}.jpg`,location.href).href,resolve,reject,signal:controller.signal};
     job.abort=()=>{
       if(!jobs.delete(job.id))return;
       const slot=workers.find(s=>s.job===job);if(slot){slot.worker.postMessage({id:job.id,cancel:true});slot.job=null;}

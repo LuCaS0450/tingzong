@@ -106,8 +106,8 @@
   function baseStyle() {
     return {version:8,projection:{type:'globe'},
       // A resident z0 tile covers the whole sphere while the detail source changes LOD.
-      sources:{'earth-base':{type:'raster',tiles:[new URL('earth/0/0/0.jpg?v=2',location.href).href],tileSize:512,minzoom:0,maxzoom:0},
-        earth:{type:'raster',tiles:[new URL('earth/{z}/{x}/{y}.jpg?v=2',location.href).href.replaceAll('%7B','{').replaceAll('%7D','}')],tileSize:512,minzoom:0,maxzoom:3},
+      sources:{'earth-base':{type:'raster',tiles:[new URL('earth/0/0/0.jpg?v=3',location.href).href],tileSize:512,minzoom:0,maxzoom:0},
+        earth:{type:'raster',tiles:[new URL('earth/{z}/{x}/{y}.jpg?v=3',location.href).href.replaceAll('%7B','{').replaceAll('%7D','}')],tileSize:512,minzoom:0,maxzoom:3},
         'earth-hd':{type:'raster',tiles:['opus-earth://{z}/{x}/{y}'],tileSize:256,minzoom:3,maxzoom:9},
         places:{type:'geojson',data:featureSet(places.filter(p=>p.id!==selected)),cluster:true,clusterRadius:32,clusterMaxZoom:17,clusterMinPoints:2},
         selection:{type:'geojson',data:byId.has(selected)?featureSet([byId.get(selected)]):empty}},
@@ -128,9 +128,6 @@
     const fill=(id,layer,color,filter,minzoom=5)=>({id,type:'fill',source,'source-layer':layer,minzoom,...(filter?{filter}:{}),paint:{'fill-color':color,'fill-opacity':fade}});
     const line=(id,layer,color,width,filter,minzoom=5)=>({id,type:'line',source,'source-layer':layer,minzoom,...(filter?{filter}:{}),layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':color,'line-width':width,'line-opacity':fade}});
     return [
-      // Satellite mosaic brightness varies over water. Use the existing real water geometry
-      // to retain Opus's continuous blue material while leaving high-resolution land untouched.
-      {id:'earth-ocean-material',type:'fill',source,'source-layer':'water',minzoom:1.25,maxzoom:8,paint:{'fill-color':'#76acc2','fill-opacity':['interpolate',['linear'],['zoom'],1.25,0,2.5,.9,5,.9,8,0]}},
       fill('world-park','landcover','#dee2cf',['in',['get','class'],['literal',['wood','grass','farmland']]]),
       fill('world-landuse','landuse','#dee2cf',['in',['get','class'],['literal',['park','cemetery','pitch','recreation_ground','garden']]]),
       fill('world-water','water','#b9d6dd'),
@@ -248,6 +245,7 @@
       // The canvas never resizes at a zoom threshold. Header changes cannot interrupt a flight.
     }
     root.classList.toggle('beyond-globe',z>=4);
+    root.classList.toggle('satellite-scale',z<8);
     const name=z>=13?'街道':z>=7?'城市':z>=3?'国家':'地球';
     $('level').textContent=name;
     $('level').style.top=`${clamp((15-z)/14.5,0,1)*72+4}px`;
