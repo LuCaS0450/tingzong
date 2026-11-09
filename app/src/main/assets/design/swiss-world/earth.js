@@ -1,8 +1,8 @@
 /* The source's 512px satellite tiles are graded on two dedicated workers, never on the UI thread. */
 window.TingzongEarthTiles=function(){
   let sequence=0;const queue=[],jobs=new Map();
-  const stats={requested:0,completed:0,errors:0,maxRequestedLevel:0,maxLoadedLevel:0,tilePixels:0};
-  const workers=Array.from({length:2},()=>({worker:new Worker('earth-worker.js'),job:null}));
+  const stats={requested:0,completed:0,errors:0,coastTiles:0,maxRequestedLevel:0,maxLoadedLevel:0,tilePixels:0};
+  const workers=Array.from({length:2},()=>({worker:new Worker('earth-worker.js?v=4'),job:null}));
   function pump(){for(const slot of workers){
     if(slot.job)continue;let job;while(queue.length&&!job){const next=queue.shift();if(jobs.has(next.id))job=next;}
     if(job){slot.job=job;slot.worker.postMessage({id:job.id,url:job.url,z:job.z,x:job.x,y:job.y});}
@@ -12,7 +12,11 @@ window.TingzongEarthTiles=function(){
     if(jobs.delete(job.id)){
       job.signal.removeEventListener('abort',job.abort);
       if(data.error){stats.errors++;stats.lastError=`${data.phase}:${data.name}`;job.reject(Error('Earth image unavailable'));}
-      else{stats.completed++;stats.maxLoadedLevel=Math.max(stats.maxLoadedLevel,job.z);stats.tilePixels=data.width;job.resolve({data:data.buffer});}
+      else{
+        stats.completed++;if(data.coast)stats.coastTiles++;
+        stats.maxLoadedLevel=Math.max(stats.maxLoadedLevel,job.z);stats.tilePixels=data.width;
+        job.resolve({data:data.buffer});
+      }
     }
     pump();
   };
