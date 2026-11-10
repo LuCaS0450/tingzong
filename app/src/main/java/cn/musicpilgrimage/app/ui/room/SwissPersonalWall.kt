@@ -60,9 +60,7 @@ import org.json.JSONObject
         }
         item("links") {
             Column(Modifier.padding(top=10.dp)) {
-                PersonalLink("个人资料"){if(signedIn)onRoute("account-profile")else onLogin()}
                 PersonalLink("设置"){onRoute("settings")}
-                PersonalLink("关于听踪"){onRoute("account-about")}
                 PersonalLink("更多功能与记录",last=true,onClick=onSpace)
             }
         }
