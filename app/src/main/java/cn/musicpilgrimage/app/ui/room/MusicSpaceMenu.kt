@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.sp
             Text("更多功能\n与记录。",fontSize=32.sp,lineHeight=41.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink,modifier=Modifier.padding(top=16.dp,bottom=28.dp))
             val entries=listOf(Triple("room","音乐与唱片",Icons.Outlined.Album),Triple("explore","世界与旅行",Icons.Outlined.Map),
                 Triple("performance","演奏",Icons.Outlined.Piano),Triple("me","我的空间",Icons.Outlined.PersonOutline),
-                Triple("library","资料册与记录",Icons.Outlined.Inventory2),Triple("settings","设置",Icons.Outlined.Settings))
+                Triple("library","资料册与记录",Icons.Outlined.Inventory2))
             entries.forEachIndexed { index,(route,label,icon)->
                 HorizontalDivider(color=RoomColors.Line)
                 Row(Modifier.fillMaxWidth().heightIn(min=68.dp).semantics{selected=current==route}

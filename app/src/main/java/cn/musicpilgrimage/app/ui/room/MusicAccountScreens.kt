@@ -35,7 +35,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.MusicProfileDraft
@@ -136,38 +135,46 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun RoomMyAccount(
-    profile:JSONObject?,signedIn:Boolean,email:String,avatar:String?,favorites:Int?,visits:Int?,performances:Int,
-    onLogin:()->Unit,onEdit:()->Unit,onRoute:(String)->Unit,error:String?=null,onRetry:()->Unit={}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable internal fun RoomProfileManagement(
+    email:String,favorites:Int?,visits:Int?,performances:Int,disabled:Boolean,
+    onEdit:()->Unit,onRoute:(String)->Unit,error:String?,onRetry:()->Unit
 ) {
-    LazyColumn(Modifier.fillMaxSize().testTag("room-my-account"),state=rememberLazyListState(),contentPadding=PaddingValues(24.dp,10.dp,24.dp,30.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
-        item {RoomPaper(Modifier.fillMaxWidth()) {Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-            RoomAccountAvatar(avatar,Modifier.size(54.dp))
-            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                Text(if(signedIn)profile?.optString("nickname")?.takeIf{it.isNotBlank()}?:"音乐旅人" else "我的音乐空间",fontSize=18.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink,maxLines=1,overflow=TextOverflow.Ellipsis,modifier=Modifier.testTag("account-nickname"))
-                Text(if(signedIn)email else "收藏、足迹与演奏记录",fontSize=12.sp,color=RoomColors.Muted,maxLines=1,overflow=TextOverflow.Ellipsis)
+    var expanded by remember {mutableStateOf(false)}
+    RoomPaper(Modifier.fillMaxWidth().padding(start=18.dp,end=18.dp,bottom=8.dp)) {
+        Box(Modifier.padding(horizontal=14.dp).testTag("account-profile-management")) {
+            AccountLink("本人管理",Icons.Outlined.PersonOutline,last=true){expanded=true}
+        }
+    }
+    if(expanded)ModalBottomSheet(onDismissRequest={expanded=false},containerColor=RoomColors.Paper,
+        sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),shape=RoundedCornerShape(0.dp)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start=24.dp,end=24.dp,bottom=24.dp),
+            verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            Text("本人管理",fontSize=22.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Text(email,Modifier.weight(1f),fontSize=13.sp,color=RoomColors.Muted)
+                SwissTextButton({expanded=false;onEdit()},Modifier.testTag("account-edit-profile")){Text("编辑资料")}
             }
-            if(signedIn)IconButton(onEdit,Modifier.testTag("account-edit-profile")){Icon(Icons.Outlined.Edit,"修改头像和昵称",tint=RoomColors.Navy)}else SwissTextButton(onLogin,Modifier.testTag("account-login-entry")){Text("登录")}
-        }}}
-        if(error!=null)item{Column {Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp);SwissTextButton(onRetry){Text("重新加载资料")}}}
-        item {Text("我的音乐足迹",fontSize=19.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
-            Row(Modifier.fillMaxWidth().padding(top=18.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                listOf(Triple("收藏",favorites,"library"),Triple("到访",visits,"archive/footprints"),Triple("演奏",performances,"account-scores")).forEach{(label,count,route)->
-                    Column(Modifier.weight(1f).clip(androidx.compose.ui.graphics.RectangleShape).clickable{onRoute(route)}.padding(vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            if(error!=null)Column {
+                Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
+                SwissTextButton(onRetry){Text("重新加载资料")}
+            }
+            if(disabled)Text("账号已停用，仍可查看和管理已有个人内容。",color=MaterialTheme.colorScheme.error,fontSize=13.sp)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                listOf(Triple("收藏",favorites,"library"),Triple("到访",visits,"archive/footprints"),Triple("演奏",performances,null)).forEach{(label,count,route)->
+                    val action=if(route==null)Modifier else Modifier.clickable{expanded=false;onRoute(route)}
+                    Column(Modifier.weight(1f).then(action).padding(vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally,
+                        verticalArrangement=Arrangement.spacedBy(8.dp)) {
                         Text(count?.toString()?:"—",fontSize=25.sp,color=RoomColors.Ink,fontWeight=FontWeight.Medium)
                         Text(label,fontSize=13.sp,color=RoomColors.Muted)
                     }
                 }
             }
+            Column {
+                AccountLink("我的发布与投稿",Icons.Outlined.EditNote){expanded=false;onRoute("account-publications")}
+                AccountLink("徽章",Icons.Outlined.Verified,last=true){expanded=false;onRoute("account-badges")}
+            }
         }
-        item {RoomPaper(Modifier.fillMaxWidth(),woodEdge=true){Column(Modifier.padding(horizontal=14.dp)) {
-            AccountLink("演奏记录",Icons.Outlined.Piano){onRoute("account-scores")}
-            AccountLink("我的发布与投稿",Icons.Outlined.EditNote){if(signedIn)onRoute("account-publications")else onLogin()}
-            AccountLink("公开主页",Icons.Outlined.PersonOutline){if(signedIn)onRoute("profile/${profile?.optString("id").orEmpty()}")else onLogin()}
-            AccountLink("徽章",Icons.Outlined.Verified){if(signedIn)onRoute("account-badges")else onLogin()}
-            AccountLink("设置",Icons.Outlined.Settings,last=true){onRoute("settings")}
-        }}}
-        if(profile?.optString("status")=="disabled")item{Text("账号已停用，仍可查看和管理已有个人内容。",color=MaterialTheme.colorScheme.error,fontSize=13.sp)}
     }
 }
 

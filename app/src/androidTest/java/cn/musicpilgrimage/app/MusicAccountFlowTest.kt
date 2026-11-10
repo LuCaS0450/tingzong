@@ -59,17 +59,17 @@ class MusicSettingsFlowTest {
     @Before fun retainPreferences(){preferences=AppPreferences(InstrumentationRegistry.getInstrumentation().targetContext);original=runBlocking{preferences.read()}}
     @After fun restorePreferences(){original?.let{runBlocking{preferences.set(it)}}}
     @Test fun profileAndSettingsHeadersStayOnWallAndSwitchesPersistWithoutToasts(){
-        compose.waitUntil(10000){compose.onAllNodesWithTag("room-home").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithTag("room-space-button").performClick()
-        compose.onNodeWithTag("room-module-me").performClick()
-        compose.onNodeWithTag("room-my-account").assertIsDisplayed()
+        compose.waitUntil(10000){compose.onAllNodesWithTag("wall-tab-3").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("wall-tab-3").performClick()
+        compose.onNodeWithTag("swiss-personal-wall").assertIsDisplayed()
         captureAccountScreen("my",compose)
-        compose.onNodeWithTag("room-space-button").performClick()
-        compose.onNodeWithTag("room-module-settings").performClick()
-        compose.onNodeWithTag("room-settings").assertIsDisplayed()
-        compose.onNodeWithTag("room-back").performClick()
-        compose.onNodeWithTag("room-my-account").assertIsDisplayed()
-        compose.onNodeWithText("设置").performScrollTo().performClick()
+        compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasText("更多功能与记录"))
+        compose.onNodeWithText("更多功能与记录").performClick()
+        compose.onNodeWithTag("room-space-menu").assertIsDisplayed()
+        compose.onNodeWithText("设置").assertDoesNotExist()
+        compose.onNodeWithTag("room-close-space").performClick()
+        compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasText("设置"))
+        compose.onNodeWithText("设置").performClick()
         compose.onNodeWithTag("account-muted").performClick()
         compose.onNodeWithTag("account-reduced-motion").performClick()
         compose.waitUntil(5000){runBlocking{preferences.read()}.let{it.muted!=original!!.muted&&it.reducedMotion!=original!!.reducedMotion}}

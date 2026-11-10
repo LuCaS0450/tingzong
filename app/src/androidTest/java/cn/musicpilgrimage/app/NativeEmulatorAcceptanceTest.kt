@@ -75,8 +75,27 @@ class NativeEmulatorAcceptanceTest {
         }
     }
     private fun module(route:String) {
+        if(route=="settings") {
+            module("me")
+            compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasText("设置"))
+            compose.onNodeWithText("设置").performClick()
+            return
+        }
+        if(route=="me"&&compose.onAllNodesWithTag("wall-tab-3").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithTag("wall-tab-3").performClick()
+            return
+        }
         compose.onNodeWithTag("room-space-button").performClick()
         compose.onNodeWithTag("room-module-$route").performClick()
+    }
+    private fun ownProfile() {
+        module("me")
+        compose.onNodeWithContentDescription("查看个人资料").performClick()
+        waitTag("account-nickname")
+    }
+    private fun editProfile() {
+        compose.onNodeWithText("本人管理").performClick()
+        compose.onNodeWithTag("account-edit-profile").performClick()
     }
     private fun screenshot(name:String,system:Boolean=false) {
         if(!system)compose.waitForIdle()
@@ -173,7 +192,7 @@ class NativeEmulatorAcceptanceTest {
 
     @Test fun systemPickerAndRealProfileSave()=runBlocking {
         val f=fixtures();login(f);seedPhoto(f)
-        module("me");waitTag("account-edit-profile");compose.onNodeWithTag("account-edit-profile").performClick()
+        ownProfile();editProfile()
         profileReady();compose.onNodeWithText("选择头像").assertIsEnabled().performClick()
         // Cancel once through Android, then choose the uniquely named fixture album.
         val end=System.currentTimeMillis()+12000
@@ -193,8 +212,8 @@ class NativeEmulatorAcceptanceTest {
     @Test fun profileSurvivesRestartThenAvatarRemoval()=runBlocking {
         val f=fixtures();login(f);assertNotEquals(probe.getInt("profile-pid",0),Process.myPid())
         assertTrue(services.accountAvatar()?.startsWith("data:image/jpeg;base64,")==true)
-        module("me");waitTag("account-nickname");compose.onNodeWithTag("account-nickname").assertTextEquals("模拟器验收甲已修改")
-        compose.onNodeWithTag("account-edit-profile").performClick();waitTag("room-profile-editor")
+        ownProfile();compose.onNodeWithTag("account-nickname").assertTextEquals("模拟器验收甲已修改")
+        editProfile();waitTag("room-profile-editor")
         compose.waitUntil(20000){compose.onAllNodesWithText("移除头像").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("移除头像").performClick();compose.onNodeWithTag("profile-save").performScrollTo().performClick()
         waitTag("account-nickname");assertNull(services.accountAvatar());screenshot("avatar-removed")
@@ -203,7 +222,7 @@ class NativeEmulatorAcceptanceTest {
 
     @Test fun realProfileUnsavedExitGuards()=runBlocking {
         val f=fixtures();login(f);val original=(services.call("self") as JSONObject).getString("nickname")
-        module("me");waitTag("account-edit-profile");compose.onNodeWithTag("account-edit-profile").performClick();profileReady()
+        ownProfile();editProfile();profileReady()
         compose.onNodeWithTag("profile-nickname").performTextReplacement("不应保存的临时昵称")
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("放弃修改？").assertIsDisplayed();compose.onNodeWithText("继续编辑").performClick()
@@ -351,7 +370,7 @@ class NativeEmulatorAcceptanceTest {
         compose.onNode(hasText("其他",substring=false) and hasAnyAncestor(isDialog())).performClick()
         compose.waitUntil(30000){compose.onAllNodesWithText("举报已提交").fetchSemanticsNodes().isNotEmpty()}
         val nickname=(services.repositories.content.profile(f.getJSONObject("accounts").getJSONObject("a").getString("id"))).getString("nickname")
-        compose.onNode(hasText(nickname,substring=false) and hasAnyAncestor(hasTestTag(tag))).performClick();waitTag("room-public-profile")
+        compose.onNode(hasText(nickname,substring=false) and hasAnyAncestor(hasTestTag(tag))).performClick();waitTag("room-profile")
         compose.waitUntil(20000){compose.onAllNodesWithText(nickname,substring=false).fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("公开到访",substring=false).performClick()
         compose.waitUntil(20000){compose.onAllNodesWithText("还没有公开到访。").fetchSemanticsNodes().isNotEmpty()}

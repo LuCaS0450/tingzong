@@ -88,40 +88,59 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun RoomPublicProfileScreen(id:String,vm:PersonalViewModel,session:SessionViewModel,onForm:(String,String,ContentItem?)->Unit,onProfile:(String)->Unit) {
+@Composable internal fun RoomProfileScreen(
+    id:String,vm:PersonalViewModel,session:SessionViewModel,onForm:(String,String,ContentItem?)->Unit,onProfile:(String)->Unit,
+    ownerName:String?=null,ownerAvatar:String?=null,ownerManagement:(@Composable ()->Unit)?=null
+) {
     val profile by vm.publicProfile.collectAsState()
     val revision by session.services.changed.collectAsState()
     val busy by vm.busy.collectAsState()
     val error by vm.error.collectAsState()
     LaunchedEffect(id,revision){vm.profile(id)}
-    RoomPublicProfileContent(profile,busy,error,{vm.profile(id)}) {item->RoomContentCard(item,session,vm,{onForm(it.kind,if(it.kind=="recreation")it.sceneId else it.location,it)},onProfile,showAuthor=false)}
+    key(id) {
+        RoomProfileContent(profile?.takeIf{it.optString("id")==id},busy,error,{vm.profile(id)},ownerName,ownerAvatar,ownerManagement) {item->
+            RoomContentCard(item,session,vm,{onForm(it.kind,if(it.kind=="recreation")it.sceneId else it.location,it)},onProfile,showAuthor=false)
+        }
+    }
 }
 
-@Composable internal fun RoomPublicProfileContent(profile:JSONObject?,busy:Boolean,error:String?,onRetry:()->Unit,card:@Composable (ContentItem)->Unit) {
-    var tab by rememberSaveable(profile?.optString("id").orEmpty()){mutableIntStateOf(1)}
+@Composable internal fun RoomProfileContent(
+    profile:JSONObject?,busy:Boolean,error:String?,onRetry:()->Unit,
+    ownerName:String?=null,ownerAvatar:String?=null,ownerManagement:(@Composable ()->Unit)?=null,
+    card:@Composable (ContentItem)->Unit
+) {
+    var tab by rememberSaveable {mutableIntStateOf(1)}
     val list=rememberLazyListState()
     val rows=profile?.optJSONArray(if(tab==1)"recreations"else "visits")?.objects()?.map(::ContentItem)
         ?.filter{RecordDraftRules.publiclyVisible(it)}?.sortedByDescending{it.raw.optString("created_at")}.orEmpty()
-    LazyColumn(Modifier.fillMaxSize().testTag("room-public-profile"),state=list,contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        profile?.let{p->
-            item("identity"){RoomPaper(Modifier.fillMaxWidth()){Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                RoomCommunityAvatar(p.optString("nickname"),Modifier.size(54.dp))
-                Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                    Text(p.optString("nickname","听众"),fontSize=22.sp,color=RoomColors.Ink)
-                    Text("公开主页",fontSize=12.sp,color=RoomColors.Muted)
-                    if(p.optString("bio").isNotBlank())Text(p.optString("bio"),fontSize=13.sp,color=RoomColors.Muted)
+    val name=ownerName?:profile?.optString("nickname","听众")
+    Column(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("room-profile"),state=list,
+            contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+            if(name!=null)item("identity") {
+                RoomPaper(Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+                        if(ownerName!=null)RoomAccountAvatar(ownerAvatar,Modifier.size(54.dp))
+                        else RoomCommunityAvatar(name,Modifier.size(54.dp))
+                        Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                            Text(name,fontSize=22.sp,color=RoomColors.Ink,modifier=Modifier.testTag("account-nickname"))
+                            val bio=profile?.optString("bio").orEmpty()
+                            if(bio.isNotBlank())Text(bio,fontSize=13.sp,color=RoomColors.Muted)
+                        }
+                    }
                 }
-            }}}
-            item("tabs"){RoomCommunityTabs(listOf("公开到访","复刻"),tab,{tab=it})}
+            }
+            if(profile!=null)item("tabs"){RoomCommunityTabs(listOf("公开到访","复刻"),tab,{tab=it})}
+            if(busy)item("busy"){LinearProgressIndicator(Modifier.fillMaxWidth(),color=RoomColors.Navy)}
+            if(error!=null)item("error"){Column{Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp);SwissTextButton(onRetry){Text("重试")}}}
+            if(!busy&&error==null&&profile==null)item("missing"){Text("暂时无法读取公开记录。",color=RoomColors.Muted)}
+            if(!busy&&error==null&&profile!=null&&rows.isEmpty())item("empty") {
+                if(tab==0&&!profile.has("visits"))Column{Text("暂时无法读取公开到访记录，请稍后重试。",color=RoomColors.Muted,fontSize=13.sp);SwissTextButton(onRetry){Text("重试")}}
+                else Text(if(tab==0)"还没有公开到访。"else "还没有公开复刻。",color=RoomColors.Muted,fontSize=14.sp)
+            }
+            items(rows,key={it.id}){card(it)}
         }
-        if(busy)item("busy"){LinearProgressIndicator(Modifier.fillMaxWidth(),color=RoomColors.Navy)}
-        if(error!=null)item("error"){Column{Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp);SwissTextButton(onRetry){Text("重试")}}}
-        if(!busy&&error==null&&profile==null)item("missing"){Text("主页暂不可用。",color=RoomColors.Muted)}
-        if(!busy&&error==null&&profile!=null&&rows.isEmpty())item("empty") {
-            if(tab==0&&!profile.has("visits"))Column{Text("暂时无法读取公开到访记录，请稍后重试。",color=RoomColors.Muted,fontSize=13.sp);SwissTextButton(onRetry){Text("重试")}}
-            else Text(if(tab==0)"还没有公开到访。"else "还没有公开复刻。",color=RoomColors.Muted,fontSize=14.sp)
-        }
-        items(rows,key={it.id}){card(it)}
+        ownerManagement?.invoke()
     }
 }
 

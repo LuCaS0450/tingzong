@@ -25,7 +25,9 @@ class MusicAccountLayoutTest {
             Column {
                 RoomHeader(if(page=="my")"我的" else if(page=="edit")"个人资料" else "设置",onBack=if(page=="edit")({discard=true})else null,onSpace={})
                 when(page) {
-                    "my"->RoomMyAccount(JSONObject().put("id","layout-owner").put("nickname",nickname),true,"layout@example.invalid",null,4,1,1,{}, {page="edit"},{page="settings"})
+                    "my"->RoomProfileContent(JSONObject().put("nickname",nickname),false,null,{},ownerName=nickname,ownerManagement={
+                        RoomProfileManagement("layout@example.invalid",4,1,1,false,{page="edit"},{},null,{})
+                    }) {}
                     "edit"->RoomProfileEditor(MusicProfileDraft(owner="layout-owner",nickname=nickname,originalNickname="音乐旅人",active=true),{nickname=it},{},{},{page="my"},{})
                     else->RoomSettings(AppPreferencesState(),true,false,null,{},{},{},{signedOut=true})
                 }
@@ -33,6 +35,13 @@ class MusicAccountLayoutTest {
             if(discard)RoomDiscardProfileDialog({discard=false},{discard=false;page="my"})
         }}}
         captureAccountScreen("my-signed-in-layout-fixture",compose)
+        compose.onNodeWithText("公开到访").assertIsDisplayed()
+        compose.onNodeWithText("layout@example.invalid").assertDoesNotExist()
+        compose.onNodeWithText("本人管理").performClick()
+        compose.onNodeWithText("layout@example.invalid").assertIsDisplayed()
+        compose.onNodeWithText("演奏").assertHasNoClickAction()
+        compose.onNodeWithText("演奏记录").assertDoesNotExist()
+        compose.onNodeWithText("设置").assertDoesNotExist()
         compose.onNodeWithTag("account-edit-profile").performClick()
         captureAccountScreen("profile-editor-layout-fixture",compose)
         compose.onNodeWithTag("profile-nickname").performTextReplacement("新的音乐旅人")
@@ -44,7 +53,7 @@ class MusicAccountLayoutTest {
         compose.onNodeWithTag("profile-nickname").assertTextContains("新的音乐旅人")
         compose.onNodeWithTag("profile-save").performScrollTo().performClick()
         compose.onNodeWithText("新的音乐旅人").assertIsDisplayed()
-        compose.onNodeWithText("设置").performScrollTo().performClick()
+        compose.runOnIdle {page="settings"}
         compose.onNodeWithTag("account-sign-out").performClick()
         compose.onNodeWithText("退出登录？").assertIsDisplayed()
         captureAccountScreen("sign-out-layout-fixture",compose)

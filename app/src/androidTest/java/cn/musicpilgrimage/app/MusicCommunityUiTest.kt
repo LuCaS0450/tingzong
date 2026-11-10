@@ -110,14 +110,16 @@ class MusicCommunityUiTest {
         val visit=item("public-visit","visit","profile-owner")
         val profile=JSONObject().put("id","profile-owner").put("nickname","界面验证用户").put("visit_count",123).put("recreation_count",456)
             .put("recreations",JSONArray().put(record.raw)).put("visits",JSONArray().put(visit.raw))
-        show("公开主页") {
-            RoomPublicProfileContent(profile,false,null,{}) {row->
+        show("个人资料") {
+            RoomProfileContent(profile,false,null,{}) {row->
                 RoomContentEntry(row,"reader",true,false,if(row.kind=="recreation")sample else null,original,"MV原作",false,{},{},{_,_->})
             }
         }
         compose.onNode(hasText("复刻") and SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)).assertIsSelected()
         compose.onAllNodesWithText("界面验证用户").assertCountEquals(1)
         compose.onAllNodesWithText("123",substring=true).assertCountEquals(0)
+        compose.onNodeWithText("本人管理").assertDoesNotExist()
+        compose.onNodeWithTag("account-edit-profile").assertDoesNotExist()
         awaitPhoto("room-original-recreation");awaitPhoto("room-user-photo-recreation")
         capture("public-profile")
         val partialTop=compose.onNodeWithTag("room-user-photo-recreation").fetchSemanticsNode().boundsInRoot.top
@@ -139,7 +141,7 @@ class MusicCommunityUiTest {
         compose.waitUntil(5000){compose.onAllNodesWithTag("room-community-photo-viewer",useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("关闭大图").performClick()
         compose.waitUntil(5000){compose.onAllNodesWithTag("room-community-photo-viewer",useUnmergedTree=true).fetchSemanticsNodes().isEmpty()}
-        compose.onNodeWithTag("room-public-profile").performScrollToKey("tabs")
+        compose.onNodeWithTag("room-profile").performScrollToKey("tabs")
         compose.onNodeWithText("公开到访").performScrollTo().performClick()
         compose.onNodeWithText("到访于 2026-10-18").assertExists()
         compose.onAllNodesWithText("界面验证用户").assertCountEquals(1)
