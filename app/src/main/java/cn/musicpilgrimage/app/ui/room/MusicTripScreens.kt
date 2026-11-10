@@ -82,6 +82,7 @@ private enum class TripRowPosition { Closed, Delete }
     trip:MusicTrip,revealed:Boolean,enabled:Boolean,onReveal:(Boolean)->Unit,onOpen:()->Unit,onDelete:()->Unit
 ) {
     val actionWidth=64.dp
+    val rowPadding=16.dp
     val actionOffset=with(LocalDensity.current){actionWidth.toPx()}
     val swipe=remember(actionOffset) {
         AnchoredDraggableState(TripRowPosition.Closed,DraggableAnchors {
@@ -101,7 +102,7 @@ private enum class TripRowPosition { Closed, Delete }
     Box(Modifier.fillMaxWidth().clipToBounds().anchoredDraggable(
         swipe,reverseDirection=false,orientation=Orientation.Horizontal,enabled=enabled
     )) {
-        Box(Modifier.matchParentSize().background(RoomColors.Red),contentAlignment=Alignment.CenterEnd) {
+        Box(Modifier.matchParentSize().padding(bottom=rowPadding).background(RoomColors.Red),contentAlignment=Alignment.CenterEnd) {
             if(actionExposed)IconButton(onDelete,Modifier.width(actionWidth).testTag("trip-delete-${trip.id}"),enabled=enabled) {
                 Icon(Icons.Outlined.DeleteOutline,"删除${trip.name}",tint=RoomColors.Paper)
             } else Box(Modifier.width(actionWidth),contentAlignment=Alignment.Center) {
@@ -115,7 +116,7 @@ private enum class TripRowPosition { Closed, Delete }
             }.semantics {
                 if(enabled)customActions=listOf(CustomAccessibilityAction("删除行程"){onDelete();true})
             }) {
-            Column(Modifier.fillMaxWidth().padding(vertical=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxWidth().padding(vertical=rowPadding),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text(trip.name,fontSize=19.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
                 Text("${trip.start} — ${trip.end} · ${trip.days}天",fontSize=13.sp,color=RoomColors.Muted)
                 Text(trip.cities.joinToString(" · "){it.label},fontSize=13.sp,color=RoomColors.Ink)
