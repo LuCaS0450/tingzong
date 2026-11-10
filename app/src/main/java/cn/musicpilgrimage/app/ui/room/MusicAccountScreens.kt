@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -23,9 +25,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -55,6 +61,16 @@ import org.json.JSONObject
     val emailFocus=remember{FocusRequester()}
     val busy=state.busy!=null||state.verified
     val motion=LocalPhysicalMotion.current
+    val registrationShake=remember{Animatable(0f)}
+    LaunchedEffect(state.registrationRequired,motion) {
+        registrationShake.snapTo(0f)
+        if(state.registrationRequired&&motion)registrationShake.animateTo(0f,keyframes {
+            durationMillis=300
+            -4f at 65
+            4f at 135
+            -2f at 215
+        })
+    }
     BackHandler(state.help||onBack!=null){if(state.help)onHelp(false)else if(!busy)onBack?.invoke()}
     LaunchedEffect(state.focusCode,state.help){if(state.focusCode>0&&!state.help){withFrameNanos{};runCatching{codeFocus.requestFocus()}}}
     LaunchedEffect(state.emailError,state.codeError){withFrameNanos{};if(state.emailError!=null)runCatching{emailFocus.requestFocus()}else if(state.codeError!=null&&!state.help)runCatching{codeFocus.requestFocus()}}
@@ -92,9 +108,13 @@ import org.json.JSONObject
                     if(state.busy==OtpOperation.SEND)AccountWaiting("发送中",motion)else Text(if(state.remainingSeconds>0)"${state.remainingSeconds}秒后重发" else "重新获取验证码")
                 }
             }
-            Box(Modifier.fillMaxWidth().height(48.dp).padding(top=8.dp)) {Text(state.formError?:state.feedback.orEmpty(),fontSize=12.sp,lineHeight=18.sp,maxLines=2,color=if(state.formError!=null)MaterialTheme.colorScheme.error else RoomColors.Muted,modifier=Modifier.testTag("account-feedback"))}
+            Box(Modifier.fillMaxWidth().height(48.dp).padding(top=8.dp)) {Text(state.formError?:state.feedback.orEmpty(),fontSize=12.sp,lineHeight=18.sp,maxLines=2,color=if(state.formError!=null)MaterialTheme.colorScheme.error else RoomColors.Muted,modifier=Modifier.testTag("account-feedback").semantics{liveRegion=LiveRegionMode.Polite})}
             if(!state.help)Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-                SwissTextButton({onRegister(!state.register)},enabled=!busy,modifier=Modifier.testTag("account-registration")){Text(if(state.register)"已有账号，登录" else "注册账号",fontSize=13.sp)}
+                SwissTextButton({onRegister(!state.register)},enabled=!busy,modifier=Modifier.testTag("account-registration")
+                    .graphicsLayer{translationX=registrationShake.value.dp.toPx()}) {
+                    Text(if(state.register)"已有账号，登录" else "注册账号",fontSize=13.sp,
+                        color=if(state.registrationRequired)MaterialTheme.colorScheme.error else LocalContentColor.current)
+                }
                 SwissTextButton({onHelp(true)},enabled=!busy,modifier=Modifier.testTag("account-code-help")){Text("收不到验证码？",fontSize=13.sp)}
             }
             Spacer(Modifier.height(20.dp))

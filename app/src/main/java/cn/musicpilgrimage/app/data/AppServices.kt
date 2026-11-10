@@ -127,7 +127,10 @@ class AppServices(context:Context) {
    if(!cfg.optBoolean("registration_enabled"))throw EmailOtpFailure(OtpFailureKind.REGISTRATION_CLOSED,"暂未开放注册，已有账号可以返回登录")
   }
   try {auth.signInWith(OTP,redirectUrl="musicpilgrimage://auth/callback") {this.email=EmailOtpController.normalized(email);createUser=register}}
-  catch(e:AuthRestException){throw emailOtpError(e,false)}
+  catch(e:AuthRestException){
+   if(!register&&e.error=="otp_disabled")throw EmailOtpFailure(OtpFailureKind.REGISTRATION_REQUIRED,"该邮箱未注册，请先注册")
+   throw emailOtpError(e,false)
+  }
   }
  }
  suspend fun verifyEmailCode(email:String,code:String) {
