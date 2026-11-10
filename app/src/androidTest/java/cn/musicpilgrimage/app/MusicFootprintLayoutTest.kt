@@ -2,6 +2,7 @@ package cn.musicpilgrimage.app
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -30,9 +31,17 @@ class MusicFootprintLayoutTest {
             .put("visibility","private").put("body","测试用文字，用于检查时间线与管理操作。"))
         var edited=false;var deleted=false
         compose.setContent {PilgrimageTheme {RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),baseColor=RoomColors.ArchiveWall) {
-            Column {RoomHeader("资料册",onSpace={});RoomPlaceFavorites(MusicArchiveState(owner="isolated-layout-owner",visits=listOf(record)),places,"footprints",{}, {}, {}, {},{edited=true},{deleted=true},services)}
+            Column {
+                RoomHeader("我的足迹",onSpace={})
+                RoomFootprints(MusicArchiveState(owner="isolated-layout-owner",visits=listOf(record)),places,"visits",
+                    {},{},{},{edited=true},{deleted=true},services){Text("复刻测试记录")}
+            }
         }}}
         compose.onNodeWithTag("archive-expand-${place.id}").performClick()
+        compose.onNodeWithText("2026-10-19").assertIsDisplayed()
+        compose.onNodeWithTag("archive-tab-recreations").performClick().assertIsSelected()
+        compose.onNodeWithText("复刻测试记录").assertIsDisplayed()
+        compose.onNodeWithTag("archive-tab-visits").performClick().assertIsSelected()
         compose.onNodeWithText("2026-10-19").assertIsDisplayed()
         val directory=File(context.getExternalFilesDir(null),"music-space-stage2").apply{mkdirs()}
         compose.waitForIdle()

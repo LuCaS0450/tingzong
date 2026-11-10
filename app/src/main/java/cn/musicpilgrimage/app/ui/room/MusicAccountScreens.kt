@@ -41,8 +41,6 @@ import cn.musicpilgrimage.app.MusicProfileDraft
 import cn.musicpilgrimage.app.MusicAccountViewModel
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.design.AppPreferencesState
-import cn.musicpilgrimage.app.performance.PerformanceResult
-import cn.musicpilgrimage.app.performance.SongPackage
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import coil.compose.AsyncImage
 import org.json.JSONObject
@@ -137,7 +135,7 @@ import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun RoomProfileManagement(
-    email:String,favorites:Int?,visits:Int?,performances:Int,disabled:Boolean,
+    email:String,favorites:Int?,visits:Int?,disabled:Boolean,
     onEdit:()->Unit,onRoute:(String)->Unit,error:String?,onRetry:()->Unit
 ) {
     var expanded by remember {mutableStateOf(false)}
@@ -161,18 +159,13 @@ import org.json.JSONObject
             }
             if(disabled)Text("账号已停用，仍可查看和管理已有个人内容。",color=MaterialTheme.colorScheme.error,fontSize=13.sp)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                listOf(Triple("收藏",favorites,"library"),Triple("到访",visits,"archive/footprints"),Triple("演奏",performances,null)).forEach{(label,count,route)->
-                    val action=if(route==null)Modifier else Modifier.clickable{expanded=false;onRoute(route)}
-                    Column(Modifier.weight(1f).then(action).padding(vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally,
+                listOf(Triple("收藏",favorites,"music-favorites/releases"),Triple("到访",visits,"archive/footprints")).forEach{(label,count,route)->
+                    Column(Modifier.weight(1f).clickable{expanded=false;onRoute(route)}.padding(vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally,
                         verticalArrangement=Arrangement.spacedBy(8.dp)) {
                         Text(count?.toString()?:"—",fontSize=25.sp,color=RoomColors.Ink,fontWeight=FontWeight.Medium)
                         Text(label,fontSize=13.sp,color=RoomColors.Muted)
                     }
                 }
-            }
-            Column {
-                AccountLink("我的发布与投稿",Icons.Outlined.EditNote){expanded=false;onRoute("account-publications")}
-                AccountLink("徽章",Icons.Outlined.Verified,last=true){expanded=false;onRoute("account-badges")}
             }
         }
     }
@@ -253,8 +246,6 @@ import org.json.JSONObject
 
 @Composable internal fun RoomAccountRecords(profile:JSONObject?,onRoute:(String)->Unit) {
     RoomPaper(Modifier.fillMaxWidth().padding(24.dp)){Column(Modifier.padding(horizontal=15.dp)) {
-        AccountLink("我的到访",Icons.Outlined.LocationOn){onRoute("archive/footprints")}
-        AccountLink("我的复刻",Icons.Outlined.PhotoCamera){onRoute("mine/recreation")}
         AccountLink("地点留言",Icons.Outlined.ChatBubbleOutline){onRoute("mine/message")}
         AccountLink("我的投稿",Icons.Outlined.EditLocationAlt,last=profile?.optString("role")!="admin"){onRoute("submissions")}
         if(profile?.optString("role")=="admin")AccountLink("管理中心",Icons.Outlined.AdminPanelSettings,last=true){onRoute("admin")}
@@ -272,13 +263,5 @@ import org.json.JSONObject
         else items(badges.size){index->val badge=badges[index];val earned=badge.optString("earned_at").let{it.isNotBlank()&&it!="null"}
             RoomPaper(Modifier.fillMaxWidth()){Row(Modifier.padding(16.dp),horizontalArrangement=Arrangement.spacedBy(14.dp)){Icon(if(earned)Icons.Outlined.Verified else Icons.Outlined.RadioButtonUnchecked,if(earned)"已获得" else "未获得",tint=RoomColors.Navy);Column(verticalArrangement=Arrangement.spacedBy(6.dp)){Text(badge.optString("name"),fontSize=16.sp,color=RoomColors.Ink);Text(badge.optString("description"),fontSize=13.sp,color=RoomColors.Muted)}}}
         }
-    }
-}
-
-@Composable internal fun RoomPerformanceRecords(results:List<PerformanceResult>,songs:List<SongPackage>,onSong:(String)->Unit) {
-    val best=remember(results){results.groupBy{it.songId to it.difficulty}.values.map{it.maxBy{row->row.score}}.sortedByDescending{it.finishedAt}}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        if(best.isEmpty())item{Text("还没有演奏成绩，去钢琴区域选一首喜欢的曲目。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)}
-        items(best,key={"${it.songId}:${it.difficulty}"}) {result->RoomPaper(Modifier.fillMaxWidth().clickable{onSong(result.songId)}){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(songs.find{it.id==result.songId}?.title?:result.songId,fontSize=17.sp,color=RoomColors.Ink);Text("${when(result.difficulty){1->"轻松";2->"标准";else->"难度 ${result.difficulty}"}} · 最高分 ${result.score}",fontSize=13.sp,color=RoomColors.Muted);Text("最高连击 ${result.bestCombo}",fontSize=12.sp,color=RoomColors.Muted)}}}
     }
 }

@@ -72,10 +72,9 @@ class NativeLibraryLiveTest {
         instrumentation.uiAutomation.takeScreenshot().let{bitmap->File(folder,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()}
     }
     private fun archive() {
-        compose.waitUntil(20000){compose.onAllNodesWithTag("room-home").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithTag("room-space-button").performClick()
-        compose.onNodeWithTag("room-module-library").performClick()
-        compose.onNodeWithTag("room-archive").assertIsDisplayed()
+        compose.waitUntil(20000){compose.onAllNodesWithTag("wall-tab-3").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("wall-tab-3").performClick()
+        compose.onNodeWithTag("swiss-personal-wall").assertIsDisplayed()
     }
     private fun tripPage(){archive();compose.onNodeWithText("我的行程").performScrollTo().performClick();compose.onNodeWithTag("room-trips").assertIsDisplayed()}
     private suspend fun cleanup(owner:String) {

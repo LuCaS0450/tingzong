@@ -27,7 +27,7 @@ class MusicArchiveFlowTest {
     private lateinit var album:String
 
     @Before fun seedIsolatedGuestExamples(){
-        compose.waitUntil(10000){compose.onAllNodesWithTag("room-home").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(10000){compose.onAllNodesWithTag("wall-tab-3").fetchSemanticsNodes().isNotEmpty()}
         val services=(context.applicationContext as PilgrimageApplication).services
         assumeTrue("Do not alter a signed-in account during UI checks",services.userId.value==null)
         owner=LibraryDatabase.guestOwner(context)
@@ -48,7 +48,7 @@ class MusicArchiveFlowTest {
         val directory=File(context.getExternalFilesDir(null),"music-space-stage2").apply{mkdirs()}
         InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot().let{bitmap->File(directory,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()}
     }
-    private fun archive(){compose.onNodeWithTag("room-space-button").performClick();compose.onNodeWithTag("room-module-library").performClick();compose.onNodeWithTag("room-archive").assertIsDisplayed()}
+    private fun archive(){compose.onNodeWithTag("wall-tab-3").performClick();compose.onNodeWithTag("swiss-personal-wall").assertIsDisplayed()}
     @Test fun cabinetMusicUndoCategoryAndSourceReturn(){
         archive();capture("archive")
         compose.onNodeWithTag("room-drawer-songs").performScrollTo().performClick()
@@ -77,10 +77,12 @@ class MusicArchiveFlowTest {
         compose.onNodeWithTag("room-drawer-places").performClick()
         compose.onNodeWithText("登录查看地点收藏").assertIsDisplayed()
         capture("places-empty")
-        compose.onNodeWithTag("archive-tab-footprints").performClick()
-        compose.onNodeWithText("登录查看认证足迹").assertIsDisplayed()
+        compose.onNodeWithTag("room-back").performClick()
+        compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasTestTag("room-drawer-footprints"))
+        compose.onNodeWithTag("room-drawer-footprints").performClick()
+        compose.onNodeWithText("登录查看足迹").assertIsDisplayed()
         capture("footprints-empty")
         compose.onNodeWithTag("room-back").performClick()
-        compose.onNodeWithTag("room-archive").assertIsDisplayed()
+        compose.onNodeWithTag("swiss-personal-wall").assertIsDisplayed()
     }
 }

@@ -35,10 +35,10 @@ class MusicLibrarySyncUiTest {
     }
     @Test fun guestPagesRemainLocalAndDoNotScheduleAccountUploads() {
         val services=(context.applicationContext as PilgrimageApplication).services
-        compose.waitUntil(12000){services.authReady.value&&compose.onAllNodesWithTag("room-home").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(12000){services.authReady.value&&compose.onAllNodesWithTag("wall-tab-3").fetchSemanticsNodes().isNotEmpty()}
         assumeTrue("Do not operate a signed-in account",services.userId.value==null)
-        compose.onNodeWithTag("room-space-button").performClick();compose.onNodeWithTag("room-module-library").performClick()
-        compose.onNodeWithTag("room-archive").performScrollToNode(hasTestTag("room-drawer-songs"))
+        compose.onNodeWithTag("wall-tab-3").performClick()
+        compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasTestTag("room-drawer-songs"))
         compose.onNodeWithTag("room-drawer-songs").performClick()
         compose.onNodeWithTag("room-music-favorites").assertIsDisplayed()
         compose.onNodeWithText("行程和音乐收藏保存在这台设备。").assertIsDisplayed();capture("favorites")
@@ -76,7 +76,7 @@ class MusicLibrarySyncUiTest {
     /** Guest cache fixture exercises editor refresh; no authentication or cloud write is used. */
     @Test fun staleTripEditorRetainsDraftAndReportsConflict() {
         val services=(context.applicationContext as PilgrimageApplication).services
-        compose.waitUntil(12000){services.authReady.value&&compose.onAllNodesWithTag("room-home").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(12000){services.authReady.value&&compose.onAllNodesWithTag("wall-tab-3").fetchSemanticsNodes().isNotEmpty()}
         assumeTrue("Do not operate a signed-in account",services.userId.value==null)
         val owner=LibraryDatabase.guestOwner(context);val store=services.library.trips
         val start=LocalDate.of(2026,11,1)

@@ -59,7 +59,7 @@ class NativeEmulatorAcceptanceTest {
         }
         withTimeout(30000){services.userId.first{it==account.getString("id")}}
         assertEquals(account.getString("id"),(services.call("self") as JSONObject).getString("id"))
-        waitTag("room-home")
+        waitTag("room-catalogue")
     }
     private fun waitTag(tag:String,timeout:Long=25000) {
         compose.waitUntil(timeout){runCatching{compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()}.getOrDefault(false)}
@@ -81,16 +81,13 @@ class NativeEmulatorAcceptanceTest {
             compose.onNodeWithText("设置").performClick()
             return
         }
-        if(route=="me"&&compose.onAllNodesWithTag("wall-tab-3").fetchSemanticsNodes().isNotEmpty()) {
-            compose.onNodeWithTag("wall-tab-3").performClick()
-            return
-        }
-        compose.onNodeWithTag("room-space-button").performClick()
-        compose.onNodeWithTag("room-module-$route").performClick()
+        val tab=when(route){"library","me"->3;"performance"->2;else->error("Unknown main tab: $route")}
+        compose.onNodeWithTag("wall-tab-$tab").performClick()
     }
     private fun ownProfile() {
         module("me")
-        compose.onNodeWithContentDescription("查看个人资料").performClick()
+        compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasText("个人资料"))
+        compose.onNodeWithText("个人资料").performClick()
         waitTag("account-nickname")
     }
     private fun editProfile() {
@@ -160,9 +157,10 @@ class NativeEmulatorAcceptanceTest {
         pickOwnAlbum(f,"room-record-editor")
     }
     private fun openRecord(f:JSONObject) {
-        if(compose.onAllNodesWithTag("room-place-favorites").fetchSemanticsNodes().isEmpty()) {
-            module("library");waitTag("room-archive")
-            compose.onNodeWithTag("room-drawer-footprints").performScrollTo().performClick()
+        if(compose.onAllNodesWithTag("room-footprints").fetchSemanticsNodes().isEmpty()) {
+            module("library");waitTag("swiss-personal-wall")
+            compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasTestTag("room-drawer-footprints"))
+            compose.onNodeWithTag("room-drawer-footprints").performClick()
         }
         val expand="archive-expand-${f.getString("location")}"
         waitTag(expand)
@@ -226,13 +224,12 @@ class NativeEmulatorAcceptanceTest {
         compose.onNodeWithTag("profile-nickname").performTextReplacement("不应保存的临时昵称")
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("放弃修改？").assertIsDisplayed();compose.onNodeWithText("继续编辑").performClick()
-        module("library");compose.onNodeWithText("放弃修改？").assertIsDisplayed();compose.onNodeWithText("继续编辑").performClick()
         compose.runOnIdle{compose.activity.onBackPressedDispatcher.onBackPressed()}
         compose.waitUntil(3000){compose.onAllNodesWithText("放弃修改？").fetchSemanticsNodes().isNotEmpty()}
         screenshot("profile-system-back-guard");compose.onNodeWithTag("account-discard-confirm").performClick()
         waitTag("account-nickname");compose.onNodeWithTag("account-nickname").assertTextEquals(original)
         assertEquals(original,(services.call("self") as JSONObject).getString("nickname"))
-        mark("real_profile_header_module_and_system_back_discard_guards")
+        mark("real_profile_header_and_system_back_discard_guards")
     }
 
     @Test fun productionDraftGuardsAndPrivatePhotoUpload()=runBlocking {
@@ -240,11 +237,10 @@ class NativeEmulatorAcceptanceTest {
         compose.onNodeWithTag("room-record-body").performTextReplacement("未提交的临时感想")
         compose.onNodeWithContentDescription("返回").performClick()
         expectDiscard("header");compose.onNodeWithText("继续编辑").performClick()
-        module("me");expectDiscard("module");compose.onNodeWithText("继续编辑").performClick()
         compose.runOnIdle{compose.activity.onBackPressedDispatcher.onBackPressed()}
         expectDiscard("system");screenshot("production-draft-guard");discardRecord()
         assertEquals(0,services.drafts.read(services.userId.value!!,"visit:${f.getString("location")}:${f.getString("visit")}").length())
-        mark("production_header_system_back_and_module_draft_guards")
+        mark("production_header_and_system_back_draft_guards")
         openRecord(f);compose.onNodeWithTag("room-record-body").assertTextContains("未认证的私有验收记录")
         recordTextClick("相册选择");pickPhotoForRecord(f)
         compose.waitUntil(25000){compose.onAllNodes(hasTestTag("room-record-photo") and isEnabled()).fetchSemanticsNodes().isNotEmpty()}
@@ -255,7 +251,7 @@ class NativeEmulatorAcceptanceTest {
         val saved=record(f);assertEquals("相册上传的私有验收记录",saved.body);assertEquals("private",saved.visibility)
         assertNotNull(saved.mediaId);assertTrue(saved.raw.isNull("verified_at"))
         probe.edit().putString("record-media",saved.mediaId).commit();screenshot("private-record-saved")
-        mark("production_header_system_back_and_module_draft_guards");mark("private_record_real_photo_upload")
+        mark("production_header_and_system_back_draft_guards");mark("private_record_real_photo_upload")
     }
 
     @Test fun requestDedicatedMailboxCodeThroughLoginUi()=runBlocking {
@@ -330,7 +326,9 @@ class NativeEmulatorAcceptanceTest {
 
     private suspend fun openCommunity(f:JSONObject) {
         services.repositories.content.save("favorite",JSONObject().put("location_id",f.getString("location")).put("enabled",true))
-        module("library");waitTag("room-archive");compose.onNodeWithTag("room-drawer-places").performScrollTo().performClick()
+        module("library");waitTag("swiss-personal-wall")
+        compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasTestTag("room-drawer-places"))
+        compose.onNodeWithTag("room-drawer-places").performClick()
         waitTag("archive-place-${f.getString("location")}")
         val name=services.catalog.value.places.first{it.id==f.getString("location")}.name
         compose.onNodeWithText(name,substring=false).performScrollTo().performClick();waitTag("room-place-detail")
@@ -447,7 +445,7 @@ class NativeEmulatorAcceptanceTest {
         assertTrue(services.library.favorites.read("user:$b").songs.isEmpty())
         assertTrue(services.library.trips.read("user:$b").isEmpty())
         assertNull(services.accountAvatar());assertEquals("模拟器验收乙",(services.call("self") as JSONObject).getString("nickname"))
-        module("me");waitTag("account-nickname");compose.waitUntil(20000){compose.onAllNodesWithText("模拟器验收乙").fetchSemanticsNodes().isNotEmpty()}
+        ownProfile();compose.waitUntil(20000){compose.onAllNodesWithText("模拟器验收乙").fetchSemanticsNodes().isNotEmpty()}
         assertTrue(compose.onAllNodesWithText("只属于验收甲的本机草稿").fetchSemanticsNodes().isEmpty());screenshot("second-account-isolated")
         login(f);openRecord(f);compose.onNodeWithTag("room-record-body").assertTextContains("只属于验收甲的本机草稿")
         librarySettled(a)
@@ -495,7 +493,7 @@ class NativeEmulatorAcceptanceTest {
         compose.onNodeWithTag("account-code").performTextReplacement(mail.getString("code"))
         compose.onNodeWithTag("account-sign-in").performScrollTo().performClick()
         withTimeout(35000){services.userId.first{it==f.getJSONObject("otp").getString("id")}}
-        waitTag("room-home");mark("real_email_delivery_and_native_otp_login");screenshot("otp-signed-in")
+        waitTag("room-catalogue");mark("real_email_delivery_and_native_otp_login");screenshot("otp-signed-in")
         mark("real_incorrect_code_rejected_without_losing_valid_code")
     }
 

@@ -73,7 +73,7 @@ internal val SwissWallMuted=Color(0xFF5C625C)
     fun play(index:Int,offset:Int){playIndex=index;playOffset=offset;prefs.edit().putInt("play-index",index).putInt("play-offset",offset).apply()}
 }
 
-@Composable internal fun SwissWallHeader(section:Int,onSearch:()->Unit,onSpace:()->Unit,onOrigin:(Offset)->Unit) {
+@Composable internal fun SwissWallHeader(section:Int,onSearch:()->Unit) {
     Row(Modifier.fillMaxWidth().height(112.dp).padding(start=26.dp,end=16.dp),verticalAlignment=Alignment.CenterVertically) {
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(9.dp)) {
             Text(listOf("01 / MUSIC","02 / WORLD","03 / PLAY","04 / PERSONAL")[section],color=SwissRed,fontSize=11.sp,letterSpacing=1.8.sp,fontWeight=FontWeight.Medium)

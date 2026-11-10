@@ -26,7 +26,7 @@ class MusicAccountLayoutTest {
                 RoomHeader(if(page=="my")"我的" else if(page=="edit")"个人资料" else "设置",onBack=if(page=="edit")({discard=true})else null,onSpace={})
                 when(page) {
                     "my"->RoomProfileContent(JSONObject().put("nickname",nickname),false,null,{},ownerName=nickname,ownerManagement={
-                        RoomProfileManagement("layout@example.invalid",4,1,1,false,{page="edit"},{},null,{})
+                        RoomProfileManagement("layout@example.invalid",4,1,false,{page="edit"},{},null,{})
                     }) {}
                     "edit"->RoomProfileEditor(MusicProfileDraft(owner="layout-owner",nickname=nickname,originalNickname="音乐旅人",active=true),{nickname=it},{},{},{page="my"},{})
                     else->RoomSettings(AppPreferencesState(),true,false,null,{},{},{},{signedOut=true})
@@ -39,7 +39,7 @@ class MusicAccountLayoutTest {
         compose.onNodeWithText("layout@example.invalid").assertDoesNotExist()
         compose.onNodeWithText("本人管理").performClick()
         compose.onNodeWithText("layout@example.invalid").assertIsDisplayed()
-        compose.onNodeWithText("演奏").assertHasNoClickAction()
+        compose.onNodeWithText("演奏").assertDoesNotExist()
         compose.onNodeWithText("演奏记录").assertDoesNotExist()
         compose.onNodeWithText("设置").assertDoesNotExist()
         compose.onNodeWithTag("account-edit-profile").performClick()

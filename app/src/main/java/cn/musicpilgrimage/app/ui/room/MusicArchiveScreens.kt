@@ -1,6 +1,5 @@
 package cn.musicpilgrimage.app.ui.room
 
-import android.graphics.BitmapFactory
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -13,21 +12,20 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,80 +35,7 @@ import cn.musicpilgrimage.app.MusicArchiveState
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.PrivatePhoto
-import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import java.time.Instant
-
-@Composable internal fun RoomArchiveHome(
-    catalog:MusicCatalogue,favorites:MusicFavorites,archive:MusicArchiveState,places:List<Place>,
-    onDrawer:(String)->Unit,onWork:(MusicWork)->Unit,onRelease:(MusicRelease)->Unit,onPlace:(String)->Unit,onMore:()->Unit,onTrips:()->Unit=onMore
-) {
-    val motion=LocalPhysicalMotion.current
-    val scope=rememberCoroutineScope()
-    var selected by rememberSaveable {mutableStateOf<String?>(null)}
-    val pull=remember {Animatable(if(selected==null)0f else 1f)}
-    LaunchedEffect(Unit){if(selected!=null){pull.animateTo(0f,tween(if(motion)120 else 0));selected=null}}
-    LazyColumn(Modifier.fillMaxSize().testTag("room-archive"),state=rememberLazyListState(),contentPadding=PaddingValues(bottom=28.dp)) {
-        item {
-            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal=12.dp)) {
-                val scale=maxWidth/1155f
-                Box(Modifier.fillMaxWidth().height(scale*1362f)) {
-                    AsyncImage(roomAsset("cabinet-empty"),null,Modifier.matchParentSize(),contentScale=ContentScale.FillBounds)
-                    val tops=listOf(310f,564f,778f,990f)
-                    val heights=listOf(252f,212f,210f,211f)
-                    listOf("songs" to "歌曲","releases" to "专辑","places" to "地点","footprints" to "足迹").forEachIndexed { index,(kind,label)->
-                        val active=selected==kind
-                        val amount=if(active)pull.value else 0f
-                        Box(Modifier.offset(x=scale*68f,y=scale*tops[index]).width(scale*1020f).height(scale*heights[index])
-                            .graphicsLayer{translationY=8.dp.toPx()*amount;scaleX=1f+.025f*amount;scaleY=1f+.025f*amount}
-                            .testTag("room-drawer-$kind")
-                            .clickable(role=Role.Button,onClickLabel="打开$label 抽屉") {
-                                if(!pull.isRunning)scope.launch{selected=kind;pull.animateTo(1f,tween(if(motion)160 else 0));onDrawer(kind)}
-                            }) {
-                            if(active&&amount>0f) {
-                                CabinetDrawerSlice(tops[index],heights[index],Modifier.matchParentSize())
-                            }
-                            Text(label,Modifier.align(Alignment.CenterStart).padding(start=30.dp),color=RoomColors.Ink,fontSize=20.sp,fontWeight=FontWeight.SemiBold)
-                        }
-                    }
-                }
-            }
-        }
-        item {RoomPaper(Modifier.padding(horizontal=20.dp).fillMaxWidth().clickable(role=Role.Button,onClick=onTrips)){Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Outlined.Route,null,tint=RoomColors.Navy);Text("我的行程",Modifier.weight(1f).padding(start=12.dp),fontSize=16.sp,color=RoomColors.Ink);Icon(Icons.Outlined.ChevronRight,null,tint=RoomColors.Muted)}}}
-        item {Text("最近添加",Modifier.padding(start=25.dp,top=22.dp,bottom=12.dp),fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)}
-        val recent=buildList {
-            favorites.songs.forEach{id->catalog.works.find{it.id==id}?.let{add(RecentArchiveItem("song:$id",it.title,"歌曲 · ${it.artist}",favorites.time(id,false),work=it))}}
-            favorites.releases.forEach{id->catalog.releases.find{it.id==id}?.let{add(RecentArchiveItem("release:$id",it.title,"专辑 · ${it.artist}",favorites.time(id,true),release=it))}}
-            archive.places.forEach{id->places.find{it.id==id}?.let{add(RecentArchiveItem("place:$id",it.name,"地点 · ${it.city}",0,place=it))}}
-            archive.visits.forEach{record->places.find{it.id==record.location}?.let{place->
-                val time=runCatching{Instant.parse(record.raw.optString("created_at")).toEpochMilli()}.getOrDefault(0L)
-                add(RecentArchiveItem("visit:${record.id}",place.name,"足迹 · ${visitDate(record)}",time,place=place))
-            }}
-        }.sortedByDescending{it.time}.take(3)
-        if(recent.isEmpty())item {Text("打开抽屉整理收藏，或去唱片架发现喜欢的作品。",Modifier.padding(horizontal=25.dp),fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)}
-        items(recent,key={it.key}) { item->
-            Row(Modifier.fillMaxWidth().clickable(role=Role.Button){when{item.work!=null->onWork(item.work);item.release!=null->onRelease(item.release);item.place!=null->onPlace(item.place.id)}}.padding(horizontal=25.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                val art=item.work?.artwork?:item.release?.artwork
-                if(art!=null)RoomCover(art,item.title,Modifier.size(52.dp)) else ArchivePlaceImage(item.place,Modifier.size(52.dp))
-                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)){Text(item.title,fontSize=16.sp,maxLines=1,overflow=TextOverflow.Ellipsis,color=RoomColors.Ink);Text(item.subtitle,fontSize=12.sp,color=RoomColors.Muted)}
-                Icon(Icons.Outlined.ChevronRight,null,tint=RoomColors.Muted)
-            }
-        }
-        item {SwissTextButton(onMore,Modifier.padding(start=15.dp,top=16.dp).testTag("archive-more-records")){Text("更多记录");Icon(Icons.Outlined.ChevronRight,null)}}
-    }
-}
-
-private data class RecentArchiveItem(val key:String,val title:String,val subtitle:String,val time:Long,val work:MusicWork?=null,val release:MusicRelease?=null,val place:Place?=null)
-
-/** The furniture sprite is clipped during drawing, while labels and touch targets remain native. */
-@Composable private fun CabinetDrawerSlice(top:Float,height:Float,modifier:Modifier) {
-    val context=LocalContext.current
-    val bitmap=remember{context.assets.open("design/music-space/cabinet-empty.webp").use{BitmapFactory.decodeStream(it)}.asImageBitmap()}
-    Canvas(modifier.clip(androidx.compose.ui.graphics.RectangleShape)) {
-        drawImage(bitmap,srcOffset=IntOffset(68,top.toInt()),srcSize=IntSize(1020,height.toInt()),dstSize=IntSize(size.width.toInt(),size.height.toInt()))
-    }
-}
 
 @Composable internal fun RoomDrawerFrame(modifier:Modifier=Modifier,content:@Composable BoxScope.()->Unit) {
     Box(modifier.padding(horizontal=24.dp,vertical=8.dp),content=content)
@@ -118,10 +43,15 @@ private data class RecentArchiveItem(val key:String,val title:String,val subtitl
 
 @Composable private fun ArchiveTabs(selected:String,entries:List<Pair<String,String>>,onSelect:(String)->Unit) {
     Row(Modifier.fillMaxWidth().padding(horizontal=24.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-        entries.forEach{(id,title)->Column(horizontalAlignment=Alignment.CenterHorizontally) {
-            SwissTextButton({onSelect(id)},Modifier.heightIn(min=44.dp).testTag("archive-tab-$id")){Text(title,color=if(selected==id)RoomColors.Ink else RoomColors.Muted,fontSize=14.sp)}
-            Box(Modifier.width(22.dp).height(2.dp).background(if(selected==id)RoomColors.Red else Color.Transparent))
-        }}
+        entries.forEach{(id,title)->
+            val active=id==selected
+            Column(horizontalAlignment=Alignment.CenterHorizontally) {
+                SwissTextButton({onSelect(id)},Modifier.heightIn(min=44.dp).testTag("archive-tab-$id").semantics{this.selected=active}) {
+                    Text(title,color=if(active)RoomColors.Ink else RoomColors.Muted,fontSize=14.sp)
+                }
+                Box(Modifier.width(22.dp).height(2.dp).background(if(active)RoomColors.Red else Color.Transparent))
+            }
+        }
     }
 }
 
@@ -161,42 +91,97 @@ private data class RecentArchiveItem(val key:String,val title:String,val subtitl
 }
 
 @Composable internal fun RoomPlaceFavorites(
-    archive:MusicArchiveState,places:List<Place>,initialKind:String,onPlace:(String)->Unit,onRemove:(String)->Unit,
-    onLogin:()->Unit,onReload:()->Unit,onEdit:(ContentItem)->Unit,onDelete:(ContentItem)->Unit,services:AppServices,onMusic:((String)->Unit)?=null
+    archive:MusicArchiveState,places:List<Place>,onPlace:(String)->Unit,onRemove:(String)->Unit,
+    onLogin:()->Unit,onReload:()->Unit,onMusic:(String)->Unit
 ) {
-    var kind by rememberSaveable{mutableStateOf(initialKind)}
-    val placeScroll=rememberLazyListState();val visitScroll=rememberLazyListState()
-    val grouped=archive.visits.groupBy{it.location}.entries.sortedByDescending{(_,rows)->rows.maxOf{visitDate(it)}}
     Column(Modifier.fillMaxSize().testTag("room-place-favorites")) {
-        ArchiveTabs(kind,if(initialKind=="places"&&onMusic!=null)listOf("releases" to "发行","songs" to "作品","places" to "地点")else listOf("places" to "地点","footprints" to "足迹")){if(it in listOf("songs","releases"))onMusic?.invoke(it)else kind=it}
+        ArchiveTabs("places",listOf("releases" to "发行","songs" to "作品","places" to "地点")) {
+            if(it!="places")onMusic(it)
+        }
         RoomDrawerFrame(Modifier.weight(1f)) {
-            LazyColumn(Modifier.fillMaxSize(),state=if(kind=="places")placeScroll else visitScroll,contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),verticalArrangement=Arrangement.spacedBy(11.dp)) {
-                if(archive.owner==null)item{Column(Modifier.padding(vertical=18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){Text("登录查看${if(kind=="places")"地点收藏" else "认证足迹"}",color=RoomColors.Ink);Text("已有收藏和到访记录会保留在你的账号中。",fontSize=14.sp,color=RoomColors.Muted);SwissButton(onLogin,shape=androidx.compose.ui.graphics.RectangleShape){Text("登录")}}}
+            LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),
+                verticalArrangement=Arrangement.spacedBy(11.dp)) {
+                if(archive.owner==null)item {ArchiveLogin("地点收藏",onLogin)}
                 else {
-                    item {Text(if(kind=="places")"${archive.places.size} 个收藏地点" else "${grouped.size} 个到访地点",fontSize=12.sp,color=RoomColors.Muted)}
-                    if(archive.loading)item{LinearProgressIndicator(Modifier.fillMaxWidth(),color=RoomColors.Navy)}
-                    if(archive.error!=null)item{Column{Text(archive.error,color=MaterialTheme.colorScheme.error,fontSize=13.sp);SwissTextButton(onReload){Text("重试")}}}
-                    if(kind=="places") {
-                        if(archive.places.isEmpty()&&!archive.loading&&archive.error==null)item{Text("还没有收藏地点，在作品或地图中发现喜欢的地方。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)}
-                        items(archive.places,key={it}) {id->
-                            val place=places.find{it.id==id}
-                            RoomPaper(Modifier.fillMaxWidth().animateItem().testTag("archive-place-$id")) {
-                                Row(verticalAlignment=Alignment.CenterVertically) {
-                                    Row(Modifier.weight(1f).clickable(role=Role.Button){onPlace(id)}.padding(start=11.dp,top=12.dp,bottom=12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalAlignment=Alignment.CenterVertically){
-                                        ArchivePlaceImage(place,Modifier.width(90.dp).height(66.dp))
-                                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)){Text(place?.name?:"地点暂未收录",maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=16.sp,color=RoomColors.Ink);Text(listOfNotNull(place?.city,place?.country).joinToString(" · "),fontSize=12.sp,color=RoomColors.Muted,maxLines=1,overflow=TextOverflow.Ellipsis)}
+                    item {Text("${archive.places.size} 个收藏地点",fontSize=12.sp,color=RoomColors.Muted)}
+                    archiveStatus(archive,onReload)
+                    if(archive.places.isEmpty()&&!archive.loading&&archive.error==null)item {
+                        Text("还没有收藏地点，在作品或地图中发现喜欢的地方。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)
+                    }
+                    items(archive.places,key={it}) {id->
+                        val place=places.find{it.id==id}
+                        RoomPaper(Modifier.fillMaxWidth().animateItem().testTag("archive-place-$id")) {
+                            Row(verticalAlignment=Alignment.CenterVertically) {
+                                Row(Modifier.weight(1f).clickable(role=Role.Button){onPlace(id)}
+                                    .padding(start=11.dp,top=12.dp,bottom=12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),
+                                    verticalAlignment=Alignment.CenterVertically) {
+                                    ArchivePlaceImage(place,Modifier.width(90.dp).height(66.dp))
+                                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                                        Text(place?.name?:"地点暂未收录",maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=16.sp,color=RoomColors.Ink)
+                                        Text(listOfNotNull(place?.city,place?.country).joinToString(" · "),fontSize=12.sp,
+                                            color=RoomColors.Muted,maxLines=1,overflow=TextOverflow.Ellipsis)
                                     }
-                                    IconButton({onRemove(id)},Modifier.testTag("archive-remove-place-$id")){Icon(Icons.Outlined.Favorite,"取消地点收藏",tint=RoomColors.Red,modifier=Modifier.size(20.dp))}
+                                }
+                                IconButton({onRemove(id)},Modifier.testTag("archive-remove-place-$id")) {
+                                    Icon(Icons.Outlined.Favorite,"取消地点收藏",tint=RoomColors.Red,modifier=Modifier.size(20.dp))
                                 }
                             }
                         }
-                    } else {
-                        if(grouped.isEmpty()&&!archive.loading&&archive.error==null)item{Text("还没有认证足迹，到访地点后可以留下记录。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)}
-                        items(grouped,key={it.key}) {(id,records)->FootprintCard(places.find{it.id==id},records,{onPlace(id)},onEdit,onDelete,services)}
                     }
                 }
             }
         }
+    }
+}
+
+@Composable internal fun RoomFootprints(
+    archive:MusicArchiveState,places:List<Place>,initialTab:String,onPlace:(String)->Unit,onLogin:()->Unit,
+    onReload:()->Unit,onEdit:(ContentItem)->Unit,onDelete:(ContentItem)->Unit,services:AppServices,
+    recreations:@Composable ()->Unit
+) {
+    var tab by rememberSaveable(initialTab) {mutableStateOf(initialTab)}
+    val visitScroll=rememberLazyListState()
+    val tabState=rememberSaveableStateHolder()
+    Column(Modifier.fillMaxSize().testTag("room-footprints")) {
+        ArchiveTabs(tab,listOf("visits" to "到访","recreations" to "复刻")){tab=it}
+        if(archive.owner==null)Box(Modifier.padding(horizontal=24.dp)) {
+            ArchiveLogin("足迹",onLogin)
+        }
+        else tabState.SaveableStateProvider(tab) {
+            if(tab=="recreations")recreations()
+            else RoomDrawerFrame(Modifier.weight(1f)) {
+                val grouped=archive.visits.groupBy{it.location}.entries.sortedByDescending{(_,rows)->rows.maxOf{visitDate(it)}}
+                LazyColumn(Modifier.fillMaxSize(),state=visitScroll,contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),
+                    verticalArrangement=Arrangement.spacedBy(11.dp)) {
+                    item {Text("${grouped.size} 个到访地点",fontSize=12.sp,color=RoomColors.Muted)}
+                    archiveStatus(archive,onReload)
+                    if(grouped.isEmpty()&&!archive.loading&&archive.error==null)item {
+                        Text("还没有到访记录，到访地点后可以留下记录。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)
+                    }
+                    items(grouped,key={it.key}) {(id,records)->
+                        FootprintCard(places.find{it.id==id},records,{onPlace(id)},onEdit,onDelete,services)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun LazyListScope.archiveStatus(archive:MusicArchiveState,onReload:()->Unit) {
+    if(archive.loading)item {LinearProgressIndicator(Modifier.fillMaxWidth(),color=RoomColors.Navy)}
+    if(archive.error!=null)item {
+        Column {
+            Text(archive.error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
+            SwissTextButton(onReload){Text("重试")}
+        }
+    }
+}
+
+@Composable private fun ArchiveLogin(section:String,onLogin:()->Unit) {
+    Column(Modifier.padding(vertical=18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Text("登录查看$section",color=RoomColors.Ink)
+        Text("已有收藏和足迹会保留在你的账号中。",fontSize=14.sp,color=RoomColors.Muted)
+        SwissButton(onLogin,shape=androidx.compose.ui.graphics.RectangleShape){Text("登录")}
     }
 }
 
