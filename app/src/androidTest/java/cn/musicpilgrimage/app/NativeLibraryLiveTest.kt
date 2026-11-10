@@ -115,7 +115,7 @@ class NativeLibraryLiveTest {
             compose.onNodeWithTag("archive-undo-button").performClick()
             settled(owner)
             assertTrue("Undo preserved the original timestamp",songs(remote(owner),owner).time(song,false)==date)
-            compose.onNodeWithText("行程和音乐收藏已同步").assertIsDisplayed();capture("online-favorites")
+            compose.onNodeWithTag("room-library-sync-retry").assertIsEnabled();capture("online-favorites")
             plans.update(owner){rows->rows.map{if(it.id==plan.id)it.copy(name="在线同步临时检查（已修改）").changeDates(plan.start,plan.start.plusDays(1))else it}}
             settled(owner)
             assertTrue("Shortened dates preserve overflow as unscheduled",trips(remote(owner)).first{it.id==plan.id}.let{it.name.endsWith("（已修改）")&&it.stops.single().day==null})
@@ -165,7 +165,7 @@ class NativeLibraryLiveTest {
             val cloud=remote(owner)
             assertTrue("Queued song uploaded after reconnect",song in songs(cloud,owner).songs)
             assertTrue("Queued trip uploaded after reconnect",trips(cloud).any{it.id==trip&&it.name=="断网恢复临时检查"})
-            tripPage();compose.onNodeWithText("行程和音乐收藏已同步").assertIsDisplayed();capture("reconnected")
+            tripPage();compose.onNodeWithTag("room-library-sync-retry").assertIsEnabled();capture("reconnected")
             mark("automatic_upload_after_reconnect")
         } finally {cleanup(owner)}
         mark("offline_fixtures_cleaned_from_local_and_cloud")

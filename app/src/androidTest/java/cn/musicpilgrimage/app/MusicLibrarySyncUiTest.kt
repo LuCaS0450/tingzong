@@ -57,7 +57,7 @@ class MusicLibrarySyncUiTest {
         assertTrue("Guest library RPC must stop before sending a request",rejected)
     }
     /** Stateless feedback fixture only; this does not create or replace an authenticated session. */
-    @Test fun syncFeedbackHasRetryAndDoesNotClaimSuccessWhileWaiting() {
+    @Test fun syncFeedbackShowsRetryAndHidesRoutineSuccess() {
         val state=mutableStateOf(PersonalLibrarySyncState("user:ui-status-fixture",LibrarySyncStatus.ERROR,error="暂时无法同步，本机更改已保留。"));var retries=0
         compose.runOnUiThread{compose.activity.setContent{PilgrimageTheme{RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             Column {RoomHeader("同步状态",onBack={},onSpace={});RoomPaper(Modifier.padding(18.dp)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -71,7 +71,9 @@ class MusicLibrarySyncUiTest {
         compose.runOnIdle{state.value=state.value.copy(status=LibrarySyncStatus.WAITING)}
         compose.onNodeWithText("已保存到本机，等待同步").assertIsDisplayed();compose.onNodeWithText("行程和音乐收藏已同步").assertDoesNotExist()
         compose.runOnIdle{state.value=state.value.copy(status=LibrarySyncStatus.SYNCED,notice="另一设备也修改了行程，两个版本已分别保留。")}
-        compose.onNodeWithText("行程和音乐收藏已同步").assertIsDisplayed();compose.onNodeWithText("另一设备也修改了行程，两个版本已分别保留。").assertIsDisplayed();capture("sync-complete")
+        compose.onNodeWithText("行程和音乐收藏已同步").assertDoesNotExist()
+        compose.onNodeWithTag("room-library-sync-retry").assertIsEnabled()
+        compose.onNodeWithText("另一设备也修改了行程，两个版本已分别保留。").assertIsDisplayed();capture("sync-complete")
     }
     /** Guest cache fixture exercises editor refresh; no authentication or cloud write is used. */
     @Test fun staleTripEditorRetainsDraftAndReportsConflict() {
