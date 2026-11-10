@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -79,10 +80,10 @@ import kotlinx.coroutines.delay
     val ids=if(release)favorites.releases else favorites.songs
     val motion=LocalPhysicalMotion.current
     Column(Modifier.fillMaxSize().testTag("room-music-favorites")) {
-        RoomLibrarySyncStatus(sync.takeIf{it.owner==favorites.owner}?:PersonalLibrarySyncState(),onSync,Modifier.padding(horizontal=24.dp))
+        RoomLibrarySyncStatus(sync.takeIf{it.owner==favorites.owner}?:PersonalLibrarySyncState(),onSync,
+            Modifier.padding(horizontal=31.dp),caption="${ids.size} 项收藏".takeIf{ids.isNotEmpty()})
         RoomDrawerFrame(Modifier.weight(1f)) {
             LazyColumn(Modifier.fillMaxSize().testTag("archive-music-list"),contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                if(ids.isNotEmpty())item(key="count"){Text("${ids.size} 项收藏",fontSize=12.sp,color=RoomColors.Muted,modifier=Modifier.padding(bottom=3.dp))}
                 if(ids.isEmpty())item(key="empty"){Column(Modifier.padding(vertical=18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){Text(if(release)"还没有收藏专辑"else "还没有收藏歌曲",color=RoomColors.Ink);SwissOutlinedButton(onDiscover,shape=androidx.compose.ui.graphics.RectangleShape){Text("浏览唱片架")}}}
                 items(ids,key={"$kind:$it"}) { id->
                     val work=if(release)null else catalog.works.find{it.id==id}
@@ -110,6 +111,7 @@ import kotlinx.coroutines.delay
     archive:MusicArchiveState,places:List<Place>,onPlace:(String)->Unit,onRemove:(String)->Unit,
     onLogin:()->Unit,onReload:()->Unit
 ) {
+    val context=LocalContext.current
     RoomDrawerFrame(Modifier.fillMaxSize().testTag("room-place-favorites")) {
         LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),
             verticalArrangement=Arrangement.spacedBy(11.dp)) {
@@ -129,7 +131,9 @@ import kotlinx.coroutines.delay
                                 verticalAlignment=Alignment.CenterVertically) {
                                 ArchivePlaceImage(place,Modifier.width(90.dp).height(66.dp))
                                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                                    Text(place?.name?:"地点暂未收录",maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=16.sp,color=RoomColors.Ink)
+                                    Text(place?.let{PlaceEditorialCopy.name(context,it)}?:"地点暂未收录",
+                                        maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=16.sp,lineHeight=22.sp,
+                                        fontWeight=FontWeight.Medium,color=RoomColors.Ink)
                                     Text(listOfNotNull(place?.city,place?.country).joinToString(" · "),fontSize=12.sp,
                                         color=RoomColors.Muted,maxLines=1,overflow=TextOverflow.Ellipsis)
                                 }

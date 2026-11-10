@@ -1,44 +1,127 @@
 package cn.musicpilgrimage.app.ui.room
 
 import android.app.DatePickerDialog
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.musicpilgrimage.app.MusicTripState
 import cn.musicpilgrimage.app.MusicTripViewModel
 import cn.musicpilgrimage.app.data.*
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 @Composable internal fun RoomTripList(state:MusicTripState,owner:String,cities:List<MusicTripCity>,vm:MusicTripViewModel,onOpen:(String)->Unit) {
     var create by rememberSaveable{mutableStateOf(false)}
+    var deleteId by rememberSaveable{mutableStateOf<String?>(null)}
+    var revealedId by remember{mutableStateOf<String?>(null)}
+    val deleting=state.trips.find{it.id==deleteId}
     val librarySync by vm.sync.collectAsStateWithLifecycle()
-    LazyColumn(Modifier.fillMaxSize().testTag("room-trips"),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("出发的日子",Modifier.weight(1f),fontSize=21.sp,color=RoomColors.Ink);SwissTextButton({vm.dismissError();create=true},enabled=!state.busy){Text("新建行程")}}}
-        item{RoomLibrarySyncStatus(librarySync.takeIf{it.owner==owner}?:PersonalLibrarySyncState(),vm::syncLibrary)}
+    LazyColumn(Modifier.fillMaxSize().testTag("room-trips"),contentPadding=PaddingValues(24.dp,12.dp,24.dp,24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        item{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("出发的日子",Modifier.weight(1f),fontSize=23.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink);SwissTextButton({vm.dismissError();create=true;revealedId=null},enabled=!state.busy){Text("新建行程")}}}
+        item{RoomLibrarySyncStatus(librarySync.takeIf{it.owner==owner}?:PersonalLibrarySyncState(),vm::syncLibrary,
+            caption="左滑行程可删除".takeIf{state.trips.isNotEmpty()})}
         if(state.busy)item{LinearProgressIndicator(Modifier.fillMaxWidth(),color=RoomColors.Navy)}
-        if(state.error!=null)item{TripError(state.error)}
+        if(state.error!=null&&deleting==null)item{TripError(state.error)}
         if(state.trips.isEmpty()&&!state.busy)item{Text("还没有行程。先选出行日期，再把喜欢的地点安排到每天。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)}
-        items(state.trips,key={it.id}){trip->RoomPaper(Modifier.fillMaxWidth().clickable(role=Role.Button){onOpen(trip.id)},woodEdge=true){Column(Modifier.padding(17.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text(trip.name,fontSize=19.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
-            Text("${trip.start} — ${trip.end} · ${trip.days}天",fontSize=13.sp,color=RoomColors.Muted)
-            Text(trip.cities.joinToString(" · "){it.label},fontSize=13.sp,color=RoomColors.Ink)
-        }}}
+        items(state.trips,key={it.id}){trip->
+            TripSwipeRow(trip,revealedId==trip.id,!state.busy,{revealed->
+                if(revealed)revealedId=trip.id else if(revealedId==trip.id)revealedId=null
+            },{revealedId=null;onOpen(trip.id)},{vm.dismissError();deleteId=trip.id})
+        }
     }
     if(create)RoomTripCreateDialog(cities,state.busy,state.error,{create=false}){name,start,end,selected->
         vm.create(owner,name,start,end,selected){id->create=false;onOpen(id)}
+    }
+    if(deleting!=null) {
+        val close={deleteId=null;revealedId=null;vm.dismissError()}
+        TripPanel("删除行程？",state.busy,close) {
+            Text("「${deleting.name}」及每天的全部安排都会被删除。此操作无法撤销。",
+                color=RoomColors.Ink,fontSize=15.sp,lineHeight=24.sp)
+            TripError(state.error)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+                SwissTextButton(close,enabled=!state.busy){Text("取消")}
+                SwissButton({vm.deleteTrip(owner,deleting.id,close)},enabled=!state.busy,
+                    colors=ButtonDefaults.buttonColors(containerColor=RoomColors.Red,contentColor=RoomColors.Paper)) {
+                    Text(if(state.busy)"正在删除…" else "删除行程")
+                }
+            }
+        }
+    }
+}
+
+private enum class TripRowPosition { Closed, Delete }
+
+@Composable private fun TripSwipeRow(
+    trip:MusicTrip,revealed:Boolean,enabled:Boolean,onReveal:(Boolean)->Unit,onOpen:()->Unit,onDelete:()->Unit
+) {
+    val actionWidth=64.dp
+    val actionOffset=with(LocalDensity.current){actionWidth.toPx()}
+    val swipe=remember(actionOffset) {
+        AnchoredDraggableState(TripRowPosition.Closed,DraggableAnchors {
+            TripRowPosition.Closed at 0f
+            TripRowPosition.Delete at -actionOffset
+        })
+    }
+    val scope=rememberCoroutineScope()
+    val reportReveal by rememberUpdatedState(onReveal)
+    val actionExposed=swipe.settledValue==TripRowPosition.Delete
+    LaunchedEffect(swipe) {
+        snapshotFlow{swipe.settledValue}.collect{reportReveal(it==TripRowPosition.Delete)}
+    }
+    LaunchedEffect(revealed) {
+        if(!revealed&&actionExposed)swipe.animateTo(TripRowPosition.Closed)
+    }
+    Box(Modifier.fillMaxWidth().clipToBounds().anchoredDraggable(
+        swipe,reverseDirection=false,orientation=Orientation.Horizontal,enabled=enabled
+    )) {
+        Box(Modifier.matchParentSize().background(RoomColors.Red),contentAlignment=Alignment.CenterEnd) {
+            if(actionExposed)IconButton(onDelete,Modifier.width(actionWidth).testTag("trip-delete-${trip.id}"),enabled=enabled) {
+                Icon(Icons.Outlined.DeleteOutline,"删除${trip.name}",tint=RoomColors.Paper)
+            } else Box(Modifier.width(actionWidth),contentAlignment=Alignment.Center) {
+                Icon(Icons.Outlined.DeleteOutline,null,tint=RoomColors.Paper)
+            }
+        }
+        RoomPaper(Modifier.fillMaxWidth().offset{IntOffset(swipe.requireOffset().roundToInt(),0)}
+            .testTag("trip-row-${trip.id}")
+            .clickable(enabled=enabled,role=Role.Button) {
+                if(actionExposed)scope.launch{swipe.animateTo(TripRowPosition.Closed)} else onOpen()
+            }.semantics {
+                if(enabled)customActions=listOf(CustomAccessibilityAction("删除行程"){onDelete();true})
+            }) {
+            Column(Modifier.fillMaxWidth().padding(vertical=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text(trip.name,fontSize=19.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
+                Text("${trip.start} — ${trip.end} · ${trip.days}天",fontSize=13.sp,color=RoomColors.Muted)
+                Text(trip.cities.joinToString(" · "){it.label},fontSize=13.sp,color=RoomColors.Ink)
+                HorizontalDivider(Modifier.padding(top=8.dp),color=RoomColors.Line)
+            }
+        }
     }
 }
 

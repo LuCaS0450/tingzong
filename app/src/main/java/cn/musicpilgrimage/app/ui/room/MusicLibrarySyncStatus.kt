@@ -14,10 +14,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.*
 
-@Composable internal fun RoomLibrarySyncStatus(state:PersonalLibrarySyncState,onRetry:()->Unit,modifier:Modifier=Modifier) {
+@Composable internal fun RoomLibrarySyncStatus(
+    state:PersonalLibrarySyncState,onRetry:()->Unit,modifier:Modifier=Modifier,caption:String?=null
+) {
     val local=!state.owner.startsWith("user:")||state.status==LibrarySyncStatus.LOCAL
     Row(modifier.fillMaxWidth().testTag("room-library-sync"),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         Column(Modifier.weight(1f).semantics{liveRegion=LiveRegionMode.Polite},verticalArrangement=Arrangement.spacedBy(5.dp)) {
+            caption?.let{Text(it,fontSize=13.sp,lineHeight=20.sp,color=RoomColors.Muted)}
             val statusText=if(local)state.error?:"行程和音乐收藏保存在这台设备。"else when(state.status) {
                 LibrarySyncStatus.WAITING->"已保存到本机，等待同步"
                 LibrarySyncStatus.SYNCING->"正在同步，本机更改会保留"

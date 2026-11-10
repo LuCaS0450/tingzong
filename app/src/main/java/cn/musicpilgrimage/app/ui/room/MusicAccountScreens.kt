@@ -1,5 +1,8 @@
 package cn.musicpilgrimage.app.ui.room
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -29,7 +32,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -71,15 +76,26 @@ import org.json.JSONObject
     BackHandler(state.help||onBack!=null){if(state.help)onHelp(false)else if(!busy)onBack?.invoke()}
     LaunchedEffect(state.focusCode,state.help){if(state.focusCode>0&&!state.help){withFrameNanos{};runCatching{codeFocus.requestFocus()}}}
     LaunchedEffect(state.emailError,state.codeError){withFrameNanos{};if(state.emailError!=null)runCatching{emailFocus.requestFocus()}else if(state.codeError!=null&&!state.help)runCatching{codeFocus.requestFocus()}}
+    val title=when {
+        state.help->"收不到验证码？"
+        state.register->"注册听踪"
+        else->"登录听踪"
+    }
+    val introduction=when {
+        state.help->"检查邮箱地址、垃圾邮件与收件箱空间。"
+        state.register->"用邮箱验证码创建你的音乐空间。"
+        else->"用邮箱验证码进入你的音乐空间。"
+    }
     Column(Modifier.fillMaxSize().testTag("room-email-login")) {
         if(onBack!=null||state.help)Row(Modifier.fillMaxWidth().height(54.dp).padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically){IconButton({if(state.help)onHelp(false)else onBack?.invoke()},enabled=!busy){Icon(Icons.AutoMirrored.Outlined.ArrowBack,"返回登录")}}
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(horizontal=25.dp),verticalArrangement=Arrangement.spacedBy(0.dp)) {
+        Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal=24.dp)) {
             Spacer(Modifier.height(if(onBack==null&&!state.help)30.dp else 8.dp))
-            if(!state.help){SwissEyebrow("WELCOME / 听踪");Spacer(Modifier.height(14.dp))}
-            Text(if(state.help)"收不到验证码？" else if(state.register)"注册" else "把你的旅途\n带在身边。",fontSize=30.sp,lineHeight=39.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
-            Spacer(Modifier.height(8.dp))
-            Text(if(state.help)"检查邮箱地址、垃圾邮件与收件箱空间。" else if(state.register)"用邮箱创建你的音乐空间" else "登录你的音乐空间",fontSize=14.sp,color=RoomColors.Muted,lineHeight=22.sp)
-            Spacer(Modifier.height(24.dp))
+            Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                SwissEyebrow("TINGZONG / ACCOUNT")
+                Text(title,fontSize=34.sp,lineHeight=42.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
+                Text(introduction,fontSize=14.sp,color=RoomColors.Muted,lineHeight=23.sp)
+            }
+            HorizontalDivider(Modifier.padding(top=18.dp,bottom=16.dp),color=RoomColors.Line)
             OutlinedTextField(state.email,onEmail,Modifier.fillMaxWidth().focusRequester(emailFocus).testTag("account-email"),label={Text("邮箱")},singleLine=true,enabled=!busy,isError=state.emailError!=null,
                 supportingText={Text(state.emailError.orEmpty(),fontSize=12.sp)},shape=androidx.compose.ui.graphics.RectangleShape,
                 keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email,imeAction=ImeAction.Next),keyboardActions=KeyboardActions(onNext={if(!state.help)codeFocus.requestFocus()}),
@@ -96,7 +112,8 @@ import org.json.JSONObject
                 }
                 Spacer(Modifier.height(10.dp))
                 SwissButton(onVerify,Modifier.fillMaxWidth().height(52.dp).testTag("account-sign-in"),enabled=!busy,shape=androidx.compose.ui.graphics.RectangleShape,colors=ButtonDefaults.buttonColors(containerColor=RoomColors.Navy)) {
-                    if(state.busy==OtpOperation.VERIFY||state.verified)AccountWaiting("登录中",motion)else Text(if(state.register)"注册并进入" else "登录")
+                    if(state.busy==OtpOperation.VERIFY||state.verified)AccountWaiting(if(state.register)"注册中" else "登录中",motion)
+                    else Text(if(state.register)"注册并进入" else "登录")
                 }
             } else {
                 Text("验证码可能需要一点时间送达。确认邮箱无误后，可以重新获取；不要向他人提供验证码。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)
@@ -105,8 +122,13 @@ import org.json.JSONObject
                     if(state.busy==OtpOperation.SEND)AccountWaiting("发送中",motion)else Text(if(state.remainingSeconds>0)"${state.remainingSeconds}秒后重发" else "重新获取验证码")
                 }
             }
-            Box(Modifier.fillMaxWidth().height(48.dp).padding(top=8.dp)) {Text(state.formError?:state.feedback.orEmpty(),fontSize=12.sp,lineHeight=18.sp,maxLines=2,color=if(state.formError!=null)MaterialTheme.colorScheme.error else RoomColors.Muted,modifier=Modifier.testTag("account-feedback").semantics{liveRegion=LiveRegionMode.Polite})}
-            if(!state.help)Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+            Box(Modifier.fillMaxWidth().heightIn(min=40.dp).padding(top=8.dp)) {
+                Text(state.formError?:state.feedback.orEmpty(),fontSize=12.sp,lineHeight=18.sp,
+                    color=if(state.formError!=null)MaterialTheme.colorScheme.error else RoomColors.Muted,
+                    modifier=Modifier.testTag("account-feedback").semantics{liveRegion=LiveRegionMode.Polite})
+            }
+            if(!state.help)HorizontalDivider(color=RoomColors.Line)
+            if(!state.help)Row(Modifier.fillMaxWidth().padding(top=4.dp),horizontalArrangement=Arrangement.SpaceBetween) {
                 SwissTextButton({onRegister(!state.register)},enabled=!busy,modifier=Modifier.testTag("account-registration")
                     .graphicsLayer{translationX=registrationShake.value.dp.toPx()}) {
                     Text(if(state.register)"已有账号，登录" else "注册账号",fontSize=13.sp,
@@ -184,13 +206,21 @@ import org.json.JSONObject
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()){uri->uri?.let(onPhoto)}
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(24.dp).testTag("room-profile-editor"),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         if(draft.loading)LinearProgressIndicator(Modifier.fillMaxWidth())
-        RoomPaper(Modifier.fillMaxWidth()){Column(Modifier.fillMaxWidth().padding(20.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            RoomAccountAvatar(draft.avatar,Modifier.size(80.dp))
-            SwissTextButton({picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))},enabled=draft.active&&!draft.saving&&!draft.processingPhoto){Text(if(draft.processingPhoto)"正在整理头像…" else "选择头像")}
-            if(draft.avatar!=null)SwissTextButton(onRemovePhoto,enabled=!draft.saving&&!draft.processingPhoto){Text("移除头像",fontSize=12.sp)}
-        }}
+        AccountSection("01","头像") {
+            Row(Modifier.fillMaxWidth().padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically,
+                horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                RoomAccountAvatar(draft.avatar,Modifier.size(64.dp))
+                Column {
+                    SwissTextButton({picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))},
+                        enabled=draft.active&&!draft.saving&&!draft.processingPhoto) {
+                        Text(if(draft.processingPhoto)"正在整理头像…" else "选择头像")
+                    }
+                    if(draft.avatar!=null)SwissTextButton(onRemovePhoto,enabled=!draft.saving&&!draft.processingPhoto){Text("移除头像",fontSize=12.sp)}
+                }
+            }
+        }
         OutlinedTextField(draft.nickname,onNickname,Modifier.fillMaxWidth().testTag("profile-nickname"),label={Text("昵称")},singleLine=true,enabled=draft.active&&!draft.saving,shape=androidx.compose.ui.graphics.RectangleShape,supportingText={Text("2—32个字",fontSize=12.sp)},colors=accountFieldColors())
-        Text(draft.error.orEmpty(),color=MaterialTheme.colorScheme.error,fontSize=13.sp,lineHeight=20.sp)
+        draft.error?.let{Text(it,color=MaterialTheme.colorScheme.error,fontSize=13.sp,lineHeight=20.sp)}
         if(!draft.active&&!draft.loading)SwissTextButton(onRetry){Text("重新加载资料")}
         if(!draft.active&&!draft.loading&&draft.error==null)Text("当前账号无法修改资料。",fontSize=13.sp,color=RoomColors.Muted)
         SwissButton(onSave,Modifier.fillMaxWidth().height(52.dp).testTag("profile-save"),enabled=draft.active&&!draft.saving&&!draft.processingPhoto&&(draft.dirty||draft.error!=null),shape=androidx.compose.ui.graphics.RectangleShape) {if(draft.saving)AccountWaiting("保存中",LocalPhysicalMotion.current)else Text("保存")}
@@ -199,15 +229,26 @@ import org.json.JSONObject
 
 @Composable internal fun RoomSettings(pref:AppPreferencesState,signedIn:Boolean,busy:Boolean,error:String?,onMuted:(Boolean)->Unit,onMotion:(Boolean)->Unit,onRoute:(String)->Unit,onSignOut:()->Unit) {
     var signOut by rememberSaveable{mutableStateOf(false)}
-    LazyColumn(Modifier.fillMaxSize().testTag("room-settings"),state=rememberLazyListState(),contentPadding=PaddingValues(24.dp,10.dp,24.dp,30.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-        item {RoomPaper(Modifier.fillMaxWidth()){Column(Modifier.padding(horizontal=15.dp)) {
-            SettingToggle("静音",pref.muted,onMuted,"account-muted")
-            SettingToggle("减少动态",pref.reducedMotion,onMotion,"account-reduced-motion")
-            AccountLink("邮箱账号",Icons.Outlined.MailOutline){onRoute("account-email")}
-            AccountLink("位置与公开范围",Icons.Outlined.LocationOn){onRoute("account-privacy")}
-            AccountLink("本机草稿与图片",Icons.Outlined.PhotoLibrary){onRoute("account-storage")}
-            AccountLink("关于听踪",Icons.Outlined.Info,last=true){onRoute("account-about")}
-        }}}
+    LazyColumn(Modifier.fillMaxSize().testTag("room-settings"),contentPadding=PaddingValues(24.dp,14.dp,24.dp,30.dp),
+        verticalArrangement=Arrangement.spacedBy(24.dp)) {
+        item {
+            AccountSection("01","播放与动效") {
+                SettingToggle("静音",pref.muted,onMuted,"account-muted")
+                SettingToggle("减少动态",pref.reducedMotion,onMotion,"account-reduced-motion")
+            }
+        }
+        item {
+            AccountSection("02","账号与隐私") {
+                AccountLink("邮箱账号",Icons.Outlined.MailOutline){onRoute("account-email")}
+                AccountLink("位置与公开范围",Icons.Outlined.LocationOn){onRoute("account-privacy")}
+                AccountLink("本机草稿与图片",Icons.Outlined.PhotoLibrary,last=true){onRoute("account-storage")}
+            }
+        }
+        item {
+            AccountSection("03","应用信息") {
+                AccountLink("关于听踪",Icons.Outlined.Info,last=true){onRoute("account-about")}
+            }
+        }
         if(error!=null)item{Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)}
         if(signedIn)item{SwissOutlinedButton({signOut=true},Modifier.fillMaxWidth().height(50.dp).testTag("account-sign-out"),enabled=!busy,shape=androidx.compose.ui.graphics.RectangleShape){Text("退出登录")}}
     }
@@ -219,27 +260,84 @@ import org.json.JSONObject
     HorizontalDivider(color=RoomColors.Line.copy(alpha=.65f),thickness=.5.dp)
 }
 
+@Composable private fun AccountSection(number:String,title:String,content:@Composable ColumnScope.()->Unit) {
+    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        SwissNumberedHeading(number,title)
+        HorizontalDivider(color=RoomColors.Line)
+        Column(content=content)
+    }
+}
+
+@Composable private fun AccountParagraph(text:String) {
+    Text(text,fontSize=15.sp,lineHeight=25.sp,color=RoomColors.Muted,modifier=Modifier.padding(top=5.dp))
+}
+
+@Composable private fun AboutSource(label:String,detail:String,url:String) {
+    val context=LocalContext.current
+    Row(Modifier.fillMaxWidth().clickable(role=Role.Button) {
+        runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))}
+            .onFailure{Toast.makeText(context,"暂时无法打开链接",Toast.LENGTH_SHORT).show()}
+    }.heightIn(min=56.dp).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically,
+        horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+            Text(label,fontSize=15.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
+            Text(detail,fontSize=12.sp,lineHeight=18.sp,color=RoomColors.Muted)
+        }
+        Icon(Icons.Outlined.OpenInNew,null,Modifier.size(18.dp),tint=RoomColors.Muted)
+    }
+}
+
 @Composable internal fun RoomAccountInfo(kind:String,email:String,signedIn:Boolean,busy:Boolean,error:String?,onDelete:()->Unit,onLogin:()->Unit) {
     var deleting by rememberSaveable{mutableStateOf(false)};var confirmation by rememberSaveable{mutableStateOf("")}
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-        RoomPaper(Modifier.fillMaxWidth()){Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-            when(kind) {
-                "email"->{Text("邮箱",fontSize=13.sp,color=RoomColors.Muted);Text(if(signedIn)email else "尚未登录",fontSize=17.sp,color=RoomColors.Ink);HorizontalDivider(color=RoomColors.Line);Text("登录方式：邮箱验证码",fontSize=14.sp,color=RoomColors.Ink)}
-                "privacy"->{Text("现场定位认证",fontSize=18.sp,color=RoomColors.Ink);Text("到访认证记录时间、定位精度和距离，不长期保存原始定位。",fontSize=14.sp,lineHeight=24.sp);Text("公开范围",fontSize=18.sp,color=RoomColors.Ink);Text("到访和复刻默认仅自己可见。主动公开后，其他登录用户可以浏览、点赞或举报。",fontSize=14.sp,lineHeight=24.sp)}
-                "storage"->{Text("本机草稿与图片",fontSize=18.sp,color=RoomColors.Ink);Text("草稿按账号保存在本机。断网不会自动发布，现场提交会重新获取定位。",fontSize=14.sp,lineHeight=24.sp);Text("上传前会优化图片并清除位置元数据。卸载应用会删除本机草稿。",fontSize=14.sp,lineHeight=24.sp)}
-                else->{Text("听踪",fontSize=23.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink);Text("在音乐中发现地点，留下自己的足迹。",fontSize=14.sp,lineHeight=24.sp,color=RoomColors.Muted);Text(cn.musicpilgrimage.app.BuildConfig.VERSION_NAME,fontSize=12.sp,color=RoomColors.Muted)}
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=24.dp,vertical=20.dp),
+        verticalArrangement=Arrangement.spacedBy(28.dp)) {
+        when(kind) {
+            "email"->{
+                AccountSection("01","登录邮箱") {
+                    Text(if(signedIn)email else "尚未登录",fontSize=20.sp,color=RoomColors.Ink,modifier=Modifier.padding(top=4.dp))
+                    AccountParagraph("使用邮箱验证码登录。")
+                }
+                if(signedIn) AccountSection("02","账号管理") {
+                    SwissTextButton({deleting=true},enabled=!busy,modifier=Modifier.testTag("account-delete-entry")){
+                        Text("注销账号",color=MaterialTheme.colorScheme.error)
+                    }
+                } else SwissButton(onLogin,Modifier.fillMaxWidth()){Text("登录")}
             }
-        }}
-        if(kind=="email") {if(signedIn)SwissTextButton({deleting=true},enabled=!busy,modifier=Modifier.testTag("account-delete-entry")){Text("注销账号",color=MaterialTheme.colorScheme.error)}else SwissButton(onLogin,shape=androidx.compose.ui.graphics.RectangleShape){Text("登录")}}
-        if(kind=="about")RoomPaper(Modifier.fillMaxWidth()){Column(Modifier.padding(18.dp)) {
-            Text("地图数据来源",fontSize=15.sp,color=RoomColors.Ink)
-            cn.musicpilgrimage.app.ui.ExternalLink("底图服务与版权说明","https://www.maptiler.com/copyright/")
-            cn.musicpilgrimage.app.ui.ExternalLink("地图数据许可说明","https://www.openstreetmap.org/copyright")
-            Spacer(Modifier.height(12.dp))
-            Text("地球影像：NASA Earth Observatory · Blue Marble Next Generation",fontSize=12.sp,color=RoomColors.Muted)
-            cn.musicpilgrimage.app.ui.ExternalLink("海洋水深数据 · NOAA NCEI ETOPO 2022","https://www.ncei.noaa.gov/products/etopo-global-relief-model")
-            cn.musicpilgrimage.app.ui.ExternalLink("地球影像来源与说明","https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/")
-        }}
+            "privacy"->{
+                AccountSection("01","现场定位认证") {
+                    AccountParagraph("到访认证记录时间、定位精度和距离，不长期保存原始定位。")
+                }
+                AccountSection("02","公开范围") {
+                    AccountParagraph("到访和复刻默认仅自己可见。主动公开后，其他登录用户可以浏览、点赞或举报。")
+                }
+            }
+            "storage"->{
+                AccountSection("01","本机草稿") {
+                    AccountParagraph("草稿按账号保存在本机。断网不会自动发布，现场提交会重新获取定位。卸载应用会删除本机草稿。")
+                }
+                AccountSection("02","图片上传") {
+                    AccountParagraph("上传前会优化图片并清除位置元数据。")
+                }
+            }
+            "about"->{
+                Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    SwissEyebrow("TINGZONG / ${cn.musicpilgrimage.app.BuildConfig.VERSION_NAME}")
+                    Text("听踪",fontSize=36.sp,lineHeight=44.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
+                    AccountParagraph("在音乐中发现地点，留下自己的足迹。")
+                }
+                AccountSection("01","地图与许可") {
+                    AboutSource("MapTiler","底图服务与版权说明","https://www.maptiler.com/copyright/")
+                    HorizontalDivider(color=RoomColors.Line)
+                    AboutSource("OpenStreetMap","地图数据许可说明","https://www.openstreetmap.org/copyright")
+                }
+                AccountSection("02","地球影像与海洋数据") {
+                    AboutSource("NASA Earth Observatory","地球影像 · Blue Marble Next Generation",
+                        "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/")
+                    HorizontalDivider(color=RoomColors.Line)
+                    AboutSource("NOAA NCEI","海洋水深 · ETOPO 2022","https://www.ncei.noaa.gov/products/etopo-global-relief-model")
+                }
+            }
+        }
     }
     if(deleting)AlertDialog(onDismissRequest={if(!busy)deleting=false},shape=androidx.compose.ui.graphics.RectangleShape,title={Text("注销账号")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){Text("账号注销后无法恢复，个人记录、媒体与互动将删除。留言匿名保留，已采纳投稿解除身份关联。");OutlinedTextField(confirmation,{confirmation=it},enabled=!busy,label={Text("输入“删除账号”")},singleLine=true);if(error!=null)Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)}},confirmButton={SwissTextButton(onDelete,enabled=confirmation=="删除账号"&&!busy){Text(if(busy)"正在注销…" else "确认注销")}},dismissButton={SwissTextButton({deleting=false},enabled=!busy){Text("取消")}})
 }

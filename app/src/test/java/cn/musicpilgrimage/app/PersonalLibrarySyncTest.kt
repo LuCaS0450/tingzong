@@ -51,10 +51,11 @@ class PersonalLibrarySyncTest {
         assertFalse(first.dirty.containsKey(trip().getString("id")))
         assertEquals(1,first.dirty.size)
     }
-    @Test fun remotelyDeletedTripKeepsUnsentEditsUnderANewId() {
+    @Test fun remotelyDeletedTripDiscardsUnsentEdits() {
         val original=trip();val result=merged(trips,plans(original),plans(trip(name="未同步安排")),plans())
-        val copy=result.data.getJSONArray("trips").getJSONObject(0)
-        assertNotEquals(original.getString("id"),copy.getString("id"));assertEquals("未同步安排（同步副本）",copy.getString("name"))
+        assertTrue(libraryJsonEqual(plans(),result.data))
+        assertTrue(result.dirty.isEmpty())
+        assertEquals(0,result.copies)
     }
     @Test fun explicitlyRevertedTripDoesNotSilentlyLoseToAnotherDevice() {
         val base=plans(trip());val result=merged(trips,base,base,plans(trip(name="另一设备安排")),mapOf(trip().getString("id") to 4L))
@@ -82,6 +83,29 @@ class PersonalLibrarySyncTest {
             val next=LibraryCloudDocument(row.revision+1,JSONObject(data.toString()),true,clientId);documents[kind]=next
             afterApply?.also{afterApply=null}?.invoke();return next
         }
+    }
+    @Test fun confirmedTripDeletionWinsWhenAnEditReachesTheCloudFirst()=runBlocking {
+        val cloud=Cloud()
+        val deleting=Store(trips)
+        val editing=Store(trips)
+        val deleteEngine=PersonalLibraryEngine(listOf(deleting),cloud)
+        val editEngine=PersonalLibraryEngine(listOf(editing),cloud)
+        val other=trip(UUID.randomUUID().toString(),"应保留的行程")
+        deleting.edit(plans(trip(),other))
+        deleteEngine.synchronize("owner"){true}
+        editEngine.synchronize("owner"){true}
+        deleting.edit(plans(other))
+        editing.edit(plans(trip(name="另一设备更新了安排"),other))
+        cloud.beforeWrite={
+            val previous=cloud.documents.getValue(trips)
+            cloud.documents[trips]=LibraryCloudDocument(previous.revision+1,editing.data,clientId=editing.client)
+        }
+        val result=deleteEngine.synchronize("owner"){true}
+        editEngine.synchronize("owner"){true}
+        assertFalse(result.pending)
+        assertEquals(0,result.copies)
+        assertTrue(libraryJsonEqual(plans(other),cloud.documents.getValue(trips).data))
+        assertTrue(libraryJsonEqual(plans(other),editing.data))
     }
     @Test fun cancelingFavoriteDuringItsUploadCannotBeResurrectedByTheAck()=runBlocking {
         val local=Store(favorites);local.edit(fav("song"));val cloud=Cloud()

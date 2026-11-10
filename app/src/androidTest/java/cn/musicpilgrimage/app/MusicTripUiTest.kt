@@ -87,6 +87,49 @@ class MusicTripUiTest {
         compose.waitUntil(5_000){compose.onAllNodesWithTag("trip-day-search").fetchSemanticsNodes().isNotEmpty()}
     }
 
+    @Test fun swipingRevealsDeleteAndOnlyConfirmationRemovesTheTrip() {
+        val services=(context.applicationContext as PilgrimageApplication).services
+        assumeTrue("Do not alter a signed-in account",services.userId.value==null)
+        val key=LibraryDatabase.guestOwner(context)
+        owner=key
+        val today=LocalDate.now()
+        val city=MusicTripCity("约克","英国")
+        val trip=MusicTrip(UUID.randomUUID().toString(),name,today,today.plusDays(1),listOf(city))
+            .add(Place("fixture-place","车站",city.name,city.country,53.9,-1.1),1)
+        val other=MusicTrip(UUID.randomUUID().toString(),"$name-已结束",today.minusDays(2),today.minusDays(1),listOf(city))
+        services.library.trips.update(key){it+listOf(trip,other)}
+        val vm=ViewModelProvider(compose.activity)[MusicTripViewModel::class.java]
+        compose.waitUntil(8_000){!vm.state.value.busy&&vm.state.value.owner==key&&vm.state.value.trips.any{it.id==trip.id}}
+        var opened:String?=null
+        compose.runOnUiThread {compose.activity.setContent {
+            val state by vm.state.collectAsState()
+            PilgrimageTheme{RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)){
+                RoomTripList(state,key,listOf(city),vm){opened=it}
+            }}
+        }}
+
+        val row=compose.onNodeWithTag("trip-row-${trip.id}")
+        val delete=compose.onNodeWithTag("trip-delete-${trip.id}")
+        fun reveal() {
+            row.performScrollTo().performTouchInput{swipeLeft()}
+            delete.assertIsDisplayed()
+        }
+        delete.assertDoesNotExist()
+        reveal()
+        assertNull(opened)
+        delete.performClick()
+        compose.onNodeWithText("删除行程？").assertIsDisplayed()
+        compose.onNodeWithText("「$name」及每天的全部安排都会被删除。此操作无法撤销。").assertIsDisplayed()
+        compose.onNodeWithText("取消").performClick()
+        assertTrue(store.read(key).any{it.id==trip.id&&it.stops.size==1})
+        reveal()
+        delete.performClick()
+        compose.onNodeWithText("删除行程").performClick()
+        compose.waitUntil(8_000){vm.state.value.trips.none{it.id==trip.id}}
+        assertFalse(store.read(key).any{it.id==trip.id})
+        assertTrue(store.read(key).any{it.id==other.id})
+    }
+
     @Test fun searchDestinationsAddAcrossCitiesAndEditDirectlyFromDayCard() {
         val services=(context.applicationContext as PilgrimageApplication).services
         assumeTrue("Do not alter a signed-in account",services.userId.value==null)

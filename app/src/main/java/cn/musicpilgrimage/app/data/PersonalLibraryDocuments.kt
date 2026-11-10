@@ -82,11 +82,16 @@ internal object PersonalLibraryMerge {
         for(id in (r.keys+l.keys+b.keys).distinct()) {
             val before=b[id];val left=l[id];val right=r[id]
             val chosen=when {
+                // Keep a pending local removal until the cloud has dropped this id.
+                left==null && (before!=null || id in dirty)->null
+                right==null && before!=null->{
+                    pending.remove(id)
+                    null
+                }
                 id !in dirty&&libraryJsonEqual(left,before)->right
                 libraryJsonEqual(right,before)||libraryJsonEqual(left,right)->left
                 else->{
-                    // Concurrent edits never replace the other device's itinerary. A deletion
-                    // on the server remains a deletion; unsent local edits survive under a new id.
+                    // Concurrent edits keep both versions when neither device deleted the trip.
                     if(left!=null) {
                         val copyId=UUID.nameUUIDFromBytes(("trip-conflict:$id:"+libraryJson(left)).toByteArray(Charsets.UTF_8)).toString()
                         if(!l.containsKey(copyId)&&!r.containsKey(copyId)) {
@@ -94,7 +99,7 @@ internal object PersonalLibraryMerge {
                             copies++
                         }
                         pending[copyId]=dirty[id]?:0L
-                    } else copies++ // A remotely edited trip is retained when this device deleted it.
+                    }
                     pending.remove(id)
                     right
                 }

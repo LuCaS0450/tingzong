@@ -307,7 +307,7 @@ import org.json.JSONObject
      composable("profile/{id}"){profileScreen(it.arguments?.getString("id").orEmpty())}
      composable("submissions"){
       val canManage=owner!=null&&profile?.optString("id")==owner&&profile?.optString("role")=="admin"
-      SubmissionsScreen(viewModel(key="submissions-$owner"),onAdmin=if(canManage){{navigate("admin")}}else null){openForm("new_location","new",null)}
+      RoomSubmissions(viewModel(key="submissions-$owner"),onAdmin=if(canManage){{navigate("admin")}}else null){openForm("new_location","new",null)}
      }
      composable("admin"){AdminScreen(viewModel(key="admin-$owner"),back)}
      composable("form/{kind}/{target}"){e->
@@ -320,7 +320,7 @@ import org.json.JSONObject
        {navigate("camera/${Uri.encode(it)}")},
        {guard->if(guard!=null){recordGuardOwner=vm;recordLeaveGuard=guard}else if(recordGuardOwner===vm){recordGuardOwner=null;recordLeaveGuard=null;recordSaving=false}},
        {saving->if(recordGuardOwner===vm)recordSaving=saving})
-      else if(kind in listOf("new_location","correction"))ContentForm(kind,target,editing,vm,back){navigate("camera/${Uri.encode(it)}")}
+      else if(kind in listOf("new_location","correction"))RoomSubmissionForm(kind,target,editing,vm,back)
       else LaunchedEffect(Unit){nav.navigate("me"){popUpTo("room");launchSingleTop=true}}
       // Use the destination lifecycle, alongside NavHost's own back callback.
       BackHandler(enabled=kind in listOf("message","visit","recreation"),onBack=back)

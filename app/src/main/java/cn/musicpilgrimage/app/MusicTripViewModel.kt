@@ -53,6 +53,7 @@ internal class MusicTripViewModel(app:Application):AndroidViewModel(app) {
     },done)
     fun move(owner:String,trip:String,stop:String,day:Int,index:Int,done:()->Unit={})=change(owner,{rows->rows.map{if(it.id==trip)it.move(stop,day,index)else it}},done)
     fun remove(owner:String,trip:String,stop:String,done:()->Unit={})=change(owner,{rows->rows.map{if(it.id==trip)it.copy(stops=it.stops.filterNot{s->s.id==stop})else it}},done)
+    fun deleteTrip(owner:String,tripId:String,done:()->Unit)=change(owner,{trips->trips.filterNot{it.id==tripId}},done)
     fun dates(owner:String,trip:String,start:LocalDate,end:LocalDate,beforeStart:LocalDate,beforeEnd:LocalDate,done:()->Unit)=change(owner,{rows->rows.map{if(it.id==trip)it.editDates(start,end,beforeStart,beforeEnd)else it}},done)
     fun details(owner:String,trip:String,name:String,cities:List<MusicTripCity>,beforeName:String,beforeCities:List<String>,done:()->Unit)=change(owner,{rows->rows.map{if(it.id==trip)it.editDetails(name,cities,beforeName,beforeCities)else it}},done)
     fun custom(owner:String,trip:String,name:String,city:MusicTripCity,day:Int,note:String,done:()->Unit)=change(owner,{rows->rows.map{if(it.id==trip){

@@ -1,9 +1,5 @@
 package cn.musicpilgrimage.app.ui
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -67,45 +63,6 @@ import kotlinx.coroutines.launch
   Button({session.updateProfile(JSONObject().put("nickname",nickname).put("bio",bio),onSaved)},Modifier.fillMaxWidth().testTag("profile-save"),enabled=!busy&&nickname.trim().length>=2&&p?.optString("status")=="active"){Text("保存")}
  }}
 }
-
-@Composable internal fun ContentForm(kind:String,target:String,editing:ContentItem?,vm:FormViewModel,onBack:()->Unit,onCamera:(String)->Unit) {
- val fields by vm.fields.collectAsState();val busy by vm.busy.collectAsState();val ready by vm.initialized.collectAsState()
- val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){result->if(result[Manifest.permission.ACCESS_FINE_LOCATION]==true)vm.submit(onBack) else vm.error.value="需要精确位置权限才能进行现场认证。草稿已保留。"}
- val photo=rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()){uri->if(uri!=null)vm.photo(uri)}
- LaunchedEffect(kind,target){vm.initialize(kind,target,editing)}
- val title=mapOf("message" to "地点留言","visit" to "实地巡礼","recreation" to "场景复刻","new_location" to "新地点投稿","correction" to "信息修正")[kind].orEmpty()
- val onsite=editing==null&&kind in listOf("visit","recreation")
- Column(Modifier.fillMaxSize()) {BackBar(title,onBack)
-  Column(Modifier.verticalScroll(rememberScrollState()).imePadding().padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-   ViewModelStatus(vm)
-   if(!ready)return@Column
-   Text(if(onsite)"提交时验证当前位置 · 草稿自动保存在本机" else "草稿自动保存在本机",color=Muted,style=MaterialTheme.typography.bodySmall)
-   if(kind in listOf("new_location","correction")) {
-    Text("作品与地点的关联类型",style=MaterialTheme.typography.bodySmall,color=Muted)
-    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-     listOf("mv","album","song_title","lyric").forEach{type->FilterChip(fields.optString("association_type")==type,{vm.set("association_type",type)},label={Text(associationLabel(type))})}
-    }
-    FormField("place_name","地点名称",fields,vm);FormField("title","相关作品",fields,vm);FormField("artist","歌手",fields,vm);FormField("source_url","可核实的来源链接",fields,vm)
-    FormField("association_excerpt",if(fields.optString("association_type")=="lyric")"提到地点的短歌词" else "歌名或地点关联说明",fields,vm)
-    FormField("canonical_work_url","原作或正式发行封面链接（可选）",fields,vm)
-   } else if(kind=="message") {
-    FormField("song","关联歌曲（可选）",fields,vm);FormField("artist","歌手（可选）",fields,vm)
-   }
-   OutlinedTextField(fields.optString("body"),{vm.set("body",it.take(1000))},Modifier.fillMaxWidth(),label={Text(if(kind in listOf("new_location","correction"))"投稿说明与核实依据" else "想说的话")},minLines=5,supportingText={Text("${fields.optString("body").length}/1000")})
-   if(kind in listOf("visit","recreation","new_location","correction")) {
-    val local=fields.stringOrNull("local_photo")
-    if(local!=null)ReferenceImage(java.io.File(local).toURI().toString(),"草稿照片",Modifier.fillMaxWidth().aspectRatio(4f/3f))
-    else if(!fields.optBoolean("clear_media"))editing?.mediaId?.let{PrivatePhoto(it,vm.services,Modifier.fillMaxWidth().aspectRatio(4f/3f))}
-    if(kind=="recreation"&&editing==null)Button({onCamera(target)},enabled=!busy,modifier=Modifier.fillMaxWidth()){Icon(Icons.Rounded.CameraAlt,null);Spacer(Modifier.width(8.dp));Text("打开原作叠图相机")}
-    else OutlinedButton({photo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))},enabled=!busy,modifier=Modifier.fillMaxWidth()){Text(if(local!=null||editing?.mediaId!=null)"更换照片" else "选择照片")}
-    if(local!=null||kind=="visit"&&editing?.mediaId!=null)TextButton(vm::removePhoto,enabled=!busy){Text("移除照片")}
-   }
-   if(kind in listOf("visit","recreation"))Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("公开到社区");Text("默认仅自己可见",style=MaterialTheme.typography.bodySmall,color=Muted)};Switch(fields.optString("visibility","private")=="public",{vm.set("visibility",if(it)"public" else "private")})}
-   Button({if(onsite)permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION)) else vm.submit(onBack)},Modifier.fillMaxWidth().heightIn(min=52.dp),enabled=!busy){Text(if(busy)"正在提交…" else if(onsite)"获取位置并提交" else "保存并提交")}
-  }
- }
-}
-@Composable private fun FormField(key:String,title:String,fields:JSONObject,vm:FormViewModel) {OutlinedTextField(fields.optString(key),{vm.set(key,it.take(if(key=="source_url")1000 else 100))},Modifier.fillMaxWidth(),label={Text(title)},singleLine=true)}
 
 @Composable internal fun SettingsScreen(session:SessionViewModel,onBack:()->Unit,onSignedOut:()->Unit,showHeader:Boolean=true) {
  val owner by session.signedIn.collectAsState();var delete by rememberSaveable{mutableStateOf(false)};var confirm by rememberSaveable{mutableStateOf("")};val busy by session.busy.collectAsState()

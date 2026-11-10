@@ -117,6 +117,13 @@ internal object BundledCovers {
     Text(label,modifier,color=RoomColors.Red,fontSize=11.sp,letterSpacing=1.2.sp,fontWeight=FontWeight.Medium)
 }
 
+@Composable internal fun SwissNumberedHeading(number:String,title:String) {
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        SwissEyebrow(number)
+        Text(title,fontSize=20.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
+    }
+}
+
 @Composable internal fun RoomReference(scene:cn.musicpilgrimage.app.data.Scene,description:String,modifier:Modifier=Modifier,onReady:(Boolean)->Unit={}) {
     val context=LocalContext.current
     val model=remember(scene.id,scene.imageUrl){BundledCovers.model(context,"reference-${scene.id}",scene.imageUrl)}

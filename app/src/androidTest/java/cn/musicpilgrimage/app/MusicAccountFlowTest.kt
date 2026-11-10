@@ -88,7 +88,7 @@ class MusicSettingsFlowTest {
         compose.onNodeWithText("已关闭静音").assertDoesNotExist()
         captureAccountScreen("settings",compose)
         compose.onNodeWithText("邮箱账号").performClick()
-        compose.onNodeWithText("登录方式：邮箱验证码").assertIsDisplayed()
+        compose.onNodeWithText("使用邮箱验证码登录。").assertIsDisplayed()
         captureAccountScreen("email-account",compose)
         compose.onNodeWithTag("room-back").performClick()
         compose.onNodeWithTag("room-settings").assertIsDisplayed()

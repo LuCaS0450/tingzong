@@ -12,22 +12,6 @@ import cn.musicpilgrimage.app.*
 import cn.musicpilgrimage.app.data.*
 import org.json.JSONObject
 
-@Composable internal fun SubmissionsScreen(vm:PersonalViewModel,onAdmin:(()->Unit)?=null,onNew:()->Unit) {
- val list by vm.submissions.collectAsState()
- val busy by vm.busy.collectAsState();val error by vm.error.collectAsState()
- LaunchedEffect(Unit){vm.submissions()}
- Column{LazyColumn(contentPadding=PaddingValues(20.dp)){
-  item {
-   ViewModelStatus(vm)
-   if(error!=null)OutlinedButton(vm::submissions){Text("重试")}
-   Button(onNew){Text("投稿新地点")}
-   if(onAdmin!=null)TextButton(onAdmin){Text("管理中心")}
-   if(!busy&&error==null&&list.isEmpty())StatusCard("暂无投稿")
-  }
-  items(list){s->Column(Modifier.padding(vertical=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(s.optString("place_name"),style=MaterialTheme.typography.titleLarge);Text(s.optString("description"));Text(mapOf("pending" to "等待审核","approved" to "已采纳","rejected" to "未采纳")[s.optString("status")].orEmpty(),color=Acid);Text(s.optString("review_note"),color=Muted);HorizontalDivider(color=Line)}}
- }}
-}
-
 @Composable internal fun AdminScreen(vm:AdminViewModel,onBack:()->Unit) {
  val data by vm.data.collectAsState();val busy by vm.busy.collectAsState();var selected by remember{mutableStateOf<JSONObject?>(null)}
  var location by remember{mutableStateOf("")};var note by remember{mutableStateOf("")}
