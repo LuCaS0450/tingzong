@@ -159,7 +159,7 @@ import org.json.JSONObject
             }
             if(disabled)Text("账号已停用，仍可查看和管理已有个人内容。",color=MaterialTheme.colorScheme.error,fontSize=13.sp)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                listOf(Triple("收藏",favorites,"music-favorites/releases"),Triple("到访",visits,"archive/footprints")).forEach{(label,count,route)->
+                listOf(Triple("收藏",favorites,"archive/releases"),Triple("到访",visits,"archive/footprints")).forEach{(label,count,route)->
                     Column(Modifier.weight(1f).clickable{expanded=false;onRoute(route)}.padding(vertical=12.dp),horizontalAlignment=Alignment.CenterHorizontally,
                         verticalArrangement=Arrangement.spacedBy(8.dp)) {
                         Text(count?.toString()?:"—",fontSize=25.sp,color=RoomColors.Ink,fontWeight=FontWeight.Medium)
@@ -244,24 +244,6 @@ import org.json.JSONObject
     if(deleting)AlertDialog(onDismissRequest={if(!busy)deleting=false},shape=androidx.compose.ui.graphics.RectangleShape,title={Text("注销账号")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){Text("账号注销后无法恢复，个人记录、媒体与互动将删除。留言匿名保留，已采纳投稿解除身份关联。");OutlinedTextField(confirmation,{confirmation=it},enabled=!busy,label={Text("输入“删除账号”")},singleLine=true);if(error!=null)Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)}},confirmButton={SwissTextButton(onDelete,enabled=confirmation=="删除账号"&&!busy){Text(if(busy)"正在注销…" else "确认注销")}},dismissButton={SwissTextButton({deleting=false},enabled=!busy){Text("取消")}})
 }
 
-@Composable internal fun RoomAccountRecords(profile:JSONObject?,onRoute:(String)->Unit) {
-    RoomPaper(Modifier.fillMaxWidth().padding(24.dp)){Column(Modifier.padding(horizontal=15.dp)) {
-        AccountLink("地点留言",Icons.Outlined.ChatBubbleOutline){onRoute("mine/message")}
-        AccountLink("我的投稿",Icons.Outlined.EditLocationAlt,last=profile?.optString("role")!="admin"){onRoute("submissions")}
-        if(profile?.optString("role")=="admin")AccountLink("管理中心",Icons.Outlined.AdminPanelSettings,last=true){onRoute("admin")}
-    }}
-}
-
 @Composable internal fun RoomDiscardProfileDialog(onCancel:()->Unit,onDiscard:()->Unit) {
     AlertDialog(onDismissRequest=onCancel,shape=androidx.compose.ui.graphics.RectangleShape,title={Text("放弃修改？")},text={Text("尚未保存的头像或昵称修改会丢失。")},confirmButton={SwissTextButton(onDiscard,Modifier.testTag("account-discard-confirm")){Text("放弃修改")}},dismissButton={SwissTextButton(onCancel){Text("继续编辑")}})
-}
-
-@Composable internal fun RoomAccountBadges(profile:JSONObject?) {
-    val badges=profile?.optJSONArray("badges")?.objects()?.filter{it.optString("id")!="first_capsule"}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        if(badges==null||badges.isEmpty())item{Text("这里会收好你获得的徽章。",fontSize=14.sp,color=RoomColors.Muted)}
-        else items(badges.size){index->val badge=badges[index];val earned=badge.optString("earned_at").let{it.isNotBlank()&&it!="null"}
-            RoomPaper(Modifier.fillMaxWidth()){Row(Modifier.padding(16.dp),horizontalArrangement=Arrangement.spacedBy(14.dp)){Icon(if(earned)Icons.Outlined.Verified else Icons.Outlined.RadioButtonUnchecked,if(earned)"已获得" else "未获得",tint=RoomColors.Navy);Column(verticalArrangement=Arrangement.spacedBy(6.dp)){Text(badge.optString("name"),fontSize=16.sp,color=RoomColors.Ink);Text(badge.optString("description"),fontSize=13.sp,color=RoomColors.Muted)}}}
-        }
-    }
 }

@@ -152,7 +152,7 @@ import org.json.JSONObject
     val list=rememberLazyListState()
     LaunchedEffect(kind,revision){vm.load(kind)}
     LazyColumn(Modifier.fillMaxSize().testTag("room-personal-records"),state=list,contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item("status"){Column{ViewModelStatus(vm);if(error!=null)SwissTextButton({vm.load(kind)}){Text("重试")};if(rows.isEmpty()&&!busy&&error==null)Text("还没有记录。",color=RoomColors.Muted)}}
+        item("status"){Column{ViewModelStatus(vm);if(error!=null)SwissTextButton({vm.load(kind)}){Text("重试")};if(rows.isEmpty()&&!busy&&error==null)Text(if(kind=="message")"还没有留言。" else "还没有复刻记录。",color=RoomColors.Muted)}}
         items(rows,key={it.id}){item->RoomContentCard(item,session,vm,{onForm(it.kind,if(it.kind=="recreation")it.sceneId else it.location,it)},onProfile)}
         if(rows.size>=30)item("more"){SwissTextButton({vm.load(kind,true)}){Text("加载更多")}}
     }

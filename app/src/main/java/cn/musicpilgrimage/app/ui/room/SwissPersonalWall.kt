@@ -49,18 +49,10 @@ import org.json.JSONObject
             HorizontalDivider(Modifier.padding(horizontal=26.dp),color=RoomColors.Line)
         }
         item("cabinet") {PersonalCabinet(onRoute)}
-        if(signedIn)item("profile-actions") {
-            Row(Modifier.fillMaxWidth().padding(horizontal=26.dp),horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                listOf("个人资料" to "account-profile","发布与投稿" to "account-publications","徽章" to "account-badges").forEach { (label,route)->
-                    SwissTextButton({onRoute(route)},Modifier.weight(1f).heightIn(min=48.dp),
-                        contentPadding=PaddingValues(horizontal=4.dp)) {Text(label,fontSize=14.sp,maxLines=1,overflow=TextOverflow.Ellipsis)}
-                }
-            }
-            HorizontalDivider(Modifier.padding(horizontal=26.dp),color=RoomColors.Line)
-        }
         item("actions") {
             Column(Modifier.padding(horizontal=26.dp)) {
                 AccountLink("我的行程",Icons.Outlined.Route,onClick=onTrips)
+                if(signedIn)AccountLink("投稿",Icons.Outlined.EditLocationAlt){onRoute("submissions")}
                 AccountLink("设置",Icons.Outlined.Settings,last=true){onRoute("settings")}
             }
         }
@@ -70,8 +62,8 @@ import org.json.JSONObject
 private data class PersonalDrawer(val id:String,val label:String,val route:String,val top:Int,val height:Int)
 
 private val personalDrawers=listOf(
-    PersonalDrawer("songs","歌曲","music-favorites/songs",310,252),
-    PersonalDrawer("releases","专辑","music-favorites/releases",564,212),
+    PersonalDrawer("songs","歌曲","archive/songs",310,252),
+    PersonalDrawer("releases","专辑","archive/releases",564,212),
     PersonalDrawer("places","地点","archive/places",778,210),
     PersonalDrawer("footprints","足迹","archive/footprints",990,211)
 )

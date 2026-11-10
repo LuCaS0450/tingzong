@@ -49,7 +49,7 @@ import org.json.JSONObject
    else {ToggleIcon(item.liked,if(item.liked)Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,"${if(item.liked)"取消点赞" else "点赞"}，${item.likes}次",enabled=active&&!busy&&!item.hidden){vm.mutation("like",JSONObject().put("id",item.id).put("enabled",!item.liked))};Text("${item.likes}",color=Muted,style=MaterialTheme.typography.bodySmall)}
   }
  };HorizontalDivider(color=Line)
- if(remove)AlertDialog(onDismissRequest={remove=false},title={Text("确认删除？")},text={Text(if(item.kind=="visit")"感想和照片会被删除，曾到访的认证仍然保留。" else "删除后无法恢复，已经获得的历史徽章仍会保留。")},confirmButton={TextButton({remove=false;vm.mutation("delete_content",JSONObject().put("id",item.id))}){Text("删除")}},dismissButton={TextButton({remove=false}){Text("取消")}})
+ if(remove)AlertDialog(onDismissRequest={remove=false},title={Text("确认删除？")},text={Text(if(item.kind=="visit")"感想和照片会被删除，曾到访的认证仍然保留。" else "删除后无法恢复。")},confirmButton={TextButton({remove=false;vm.mutation("delete_content",JSONObject().put("id",item.id))}){Text("删除")}},dismissButton={TextButton({remove=false}){Text("取消")}})
  if(report)AlertDialog(onDismissRequest={report=false},title={Text("举报内容")},text={Column{listOf("垃圾内容","不友善内容","色情 / 违法","版权问题","信息错误","其他").forEach{reason->TextButton({report=false;vm.mutation("report",JSONObject().put("id",item.id).put("reason",reason)){vm.notice.value="举报已提交"}}){Text(reason)}}}},confirmButton={},dismissButton={TextButton({report=false}){Text("取消")}})
 }
 

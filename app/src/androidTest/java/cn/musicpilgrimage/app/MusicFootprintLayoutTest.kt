@@ -32,15 +32,17 @@ class MusicFootprintLayoutTest {
         var edited=false;var deleted=false
         compose.setContent {PilgrimageTheme {RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),baseColor=RoomColors.ArchiveWall) {
             Column {
-                RoomHeader("我的足迹",onSpace={})
+                RoomHeader("资料册",onSpace={})
                 RoomFootprints(MusicArchiveState(owner="isolated-layout-owner",visits=listOf(record)),places,"visits",
-                    {},{},{},{edited=true},{deleted=true},services){Text("复刻测试记录")}
+                    {},{},{},{edited=true},{deleted=true},services){kind->Text(if(kind=="message")"留言测试记录" else "复刻测试记录")}
             }
         }}}
         compose.onNodeWithTag("archive-expand-${place.id}").performClick()
         compose.onNodeWithText("2026-10-19").assertIsDisplayed()
         compose.onNodeWithTag("archive-tab-recreations").performClick().assertIsSelected()
         compose.onNodeWithText("复刻测试记录").assertIsDisplayed()
+        compose.onNodeWithTag("archive-tab-messages").performClick().assertIsSelected()
+        compose.onNodeWithText("留言测试记录").assertIsDisplayed()
         compose.onNodeWithTag("archive-tab-visits").performClick().assertIsSelected()
         compose.onNodeWithText("2026-10-19").assertIsDisplayed()
         val directory=File(context.getExternalFilesDir(null),"music-space-stage2").apply{mkdirs()}

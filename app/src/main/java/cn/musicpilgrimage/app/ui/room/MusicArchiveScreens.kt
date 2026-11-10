@@ -55,17 +55,33 @@ import kotlinx.coroutines.delay
     }
 }
 
-@Composable internal fun RoomMusicFavorites(catalog:MusicCatalogue,favorites:MusicFavorites,initialKind:String,onWork:(MusicWork)->Unit,onRelease:(MusicRelease)->Unit,onRemove:(String,Boolean)->Unit,onDiscover:()->Unit,sync:PersonalLibrarySyncState=PersonalLibrarySyncState(),onSync:()->Unit={},onPlaces:(()->Unit)?=null) {
+@Composable internal fun RoomArchive(
+    initialKind:String,music:@Composable (String)->Unit,places:@Composable ()->Unit,footprints:@Composable ()->Unit
+) {
     var kind by rememberSaveable(initialKind) {mutableStateOf(initialKind)}
-    val songScroll=rememberLazyListState();val releaseScroll=rememberLazyListState()
+    val tabState=rememberSaveableStateHolder()
+    Column(Modifier.fillMaxSize().testTag("room-archive")) {
+        ArchiveTabs(kind,listOf("songs" to "歌曲","releases" to "专辑","places" to "地点","footprints" to "足迹")){kind=it}
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+            tabState.SaveableStateProvider(kind) {
+                when(kind) {
+                    "places"->places()
+                    "footprints"->footprints()
+                    else->music(kind)
+                }
+            }
+        }
+    }
+}
+
+@Composable internal fun RoomMusicFavorites(catalog:MusicCatalogue,favorites:MusicFavorites,kind:String,onWork:(MusicWork)->Unit,onRelease:(MusicRelease)->Unit,onRemove:(String,Boolean)->Unit,onDiscover:()->Unit,sync:PersonalLibrarySyncState,onSync:()->Unit) {
     val release=kind=="releases"
     val ids=if(release)favorites.releases else favorites.songs
     val motion=LocalPhysicalMotion.current
     Column(Modifier.fillMaxSize().testTag("room-music-favorites")) {
-        ArchiveTabs(kind,listOf("releases" to "发行","songs" to "作品")+if(onPlaces!=null)listOf("places" to "地点")else emptyList()){if(it=="places")onPlaces?.invoke()else kind=it}
         RoomLibrarySyncStatus(sync.takeIf{it.owner==favorites.owner}?:PersonalLibrarySyncState(),onSync,Modifier.padding(horizontal=24.dp))
         RoomDrawerFrame(Modifier.weight(1f)) {
-            LazyColumn(Modifier.fillMaxSize().testTag("archive-music-list"),state=if(release)releaseScroll else songScroll,contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            LazyColumn(Modifier.fillMaxSize().testTag("archive-music-list"),contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                 if(ids.isNotEmpty())item(key="count"){Text("${ids.size} 项收藏",fontSize=12.sp,color=RoomColors.Muted,modifier=Modifier.padding(bottom=3.dp))}
                 if(ids.isEmpty())item(key="empty"){Column(Modifier.padding(vertical=18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){Text(if(release)"还没有收藏专辑"else "还没有收藏歌曲",color=RoomColors.Ink);SwissOutlinedButton(onDiscover,shape=androidx.compose.ui.graphics.RectangleShape){Text("浏览唱片架")}}}
                 items(ids,key={"$kind:$it"}) { id->
@@ -92,39 +108,34 @@ import kotlinx.coroutines.delay
 
 @Composable internal fun RoomPlaceFavorites(
     archive:MusicArchiveState,places:List<Place>,onPlace:(String)->Unit,onRemove:(String)->Unit,
-    onLogin:()->Unit,onReload:()->Unit,onMusic:(String)->Unit
+    onLogin:()->Unit,onReload:()->Unit
 ) {
-    Column(Modifier.fillMaxSize().testTag("room-place-favorites")) {
-        ArchiveTabs("places",listOf("releases" to "发行","songs" to "作品","places" to "地点")) {
-            if(it!="places")onMusic(it)
-        }
-        RoomDrawerFrame(Modifier.weight(1f)) {
-            LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),
-                verticalArrangement=Arrangement.spacedBy(11.dp)) {
-                if(archive.owner==null)item {ArchiveLogin("地点收藏",onLogin)}
-                else {
-                    item {Text("${archive.places.size} 个收藏地点",fontSize=12.sp,color=RoomColors.Muted)}
-                    archiveStatus(archive,onReload)
-                    if(archive.places.isEmpty()&&!archive.loading&&archive.error==null)item {
-                        Text("还没有收藏地点，在作品或地图中发现喜欢的地方。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)
-                    }
-                    items(archive.places,key={it}) {id->
-                        val place=places.find{it.id==id}
-                        RoomPaper(Modifier.fillMaxWidth().animateItem().testTag("archive-place-$id")) {
-                            Row(verticalAlignment=Alignment.CenterVertically) {
-                                Row(Modifier.weight(1f).clickable(role=Role.Button){onPlace(id)}
-                                    .padding(start=11.dp,top=12.dp,bottom=12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),
-                                    verticalAlignment=Alignment.CenterVertically) {
-                                    ArchivePlaceImage(place,Modifier.width(90.dp).height(66.dp))
-                                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                                        Text(place?.name?:"地点暂未收录",maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=16.sp,color=RoomColors.Ink)
-                                        Text(listOfNotNull(place?.city,place?.country).joinToString(" · "),fontSize=12.sp,
-                                            color=RoomColors.Muted,maxLines=1,overflow=TextOverflow.Ellipsis)
-                                    }
+    RoomDrawerFrame(Modifier.fillMaxSize().testTag("room-place-favorites")) {
+        LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),
+            verticalArrangement=Arrangement.spacedBy(11.dp)) {
+            if(archive.owner==null)item {ArchiveLogin("地点收藏",onLogin)}
+            else {
+                item {Text("${archive.places.size} 个收藏地点",fontSize=12.sp,color=RoomColors.Muted)}
+                archiveStatus(archive,onReload)
+                if(archive.places.isEmpty()&&!archive.loading&&archive.error==null)item {
+                    Text("还没有收藏地点，在作品或地图中发现喜欢的地方。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)
+                }
+                items(archive.places,key={it}) {id->
+                    val place=places.find{it.id==id}
+                    RoomPaper(Modifier.fillMaxWidth().animateItem().testTag("archive-place-$id")) {
+                        Row(verticalAlignment=Alignment.CenterVertically) {
+                            Row(Modifier.weight(1f).clickable(role=Role.Button){onPlace(id)}
+                                .padding(start=11.dp,top=12.dp,bottom=12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),
+                                verticalAlignment=Alignment.CenterVertically) {
+                                ArchivePlaceImage(place,Modifier.width(90.dp).height(66.dp))
+                                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                                    Text(place?.name?:"地点暂未收录",maxLines=1,overflow=TextOverflow.Ellipsis,fontSize=16.sp,color=RoomColors.Ink)
+                                    Text(listOfNotNull(place?.city,place?.country).joinToString(" · "),fontSize=12.sp,
+                                        color=RoomColors.Muted,maxLines=1,overflow=TextOverflow.Ellipsis)
                                 }
-                                IconButton({onRemove(id)},Modifier.testTag("archive-remove-place-$id")) {
-                                    Icon(Icons.Outlined.Favorite,"取消地点收藏",tint=RoomColors.Red,modifier=Modifier.size(20.dp))
-                                }
+                            }
+                            IconButton({onRemove(id)},Modifier.testTag("archive-remove-place-$id")) {
+                                Icon(Icons.Outlined.Favorite,"取消地点收藏",tint=RoomColors.Red,modifier=Modifier.size(20.dp))
                             }
                         }
                     }
@@ -137,18 +148,18 @@ import kotlinx.coroutines.delay
 @Composable internal fun RoomFootprints(
     archive:MusicArchiveState,places:List<Place>,initialTab:String,onPlace:(String)->Unit,onLogin:()->Unit,
     onReload:()->Unit,onEdit:(ContentItem)->Unit,onDelete:(ContentItem)->Unit,services:AppServices,
-    recreations:@Composable ()->Unit
+    records:@Composable (String)->Unit
 ) {
     var tab by rememberSaveable(initialTab) {mutableStateOf(initialTab)}
     val visitScroll=rememberLazyListState()
     val tabState=rememberSaveableStateHolder()
     Column(Modifier.fillMaxSize().testTag("room-footprints")) {
-        ArchiveTabs(tab,listOf("visits" to "到访","recreations" to "复刻")){tab=it}
+        ArchiveTabs(tab,listOf("visits" to "到访","recreations" to "复刻","messages" to "留言")){tab=it}
         if(archive.owner==null)Box(Modifier.padding(horizontal=24.dp)) {
             ArchiveLogin("足迹",onLogin)
         }
         else tabState.SaveableStateProvider(tab) {
-            if(tab=="recreations")recreations()
+            if(tab!="visits")records(if(tab=="messages")"message" else "recreation")
             else RoomDrawerFrame(Modifier.weight(1f)) {
                 val grouped=archive.visits.groupBy{it.location}.entries.sortedByDescending{(_,rows)->rows.maxOf{visitDate(it)}}
                 LazyColumn(Modifier.fillMaxSize(),state=visitScroll,contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),

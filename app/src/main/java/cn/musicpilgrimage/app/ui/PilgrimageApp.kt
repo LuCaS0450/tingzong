@@ -179,7 +179,7 @@ import org.json.JSONObject
     }
     previousOwner=owner
    }
-   val roomTitle=when(route){"room"->"听踪";"catalogue"->"唱片架";"album/{id}"->"发行档案";"song/{id}"->"作品档案";"search","release-search/{id}"->"搜索";"place/{id}"->"地点档案";"place-community/{id}"->"地点社区";"trips"->"我的行程";"trip/{id}"->"行程档案";"music-favorites/{kind}"->"我的收藏";"archive/{kind}"->if(entry?.arguments?.getString("kind") in listOf("footprints","recreations"))"我的足迹"else "地点收藏";"performance"->"演奏";"me"->"我的";"account-profile"->"个人资料";"edit-profile"->"个人资料";"settings"->"设置";"account-email"->"邮箱账号";"account-privacy"->"位置与公开范围";"account-storage"->"本机草稿与图片";"account-about"->"关于听踪";"submissions"->"我的投稿";"admin"->"管理中心";"account-publications"->"我的发布与投稿";"account-badges"->"徽章";"profile/{id}"->"个人资料";"mine/{kind}"->mapOf("message" to "我的留言","visit" to "我的到访","recreation" to "我的复刻")[entry?.arguments?.getString("kind")];"form/{kind}/{target}"->entry?.arguments?.getString("kind")?.takeIf{it in listOf("message","visit","recreation")}?.let(::roomRecordTitle);else->null}
+   val roomTitle=when(route){"room"->"听踪";"catalogue"->"唱片架";"album/{id}"->"发行档案";"song/{id}"->"作品档案";"search","release-search/{id}"->"搜索";"place/{id}"->"地点档案";"place-community/{id}"->"地点社区";"trips"->"我的行程";"trip/{id}"->"行程档案";"music-favorites/{kind}","archive/{kind}"->"资料册";"performance"->"演奏";"me"->"我的";"account-profile"->"个人资料";"edit-profile"->"个人资料";"settings"->"设置";"account-email"->"邮箱账号";"account-privacy"->"位置与公开范围";"account-storage"->"本机草稿与图片";"account-about"->"关于听踪";"submissions"->"我的投稿";"admin"->"管理中心";"profile/{id}"->"个人资料";"form/{kind}/{target}"->entry?.arguments?.getString("kind")?.takeIf{it in listOf("message","visit","recreation")}?.let(::roomRecordTitle);else->null}
    val archiveRoute=route in listOf("archive/{kind}","music-favorites/{kind}")
    val webDetailRoute=route in listOf("album/{id}","song/{id}","place/{id}","trip/{id}")
    val gameFullscreen=route=="perform/{song}"&&performanceImmersive
@@ -210,8 +210,10 @@ import org.json.JSONObject
      }}
      composable("search"){RoomSearch(musicCatalog){navigate("song/${Uri.encode(it.id)}")}}
      composable("release-search/{id}"){e->RoomSearch(musicCatalog,musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.title.orEmpty()){navigate("song/${Uri.encode(it.id)}")}}
-     composable("music-favorites/{kind}"){e->key(libraryOwner){RoomMusicFavorites(musicCatalog,musicFavorites,e.arguments?.getString("kind")?:"songs",{navigate("song/${Uri.encode(it.id)}")},openRelease,
-       {id,release->placeUndo?.let{archive.dismissUndo(it.token)};music.removeFavorite(id,release)},{chooseModule("catalogue")},music.librarySync.collectAsStateWithLifecycle().value,music::syncLibrary,onPlaces={navigate("archive/places")})}}
+     composable("music-favorites/{kind}"){e->
+      val kind=if(e.arguments?.getString("kind")=="releases")"releases" else "songs"
+      LaunchedEffect(kind){nav.navigate("archive/$kind"){popUpTo("music-favorites/{kind}"){inclusive=true};launchSingleTop=true}}
+     }
      composable("song/{id}"){e->musicCatalog.works.find{it.id==e.arguments?.getString("id")}?.let {work->
       LaunchedEffect(work.id,libraryOwner){music.browseWork(work.id)}
       val play=playable.find{it.title==work.title&&it.artist==work.artist}
@@ -248,19 +250,27 @@ import org.json.JSONObject
       else Text("这首作品正在校对，请返回曲目。",Modifier.padding(24.dp))
      }
      // Resolve saved navigation stacks from versions that still had these screens.
-     listOf("library" to "me","archive-more" to "archive/footprints","account-scores" to "me").forEach { (old,destination)->
+     listOf("library" to "me","archive-more" to "archive/footprints","account-scores" to "me","account-publications" to "submissions","account-badges" to "me").forEach { (old,destination)->
       composable(old){LaunchedEffect(Unit){nav.navigate(destination){popUpTo(old){inclusive=true};launchSingleTop=true}}}
      }
      composable("archive/{kind}"){e->key(libraryOwner) {
-      val kind=e.arguments?.getString("kind")
+      val kind=e.arguments?.getString("kind").orEmpty()
       val places=sourceCatalog.publicOnly().places
       val openPlace:(String)->Unit={navigate("place/${Uri.encode(it)}")}
-      if(kind=="footprints"||kind=="recreations")RoomFootprints(archiveState,places,if(kind=="recreations")"recreations" else "visits",
-       openPlace,login,archive::reload,{item->if(item.owner==owner)openForm("visit",item.location,item)},archive::deleteVisitContent,session.services) {
-        RoomPersonalContentScreen("recreation",viewModel(key="footprint-recreation-$owner"),session,openForm,openProfile)
-       }
-      else RoomPlaceFavorites(archiveState,places,openPlace,{id->musicUndo?.let{music.dismissUndo(it.token)};archive.removePlace(id)},
-       login,archive::reload,{navigate("music-favorites/$it")})
+      val initialKind=when(kind){"songs","releases","places"->kind;else->"footprints"}
+      val initialFootprint=when(kind){"recreations","messages"->kind;else->"visits"}
+      RoomArchive(initialKind,music={selection->
+       RoomMusicFavorites(musicCatalog,musicFavorites,selection,{navigate("song/${Uri.encode(it.id)}")},openRelease,
+        {id,release->placeUndo?.let{archive.dismissUndo(it.token)};music.removeFavorite(id,release)},
+        {chooseModule("catalogue")},music.librarySync.collectAsStateWithLifecycle().value,music::syncLibrary)
+      },places={
+       RoomPlaceFavorites(archiveState,places,openPlace,{id->musicUndo?.let{music.dismissUndo(it.token)};archive.removePlace(id)},login,archive::reload)
+      },footprints={
+       RoomFootprints(archiveState,places,initialFootprint,openPlace,login,archive::reload,
+        {item->if(item.owner==owner)openForm("visit",item.location,item)},archive::deleteVisitContent,session.services) { recordKind->
+         RoomPersonalContentScreen(recordKind,viewModel(key="footprint-$recordKind-$owner"),session,openForm,openProfile)
+        }
+      })
      }}
      composable("me"){
       SwissPersonalWall(profile?.takeIf{it.optString("id")==owner},owner!=null,session.services.accountAvatar(owner),login,openTrips,navigate)
@@ -287,18 +297,18 @@ import org.json.JSONObject
       RoomAccountInfo(kind,session.services.accountEmail(owner),owner!=null,sessionBusy,sessionError,
        {session.deleteAccount{if(!requireAccount)nav.navigate("auth"){popUpTo(nav.graph.id){inclusive=true}}}},login)
      }}
-     composable("account-publications"){RoomAccountRecords(profile?.takeIf{it.optString("id")==owner},navigate)}
-     composable("account-badges"){RoomAccountBadges(profile?.takeIf{it.optString("id")==owner})}
      composable("mine/{kind}"){e->
       val kind=e.arguments?.getString("kind")
-      if(kind=="message")RoomPersonalContentScreen(kind,viewModel(key="personal-$owner"),session,openForm,openProfile)
-      else LaunchedEffect(kind) {
-       val destination=when(kind){"visit"->"archive/footprints";"recreation"->"archive/recreations";else->"me"}
+      LaunchedEffect(kind) {
+       val destination=when(kind){"visit"->"archive/footprints";"recreation"->"archive/recreations";"message"->"archive/messages";else->"me"}
        nav.navigate(destination){popUpTo("mine/{kind}"){inclusive=true};launchSingleTop=true}
       }
      }
      composable("profile/{id}"){profileScreen(it.arguments?.getString("id").orEmpty())}
-     composable("submissions"){SubmissionsScreen(viewModel(key="submissions-$owner"),back){openForm("new_location","new",null)}}
+     composable("submissions"){
+      val canManage=owner!=null&&profile?.optString("id")==owner&&profile?.optString("role")=="admin"
+      SubmissionsScreen(viewModel(key="submissions-$owner"),onAdmin=if(canManage){{navigate("admin")}}else null){openForm("new_location","new",null)}
+     }
      composable("admin"){AdminScreen(viewModel(key="admin-$owner"),back)}
      composable("form/{kind}/{target}"){e->
       val vm:FormViewModel=viewModel(key="form-$owner");val kind=e.arguments?.getString("kind").orEmpty();val target=e.arguments?.getString("target").orEmpty()

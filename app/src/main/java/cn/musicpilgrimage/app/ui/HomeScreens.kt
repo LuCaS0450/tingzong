@@ -196,26 +196,6 @@ import org.json.JSONObject
                     if (p?.optString("role") == "admin") {
                         ActionRow(Icons.Rounded.AdminPanelSettings, "管理中心") { onRoute("admin") }
                     }
-                    SectionTitle("徽章")
-                    val badges = p?.optJSONArray("badges")?.objects().orEmpty()
-                    badges.forEach { b ->
-                        val earned = b.optString("earned_at").isNotBlank()
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                if (earned) Icons.Rounded.Verified else Icons.Rounded.RadioButtonUnchecked,
-                                if (earned) "已获得" else "未获得",
-                                tint = if (earned) Acid else Muted
-                            )
-                            Column {
-                                Text(b.optString("name"), fontWeight = FontWeight.Bold)
-                                Text(b.optString("description"), color = Muted, style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
                 }
             }
         }

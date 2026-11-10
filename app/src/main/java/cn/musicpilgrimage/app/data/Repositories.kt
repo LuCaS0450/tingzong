@@ -40,7 +40,7 @@ class ContentRepository(private val api:AppServices) {
 class AdminRepository(private val api:AppServices) {
  suspend fun load()=api.call("admin") as JSONObject
  suspend fun perform(action:String,payload:JSONObject) {
-  require(action in setOf("admin_status","admin_config","admin_hide","review_submission","resolve_report","revoke_badge"))
+  require(action in setOf("admin_status","admin_config","admin_hide","review_submission","resolve_report"))
   api.mutate(action,payload)
  }
 }

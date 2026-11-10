@@ -84,15 +84,10 @@ class NativeEmulatorAcceptanceTest {
         val tab=when(route){"library","me"->3;"performance"->2;else->error("Unknown main tab: $route")}
         compose.onNodeWithTag("wall-tab-$tab").performClick()
     }
-    private fun ownProfile() {
-        module("me")
-        compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasText("个人资料"))
-        compose.onNodeWithText("个人资料").performClick()
-        waitTag("account-nickname")
-    }
     private fun editProfile() {
-        compose.onNodeWithText("本人管理").performClick()
-        compose.onNodeWithTag("account-edit-profile").performClick()
+        module("me")
+        compose.onNodeWithTag("swiss-personal-wall").performScrollToNode(hasTestTag("personal-identity"))
+        compose.onNodeWithTag("personal-identity").performClick()
     }
     private fun screenshot(name:String,system:Boolean=false) {
         if(!system)compose.waitForIdle()
@@ -190,7 +185,7 @@ class NativeEmulatorAcceptanceTest {
 
     @Test fun systemPickerAndRealProfileSave()=runBlocking {
         val f=fixtures();login(f);seedPhoto(f)
-        ownProfile();editProfile()
+        editProfile()
         profileReady();compose.onNodeWithText("选择头像").assertIsEnabled().performClick()
         // Cancel once through Android, then choose the uniquely named fixture album.
         val end=System.currentTimeMillis()+12000
@@ -200,7 +195,7 @@ class NativeEmulatorAcceptanceTest {
         compose.waitUntil(20000){compose.onAllNodesWithText("移除头像").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithTag("profile-nickname").performTextReplacement("模拟器验收甲已修改")
         compose.onNodeWithTag("profile-save").performScrollTo().performClick()
-        waitTag("account-nickname");compose.onNodeWithTag("account-nickname").assertTextEquals("模拟器验收甲已修改")
+        waitTag("personal-identity");compose.onNodeWithTag("personal-identity").assertTextContains("模拟器验收甲已修改")
         assertEquals("模拟器验收甲已修改",(services.call("self") as JSONObject).getString("nickname"))
         assertTrue(services.accountAvatar()?.startsWith("data:image/jpeg;base64,")==true)
         probe.edit().putInt("profile-pid",Process.myPid()).commit();screenshot("profile-saved")
@@ -210,24 +205,24 @@ class NativeEmulatorAcceptanceTest {
     @Test fun profileSurvivesRestartThenAvatarRemoval()=runBlocking {
         val f=fixtures();login(f);assertNotEquals(probe.getInt("profile-pid",0),Process.myPid())
         assertTrue(services.accountAvatar()?.startsWith("data:image/jpeg;base64,")==true)
-        ownProfile();compose.onNodeWithTag("account-nickname").assertTextEquals("模拟器验收甲已修改")
+        module("me");compose.onNodeWithTag("personal-identity").assertTextContains("模拟器验收甲已修改")
         editProfile();waitTag("room-profile-editor")
         compose.waitUntil(20000){compose.onAllNodesWithText("移除头像").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("移除头像").performClick();compose.onNodeWithTag("profile-save").performScrollTo().performClick()
-        waitTag("account-nickname");assertNull(services.accountAvatar());screenshot("avatar-removed")
+        waitTag("personal-identity");assertNull(services.accountAvatar());screenshot("avatar-removed")
         mark("profile_persisted_across_real_restart_and_avatar_removed")
     }
 
     @Test fun realProfileUnsavedExitGuards()=runBlocking {
         val f=fixtures();login(f);val original=(services.call("self") as JSONObject).getString("nickname")
-        ownProfile();editProfile();profileReady()
+        editProfile();profileReady()
         compose.onNodeWithTag("profile-nickname").performTextReplacement("不应保存的临时昵称")
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("放弃修改？").assertIsDisplayed();compose.onNodeWithText("继续编辑").performClick()
         compose.runOnIdle{compose.activity.onBackPressedDispatcher.onBackPressed()}
         compose.waitUntil(3000){compose.onAllNodesWithText("放弃修改？").fetchSemanticsNodes().isNotEmpty()}
         screenshot("profile-system-back-guard");compose.onNodeWithTag("account-discard-confirm").performClick()
-        waitTag("account-nickname");compose.onNodeWithTag("account-nickname").assertTextEquals(original)
+        waitTag("personal-identity");compose.onNodeWithTag("personal-identity").assertTextContains(original)
         assertEquals(original,(services.call("self") as JSONObject).getString("nickname"))
         mark("real_profile_header_and_system_back_discard_guards")
     }
@@ -445,7 +440,7 @@ class NativeEmulatorAcceptanceTest {
         assertTrue(services.library.favorites.read("user:$b").songs.isEmpty())
         assertTrue(services.library.trips.read("user:$b").isEmpty())
         assertNull(services.accountAvatar());assertEquals("模拟器验收乙",(services.call("self") as JSONObject).getString("nickname"))
-        ownProfile();compose.waitUntil(20000){compose.onAllNodesWithText("模拟器验收乙").fetchSemanticsNodes().isNotEmpty()}
+        module("me");compose.waitUntil(20000){compose.onAllNodesWithText("模拟器验收乙").fetchSemanticsNodes().isNotEmpty()}
         assertTrue(compose.onAllNodesWithText("只属于验收甲的本机草稿").fetchSemanticsNodes().isEmpty());screenshot("second-account-isolated")
         login(f);openRecord(f);compose.onNodeWithTag("room-record-body").assertTextContains("只属于验收甲的本机草稿")
         librarySettled(a)
