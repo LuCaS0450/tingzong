@@ -338,7 +338,7 @@ import org.json.JSONObject
    if(savedNotice!=null&&(route in listOf("me","place/{id}","place-community/{id}","profile/{id}","mine/{kind}")||archiveRoute))Surface(Modifier.align(Alignment.BottomCenter).padding(20.dp),color=RoomColors.Navy,shape=RoundedCornerShape(6.dp)){Text(savedNotice.orEmpty(),Modifier.padding(16.dp),color=RoomColors.Paper)}
    if(route in listOf("explore","place/{id}")&&archiveState.error!=null)Surface(Modifier.align(Alignment.BottomCenter).padding(16.dp),color=RoomColors.Paper,shape=RoundedCornerShape(6.dp),shadowElevation=4.dp){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Text(archiveState.error.orEmpty(),Modifier.weight(1f),color=RoomColors.Ink);TextButton(archive::reload){Text("重试")}}}
    }
-   sourceCatalog.publicOnly().places.find{it.id==addTripPlace}?.let{place->RoomAddToTripDialog(place,tripState,libraryOwner,tripCities,trips,{addTripPlace=null}){navigate("trip/${Uri.encode(it)}")}}
+   sourceCatalog.publicOnly().places.find{it.id==addTripPlace}?.let{place->RoomAddToTripDialog(place,tripState,libraryOwner,tripCities,trips){addTripPlace=null}}
    if(discardAction!=null)RoomDiscardProfileDialog({discardAction=null},{val action=discardAction;discardAction=null;editor.discard();action?.invoke()})
    if(performanceLibraryUi.mobileConfirmation)AlertDialog(onDismissRequest=performanceLibrary::waitForWifi,
     title={Text("用移动网络准备音乐？")},text={

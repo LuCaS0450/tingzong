@@ -1,7 +1,6 @@
 package cn.musicpilgrimage.app
 
 import android.app.Application
-import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cn.musicpilgrimage.app.data.*
@@ -44,14 +43,21 @@ internal class MusicTripViewModel(app:Application):AndroidViewModel(app) {
         val id=UUID.randomUUID().toString()
         change(owner,{it+MusicTrip(id,name.trim(),start,end,cities.distinctBy{it.key})},{done(id)})
     }
-    fun add(owner:String,trip:String,place:Place,day:Int,done:()->Unit)=change(owner,{rows->rows.map{if(it.id==trip)it.add(place,day)else it}},done)
-    fun move(owner:String,trip:String,stop:String,day:Int?,index:Int)=change(owner,{rows->rows.map{if(it.id==trip)it.move(stop,day,index)else it}})
-    fun remove(owner:String,trip:String,stop:String)=change(owner,{rows->rows.map{if(it.id==trip)it.copy(stops=it.stops.filterNot{s->s.id==stop})else it}})
+    fun add(owner:String,trip:String,place:Place,date:LocalDate,requireActive:Boolean=false,done:()->Unit) = change(owner,{ rows ->
+        val plan=requireNotNull(rows.find{it.id==trip}) { "该行程已不存在" }
+        require(!requireActive || plan.acceptsNewPlacesOn(LocalDate.now())) { "该行程已结束，请选择其他行程" }
+        require(date in plan.start..plan.end) { "出行日期已更新，请重新选择" }
+        val day=(date.toEpochDay()-plan.start.toEpochDay()).toInt()+1
+        val updated=plan.add(place,day)
+        rows.map { if(it.id==trip) updated else it }
+    },done)
+    fun move(owner:String,trip:String,stop:String,day:Int,index:Int,done:()->Unit={})=change(owner,{rows->rows.map{if(it.id==trip)it.move(stop,day,index)else it}},done)
+    fun remove(owner:String,trip:String,stop:String,done:()->Unit={})=change(owner,{rows->rows.map{if(it.id==trip)it.copy(stops=it.stops.filterNot{s->s.id==stop})else it}},done)
     fun dates(owner:String,trip:String,start:LocalDate,end:LocalDate,beforeStart:LocalDate,beforeEnd:LocalDate,done:()->Unit)=change(owner,{rows->rows.map{if(it.id==trip)it.editDates(start,end,beforeStart,beforeEnd)else it}},done)
     fun details(owner:String,trip:String,name:String,cities:List<MusicTripCity>,beforeName:String,beforeCities:List<String>,done:()->Unit)=change(owner,{rows->rows.map{if(it.id==trip)it.editDetails(name,cities,beforeName,beforeCities)else it}},done)
     fun custom(owner:String,trip:String,name:String,city:MusicTripCity,day:Int,note:String,done:()->Unit)=change(owner,{rows->rows.map{if(it.id==trip){
         require(name.isNotBlank()&&name.length<=100){"请填写地点名称，最多100字"}
-        require(city in it.cities&&day in 1..it.days){"请选择行程内的城市与有效天数"}
+        require(city in it.cities&&day in 1..it.days){"请选择行程内的目的地与有效日期"}
         it.copy(stops=it.stops+MusicTripStop(UUID.randomUUID().toString(),null,name.trim(),city.name,city.country,day,note.trim()))
     }else it}},done)
     fun dismissError(){mutable.value=mutable.value.copy(error=null)}

@@ -12,5 +12,43 @@
   function workPage(){const r=release(state.payload.release),w=r.works[state.payload.index||0]||{title:r.title,places:r.places};return subHeader('作品档案')+`<div class="scroll-content"><div class="hero-wrap"><button class="media-button" type="button" data-action="image" data-src="${esc(r.image)}" data-credit="${esc(r.credit)}" aria-label="查看作品发行封面">${image(r.image,r.title,'hero-image')}</button></div><div class="pad"><p class="sub-eyebrow">WORK / MUSIC & PLACES</p><h2 class="detail-title">${esc(w.title)}</h2><div class="detail-subtitle">${esc(r.artist)} · ${esc(r.title)}</div><div class="action-strip">${favoriteButton('work:'+r.id+':'+state.payload.index)}<button type="button" data-action="release" data-id="${esc(r.id)}">发行详情 ${icon('arrow')}</button></div><div class="section-title">关联地点 <small>${w.places.length} PLACES</small></div>${w.places.map(id=>placeRow(place(id))).join('')}<p class="credit-line"><a class="source-link" href="${esc(r.source)}" data-action="sources">资料来源 ↗</a></p></div></div>`;}
   function placePage(){const p=place(state.payload.id);return subHeader('地点档案')+`<div class="scroll-content"><div class="hero-wrap"><button class="media-button" type="button" data-action="image" data-src="${esc(p.image)}" data-credit="${esc(p.credit)}" aria-label="查看完整原作图片">${image(p.image,p.name+'原作参考','hero-image')}</button></div><div class="pad"><p class="sub-eyebrow">${esc(p.country)} / ${esc(p.city)}</p><h2 class="detail-title">${esc(p.name)}</h2><div class="detail-subtitle">${esc(p.work)} · ${esc(p.artist)}<br>${esc(p.mediaLabel||'原作图片')}${p.timestamp!=null?' · '+fmt(p.timestamp):''}</div><div class="action-strip">${favoriteButton(p.id)}<button type="button" data-action="add-trip" data-id="${esc(p.id)}">${icon('plus')}加入行程</button><button type="button" data-action="map-place" data-id="${esc(p.id)}">${icon('pin')}地图</button></div><div class="section-title">地点与音乐 <small>THE CONNECTION</small></div><p class="body-text">${esc(p.description)}</p><div class="section-title">到访记录 <small>YOUR STORY</small></div><div class="button-row"><button class="block-button" type="button" data-action="record-new" data-id="${esc(p.id)}">写下到访记录</button><button class="block-button" type="button" data-action="community" data-id="${esc(p.id)}">地点社区</button></div><p class="credit-line"><a class="source-link" href="${esc(p.source)}" data-action="sources">资料来源 ↗</a></p></div></div>`;}
   function tripDays(){return Math.max(1,Math.round((Date.parse(state.trip.end)-Date.parse(state.trip.start))/86400000)+1);}
-  function tripPage(){const t=state.trip,days=tripDays();return subHeader('行程档案',`<button class="text-button" type="button" data-action="trip-edit">编辑</button>`)+`<div class="scroll-content pad"><p class="sub-eyebrow">JOURNEY / MUSIC & PLACES</p><h2 class="trip-title">${esc(t.name)}</h2><div class="trip-date"><span>${esc(t.start)} — ${esc(t.end)}</span><span>${days} ${days===1?'DAY':'DAYS'}</span></div>${Array.from({length:days},(_,day)=>{const date=new Date(Date.parse(t.start)+day*86400000).toISOString().slice(5,10);return `<h3 class="day-heading">DAY ${String(day+1).padStart(2,'0')} / ${date}</h3>${t.stops.map((s,i)=>s.day===day?stopRow(s,i):'').join('')||'<p class="pending-note">今天留给新的发现。</p>'}`;}).join('')}<h3 class="day-heading">待安排 / TO PLAN</h3>${t.stops.map((s,i)=>s.day>=days?stopRow(s,i):'').join('')||'<p class="pending-note">还没有待安排的地点。</p>'}<div style="margin-top:25px"><button class="block-button" type="button" data-action="world-root">继续发现地点 ${icon('plus')}</button></div></div>`;}
-  function stopRow(stop,index){const displayIndex=state.trip.stops.filter(s=>s.day<stop.day).length+state.trip.stops.slice(0,index).filter(s=>s.day===stop.day).length+1;const p=place(stop.place);return `<div class="trip-stop"><span class="stop-index">${String(displayIndex).padStart(2,'0')}</span><div class="stop-copy"><button class="text-button left" style="min-height:0;padding:0" type="button" data-action="place" data-id="${esc(p.id)}"><h4>${esc(p.name)}</h4></button><p>${esc(p.city)} · ${esc(p.work)}</p></div><button type="button" data-action="move-stop" data-index="${index}" aria-label="调整${esc(p.name)}的日期">${icon('up')}</button><button type="button" data-action="remove-stop" data-index="${index}" aria-label="移除${esc(p.name)}">${icon('close')}</button></div>`;}
+  function tripPage(){
+    const trip=state.trip,days=tripDays();
+    const heading=subHeader('行程档案',`<button class="text-button" type="button" data-action="trip-edit">行程设置</button>`);
+    const destinations=(trip.destinations||[]).map(esc).join(' · ');
+    const cards=Array.from({length:days},(_,index)=>{
+      const day=index+1;
+      const date=new Date(Date.parse(trip.start)+index*86400000).toISOString().slice(5,10);
+      const rows=trip.stops.map((stop,i)=>stop.day===index?stopRow(stop,i):'').join('');
+      return `<section class="trip-day" data-day="${day}">
+        <h3 class="day-heading"><button class="trip-day-button" type="button" data-action="trip-edit-day" data-day="${day}">
+          <span class="trip-day-label"><span>DAY ${String(day).padStart(2,'0')} / ${date}</span><span class="trip-day-action">编辑当天</span></span>
+          ${rows?'':'<span class="trip-day-empty">添加当天活动</span>'}
+        </button></h3>
+        ${rows}
+      </section>`;
+    }).join('');
+    return heading+`<div class="scroll-content pad">
+      <p class="sub-eyebrow">JOURNEY / MUSIC &amp; PLACES</p>
+      <h2 class="trip-title">${esc(trip.name)}</h2>
+      <div class="trip-date"><span>${esc(trip.start)} — ${esc(trip.end)}</span><span>${days} ${days===1?'DAY':'DAYS'}</span></div>
+      ${destinations?`<p class="trip-destinations">${destinations}</p>`:''}
+      ${cards}
+      <div style="margin-top:25px"><button class="block-button" type="button" data-action="world-root">继续发现地点 ${icon('plus')}</button></div>
+    </div>`;
+  }
+  function stopRow(stop,index){
+    const displayIndex=state.trip.stops.filter(s=>s.day<stop.day).length+
+      state.trip.stops.slice(0,index).filter(s=>s.day===stop.day).length+1;
+    const detail=place(stop.place);
+    const label=`<h4>${esc(detail.name)}</h4>`;
+    const title=stop.place.startsWith('custom:')?label:
+      `<button class="text-button left" style="min-height:0;padding:0" type="button" data-action="place" data-id="${esc(detail.id)}">${label}</button>`;
+    const description=[detail.city,detail.work].filter(Boolean).map(esc).join(' · ');
+    return `<div class="trip-stop">
+      <span class="stop-index">${String(displayIndex).padStart(2,'0')}</span>
+      <div class="stop-copy">${title}<p>${description}</p></div>
+      <button type="button" data-action="move-stop" data-index="${index}" aria-label="调整${esc(detail.name)}的日期">${icon('up')}</button>
+      <button type="button" data-action="remove-stop" data-index="${index}" aria-label="移除${esc(detail.name)}">${icon('close')}</button>
+    </div>`;
+  }

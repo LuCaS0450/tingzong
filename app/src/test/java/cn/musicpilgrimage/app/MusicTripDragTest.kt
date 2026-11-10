@@ -22,10 +22,10 @@ class MusicTripDragTest {
         assertEquals(TripDropTarget(1,0),resolveTripDrop(plan(),b,110f,items))
         assertEquals(TripDropTarget(1,1),resolveTripDrop(plan(),b,280f,items))
     }
-    @Test fun headersEmptyDaysAndUnscheduledAreValidDestinations() {
+    @Test fun headersAndEmptyDaysAreValidDestinations() {
         assertEquals(TripDropTarget(2,0),resolveTripDrop(plan(),a,330f,items))
         assertEquals(TripDropTarget(3,0),resolveTripDrop(plan(),a,550f,items))
-        assertEquals(TripDropTarget(null,0),resolveTripDrop(plan(),a,610f,items))
+        assertEquals(TripDropTarget(3,0),resolveTripDrop(plan(),a,610f,items))
     }
     @Test fun aDuplicateDayIsRejectedWithoutLosingEitherOccurrence() {
         val repeated=a.copy(id="repeat",day=2);val trip=plan(listOf(a,b,repeated))

@@ -10,10 +10,13 @@ class MusicTripTest {
     private val paris=MusicTripCity("巴黎","法国")
     private fun plan()=MusicTrip("trip","出发",start,start.plusDays(2),listOf(paris))
     private fun place(id:String)=Place(id,id,"巴黎","法国",48.85,2.35)
-    @Test fun shortenedDatesKeepDayNumbersAndMoveOverflowToUnscheduled() {
+    @Test fun shorteningDatesRequiresMovingOverflowFirst() {
         val trip=plan().add(place("a"),1).add(place("b"),3)
-        val short=trip.changeDates(start.plusDays(10),start.plusDays(11))
-        assertEquals(listOf(1,null),short.stops.map{it.day})
+        assertEquals(listOf("b"),trip.stopsBeyond(2).map{it.placeId})
+        assertThrows(IllegalArgumentException::class.java){trip.changeDates(start,start.plusDays(1))}
+        val moved=trip.move(trip.stops.last().id,2,0)
+        val short=moved.changeDates(start.plusDays(10),start.plusDays(11))
+        assertEquals(listOf(1,2),short.stops.map{it.day})
         assertEquals(2,short.days)
     }
     @Test fun samePlaceMayBeVisitedOnDifferentDaysButNotDuplicatedOnOneDay() {
@@ -30,8 +33,28 @@ class MusicTripTest {
         assertEquals(listOf("a","c"),moved.stops.filter{it.day==2}.map{it.placeId})
         assertEquals(trip.stops.map{it.id}.toSet(),moved.stops.map{it.id}.toSet())
     }
-    @Test fun wrongCityAndInvalidDayCannotBeSaved() {
-        assertThrows(IllegalArgumentException::class.java){plan().add(place("a").copy(city="东京"),1)}
+    @Test fun addingAcrossCitiesAppendsDestinationOnlyOnce() {
+        val brighton=MusicTripCity("布莱顿","英国")
+        val place=place("a").copy(city=brighton.name,country=brighton.country)
+        val updated=plan().add(place,1).add(place,2)
+        assertEquals(listOf(paris,brighton),updated.cities)
+        assertEquals(listOf(1,2),updated.stops.map{it.day})
+    }
+    @Test fun lastDayCountsAsAnActiveTrip() {
+        assertTrue(plan().acceptsNewPlacesOn(start.minusDays(1)))
+        assertTrue(plan().acceptsNewPlacesOn(plan().end))
+        assertFalse(plan().acceptsNewPlacesOn(plan().end.plusDays(1)))
+    }
+    @Test fun countryDestinationStaysDistinctFromSameNamedCity() {
+        val country=MusicTripCity.country("新加坡")
+        val city=MusicTripCity("新加坡","新加坡")
+        assertEquals("新加坡",country.label)
+        assertTrue(country.isCountry)
+        assertFalse(city.isCountry)
+        val trip=plan().copy(cities=listOf(country)).add(place("a").copy(city=city.name,country=city.country),1)
+        assertEquals(listOf(country,city),trip.cities)
+    }
+    @Test fun invalidDayAndDateCannotBeSaved() {
         assertThrows(IllegalArgumentException::class.java){plan().add(place("a"),0)}
         assertThrows(IllegalArgumentException::class.java){plan().changeDates(start,start.minusDays(1))}
     }

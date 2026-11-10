@@ -7,15 +7,32 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 
-internal data class MusicTripCity(val name:String,val country:String) {val key get()="$country::$name"}
+internal data class MusicTripCity(val name:String,val country:String) {
+    val key get()="$country::$name"
+    val isCountry get()=name==countryName(country)
+    val label get()=if(isCountry) country else name
+
+    companion object {
+        // Keep country destinations in the existing name/country sync format.
+        private fun countryName(country:String)="$country（全境）"
+        fun country(country:String)=MusicTripCity(countryName(country),country)
+    }
+}
 internal data class MusicTripStop(val id:String,val placeId:String?,val name:String,val city:String,val country:String,val day:Int?,val note:String="")
 internal data class MusicTrip(val id:String,val name:String,val start:LocalDate,val end:LocalDate,val cities:List<MusicTripCity>,val stops:List<MusicTripStop> = emptyList()) {
+    companion object { const val MAX_DESTINATIONS=64 }
+
     val days get()=ChronoUnit.DAYS.between(start,end).toInt()+1
-    init {require(name.isNotBlank()&&name.length<=60){"请填写1至60字的行程名称"};require(days in 1..365){"请选择有效的出行日期，最长365天"};require(cities.isNotEmpty()){ "请至少选择一座城市" };require(stops.map{it.id}.distinct().size==stops.size);require(stops.all{it.day==null||it.day in 1..days})}
+    init {require(name.isNotBlank()&&name.length<=60){"请填写1至60字的行程名称"};require(days in 1..365){"请选择有效的出行日期，最长365天"};require(cities.isNotEmpty()){ "请至少选择一个目的地" };require(stops.map{it.id}.distinct().size==stops.size);require(stops.all{it.day==null||it.day in 1..days})}
+    fun acceptsNewPlacesOn(today:LocalDate)=!end.isBefore(today)
+
+    fun stopsBeyond(dayCount:Int)=stops.filter { it.day!=null && it.day>dayCount }
+
     fun changeDates(from:LocalDate,to:LocalDate):MusicTrip {
         val count=ChronoUnit.DAYS.between(from,to).toInt()+1
         require(count in 1..365){"请选择有效的出行日期，最长365天"}
-        return copy(start=from,end=to,stops=stops.map{if(it.day!=null&&it.day>count)it.copy(day=null)else it})
+        require(stopsBeyond(count).isEmpty()){ "请先移动超出新日期的活动" }
+        return copy(start=from,end=to)
     }
     fun editDates(from:LocalDate,to:LocalDate,beforeStart:LocalDate,beforeEnd:LocalDate):MusicTrip {
         if(from==beforeStart&&to==beforeEnd)return this
@@ -25,28 +42,31 @@ internal data class MusicTrip(val id:String,val name:String,val start:LocalDate,
     fun editDetails(nextName:String,nextCities:List<MusicTripCity>,beforeName:String,beforeCities:List<String>):MusicTrip {
         val cleanName=nextName.trim();val cleanCities=nextCities.distinctBy{it.key}
         val nameChanged=cleanName!=beforeName;val citiesChanged=cleanCities.map{it.key}!=beforeCities
+        require(!citiesChanged||cleanCities.size<=MAX_DESTINATIONS){"每个行程最多 $MAX_DESTINATIONS 个目的地"}
         require(!nameChanged||name==beforeName||name==cleanName){"行程名称已更新，请关闭后重新打开编辑"}
         require(!citiesChanged||cities.map{it.key}==beforeCities||cities==cleanCities){"行程城市已更新，请关闭后重新打开编辑"}
         val mergedCities=if(citiesChanged)cleanCities else cities
-        require(stops.all{stop->mergedCities.any{it.name==stop.city&&it.country==stop.country}}){"请先移出该城市的地点，再取消这座城市"}
+        require(stops.all{stop->mergedCities.any{it.name==stop.city&&it.country==stop.country}}){"请先移出该目的地的活动，再取消这个目的地"}
         return copy(name=if(nameChanged)cleanName else name,cities=mergedCities)
     }
     fun add(place:Place,day:Int):MusicTrip {
         require(day in 1..days){"请输入1至${days}之间的天数"}
-        require(cities.any{it.key=="${place.country}::${place.city}"}){"这个地点不在行程已选城市中"}
         require(stops.none{it.placeId==place.id&&it.day==day}){"这个地点已经安排在第${day}天，可查看原安排或选择另一天"}
+        val destination=MusicTripCity(place.city,place.country)
+        val destinations=if(cities.any{it.key==destination.key}) cities else cities+destination
+        require(destinations===cities||destinations.size<=MAX_DESTINATIONS){"每个行程最多 $MAX_DESTINATIONS 个目的地"}
         val stop=MusicTripStop(UUID.randomUUID().toString(),place.id,place.name,place.city,place.country,day)
         val index=stops.indexOfLast{it.day==day}.takeIf{it>=0}?.plus(1) ?: stops.indexOfFirst{it.day==null||(it.day?:0)>day}.takeIf{it>=0} ?: stops.size
-        return copy(stops=stops.toMutableList().apply{add(index,stop)})
+        return copy(cities=destinations,stops=stops.toMutableList().apply{add(index,stop)})
     }
-    fun move(id:String,day:Int?,index:Int):MusicTrip {
-        require(day==null||day in 1..days){"请输入有效的天数"}
+    fun move(id:String,day:Int,index:Int):MusicTrip {
+        require(day in 1..days){"请输入有效的天数"}
         val stop=stops.find{it.id==id} ?: return this
-        require(day==null||stop.placeId==null||stops.none{it.id!=id&&it.placeId==stop.placeId&&it.day==day}){"这个地点已经安排在第${day}天，请选择另一天"}
+        require(stop.placeId==null||stops.none{it.id!=id&&it.placeId==stop.placeId&&it.day==day}){"这个地点已经安排在第${day}天，请选择另一天"}
         val remaining=stops.filterNot{it.id==id}.toMutableList()
         val group=remaining.filter{it.day==day}
         val slot=index.coerceIn(0,group.size)
-        val absolute=if(slot<group.size)remaining.indexOfFirst{it.id==group[slot].id} else if(group.isNotEmpty())remaining.indexOfLast{it.day==day}+1 else remaining.indexOfFirst{day!=null&&(it.day==null||it.day>day)}.takeIf{it>=0} ?: remaining.size
+        val absolute=if(slot<group.size)remaining.indexOfFirst{it.id==group[slot].id} else if(group.isNotEmpty())remaining.indexOfLast{it.day==day}+1 else remaining.indexOfFirst{it.day==null||it.day>day}.takeIf{it>=0} ?: remaining.size
         remaining.add(absolute,stop.copy(day=day));return copy(stops=remaining)
     }
 }

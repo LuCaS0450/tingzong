@@ -16,7 +16,7 @@ import cn.musicpilgrimage.app.data.MusicTripStop
 
 @Composable internal fun RoomTripStopCard(
     stop:MusicTripStop,modifier:Modifier,enabled:Boolean,canUp:Boolean,canDown:Boolean,
-    onPlace:()->Unit,onUp:()->Unit,onDown:()->Unit,onMoveDay:()->Unit,onUnscheduled:()->Unit,onRemove:()->Unit,
+    onPlace:()->Unit,onUp:()->Unit,onDown:()->Unit,onMoveDay:()->Unit,onRemove:()->Unit,
     handleModifier:Modifier
 ) {
     RoomPaper(modifier.fillMaxWidth(),woodEdge=true) {
@@ -41,7 +41,6 @@ import cn.musicpilgrimage.app.data.MusicTripStop
                     IconButton({menu=true},enabled=enabled){Icon(Icons.Outlined.MoreHoriz,"地点安排操作",tint=RoomColors.Navy)}
                     DropdownMenu(menu,{menu=false}) {
                         DropdownMenuItem({Text("移到另一天")},{menu=false;onMoveDay()})
-                        if(stop.day!=null)DropdownMenuItem({Text("移到待安排")},{menu=false;onUnscheduled()})
                         DropdownMenuItem({Text("从行程移出")},{menu=false;onRemove()})
                     }
                 }

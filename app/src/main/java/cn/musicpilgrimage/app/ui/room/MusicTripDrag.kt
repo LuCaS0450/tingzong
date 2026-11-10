@@ -42,7 +42,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 internal data class TripDragItem(val key:String,val top:Float,val height:Float)
-internal data class TripDropTarget(val day:Int?,val index:Int,val duplicate:Boolean=false)
+internal data class TripDropTarget(val day:Int,val index:Int,val duplicate:Boolean=false)
 
 /** Preserve full card geometry when its top is scrolled out of the viewport. */
 internal fun LayoutCoordinates.tripDragBounds()=Rect(positionInWindow(),Size(size.width.toFloat(),size.height.toFloat()))
@@ -50,17 +50,20 @@ internal fun LayoutCoordinates.tripDragBounds()=Rect(positionInWindow(),Size(siz
 /** Insertion indexes exclude the lifted card, including when moving down within one day. */
 internal fun resolveTripDrop(trip:MusicTrip,source:MusicTripStop,y:Float,items:List<TripDragItem>):TripDropTarget? {
     val stops=trip.stops.associateBy{it.id}
-    val item=items.filter{it.key.startsWith("day:")||it.key.startsWith("empty:")||it.key in stops}
+    val item=items.filter{
+        stops[it.key]?.day!=null ||
+            (it.key.startsWith("day:")||it.key.startsWith("empty:")) && it.key.substringAfter(':').toIntOrNull() in 1..trip.days
+    }
         .minByOrNull{when{y<it.top->it.top-y;y>it.top+it.height->y-it.top-it.height;else->0f}} ?: return null
     val over=stops[item.key]
-    val day=over?.day ?: if(over==null)item.key.substringAfter(':').toIntOrNull()else null
+    val day=over?.day ?: item.key.substringAfter(':').toInt()
     val group=trip.stops.filter{it.day==day&&it.id!=source.id}
     val index=when {
         over==null->0
         over.id==source.id->trip.stops.filter{it.day==day}.indexOfFirst{it.id==source.id}.coerceIn(0,group.size)
         else->group.indexOfFirst{it.id==over.id}+(if(y>=item.top+item.height/2)1 else 0)
     }
-    return TripDropTarget(day,index.coerceIn(0,group.size),day!=null&&source.placeId!=null&&group.any{it.placeId==source.placeId})
+    return TripDropTarget(day,index.coerceIn(0,group.size),source.placeId!=null&&group.any{it.placeId==source.placeId})
 }
 
 internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float):Float = when {
@@ -72,7 +75,7 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
 
 @Stable internal class MusicTripDragState(
     val list:LazyListState,private val scope:CoroutineScope,
-    private val onDrop:(String,Int?,Int,()->Unit)->Unit
+    private val onDrop:(String,Int,Int,()->Unit)->Unit
 ) {
     var trip:MusicTrip?=null
     var container by mutableStateOf(Rect.Zero)
@@ -157,7 +160,7 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
 
 @Composable internal fun RoomTripDragSurface(
     trip:MusicTrip,owner:String,list:LazyListState,busy:Boolean,
-    onDrop:(String,Int?,Int,()->Unit)->Unit,
+    onDrop:(String,Int,Int,()->Unit)->Unit,
     content:@Composable (MusicTripDragState)->Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -202,10 +205,10 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
         drag.source?.let{stop->
             Box(Modifier.offset{IntOffset(drag.position.x.roundToInt(),drag.position.y.roundToInt())}
                 .width(with(density){drag.width.toDp()}).shadow(12.dp,androidx.compose.ui.graphics.RectangleShape).testTag("trip-drag-preview")) {
-                RoomTripStopCard(stop,Modifier.clearAndSetSemantics{},false,false,false,{},{},{},{},{},{},Modifier)
+                RoomTripStopCard(stop,Modifier.clearAndSetSemantics{},false,false,false,{},{},{},{},{},Modifier)
             }
             if(drag.dragging)drag.target?.let{target->
-                Text(if(target.duplicate)"第${target.day}天已有这个地点" else target.day?.let{"放入第${it}天 · 第${target.index+1}个地点"} ?: "放入待安排 · 第${target.index+1}个地点",
+                Text(if(target.duplicate)"第${target.day}天已有这个地点" else "放入第${target.day}天 · 第${target.index+1}个地点",
                     Modifier.align(Alignment.TopCenter).offset{IntOffset(0,(drag.position.y-38*density.density).coerceIn(6*density.density,(drag.container.height-38*density.density).coerceAtLeast(6*density.density)).roundToInt())}
                         .background(RoomColors.Paper,androidx.compose.ui.graphics.RectangleShape).padding(10.dp,6.dp).testTag("trip-drop-hint"),
                     color=if(target.duplicate)MaterialTheme.colorScheme.error else RoomColors.Navy,fontSize=13.sp)
