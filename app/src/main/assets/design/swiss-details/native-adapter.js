@@ -30,12 +30,39 @@ function sizeDetail(){
   const scale=innerWidth/360,phone=document.getElementById('phone');
   phone.style.transform=`scale(${scale})`;phone.style.height=(innerHeight/scale)+'px';
 }
+let archiveCountries;
+function paintPlaceMap(figure){
+  if(!figure||figure.hidden)return;
+  const {latitude:lat,longitude:lon}=place(D.payload.id);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
+  archiveCountries??=fetch('https://details.tingzong.local/map/countries.json').then(response=>response.json());
+  archiveCountries.then(({countries})=>{
+    if(!figure.isConnected)return;
+    const latitudeSpan=10, ratio=Math.max(.28,Math.cos(lat*Math.PI/180));
+    const halfWidth=latitudeSpan*360/177/ratio;
+    const paths=[];
+    for(const country of countries)for(const area of country.areas){
+      const [west,south,east,north]=area.bounds;
+      if(north<lat-latitudeSpan||south>lat+latitudeSpan)continue;
+      for(const shift of [-360,0,360]){
+        if(east+shift<lon-halfWidth||west+shift>lon+halfWidth)continue;
+        const path=area.rings.map(ring=>ring.map(([x,y],i)=>{
+          const px=360+(x+shift-lon)*360/halfWidth,py=177-(y-lat)*177/latitudeSpan;
+          return `${i?'L':'M'}${px.toFixed(1)} ${py.toFixed(1)}`;
+        }).join(' ')+' Z').join(' ');
+        paths.push(`<path d="${path}"/>`);
+      }
+    }
+    figure.querySelector('.place-map-land').innerHTML=paths.join('');
+  }).catch(()=>{archiveCountries=null;});
+}
 function updateNativeDetail(data,initialScroll=0){
   const scroller=view.querySelector('.scroll-content'),same=D.identity===data.identity;
   const scrollTop=same&&scroller?scroller.scrollTop:initialScroll;
   D=data;state.payload=D.payload;state.trip=D.trip||{};state.favorites=new Set(D.favorites||[]);
   view.innerHTML=({album:albumPage,work:workPage,place:placePage,trip:tripPage}[D.page])();
   sizeDetail();
+  paintPlaceMap(view.querySelector('.place-map'));
   const nextScroller=view.querySelector('.scroll-content');
   // Keep late artwork and font layout from moving a restored position.
   if(!same&&scrollTop>0)nextScroller.style.overflowAnchor='none';
@@ -52,7 +79,15 @@ function updateNativeDetail(data,initialScroll=0){
     img.onerror=()=>{
       const source=img.getAttribute('src'),fallback=D.fallbacks?.[source];
       if(fallback&&source!==fallback){img.src=fallback;return;}
-      if(hero)hero.remove();
+      if(hero){
+        const visual=hero.closest('.place-visual'),map=visual?.querySelector('.place-map');
+        hero.remove();
+        if(map){
+          visual.querySelector(':scope > .place-visual-caption')?.remove();
+          map.hidden=false;
+          paintPlaceMap(map);
+        }
+      }
       else if(imageButton)imageButton.remove();
       else if(img.closest('.list-row'))img.remove();
     };

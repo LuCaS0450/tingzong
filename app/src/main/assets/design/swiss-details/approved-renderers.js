@@ -20,6 +20,24 @@
   function releaseHero(r,label){
     return archiveHero({image:r.image,width:r.imageWidth,height:r.imageHeight,credit:r.credit},label,r.title);
   }
+  function placeVisual(p){
+    const scopeCaption={城市级:'城市实景',区域级:'区域实景'}[p.scope];
+    const caption=p.photo&&scopeCaption?`<p class="place-visual-caption">${scopeCaption} · ${esc(p.photo.description)}</p>`:'';
+    const lat=Number(p.latitude),lon=Number(p.longitude);
+    const coords=`${Math.abs(lat).toFixed(3)}° ${lat<0?'S':'N'} · ${Math.abs(lon).toFixed(3)}° ${lon<0?'W':'E'}`;
+    return `<div class="place-visual">
+      ${archiveHero(p.photo,'查看完整地点照片',p.photo?.description||p.name,true)}${caption}
+      <figure class="place-map" ${p.photo?'hidden':''}>
+        <svg viewBox="0 0 720 354" role="img" aria-label="${esc(p.name)}参考位置">
+          <g class="place-map-land"></g>
+          <path class="place-map-grid" d="M120 0V354M240 0V354M360 0V354M480 0V354M600 0V354M0 59H720M0 118H720M0 177H720M0 236H720M0 295H720"/>
+          <circle class="place-map-halo" cx="360" cy="177" r="24"/>
+          <circle class="place-map-point" cx="360" cy="177" r="8"/>
+        </svg>
+        <figcaption class="place-visual-caption"><span>地图示意</span><span>${coords}</span></figcaption>
+      </figure>
+    </div>`;
+  }
   function connectionRow(link){
     const media=link.media;
     const timestamp=media?.timestamp==null?'':fmt(media.timestamp);
@@ -74,7 +92,7 @@
   function placePage(){
     const p=place(state.payload.id);
     return subHeader('地点档案')+`<div class="scroll-content">
-      ${archiveHero(p.photo,'查看完整地点照片',p.photo?.description||p.name,true)}
+      ${placeVisual(p)}
       <div class="pad">
         <p class="sub-eyebrow">${[p.country,p.city].filter(Boolean).map(esc).join(' / ')}</p>
         <h2 class="detail-title">${esc(p.name)}</h2>

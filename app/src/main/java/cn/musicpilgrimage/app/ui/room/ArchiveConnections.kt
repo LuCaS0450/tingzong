@@ -111,7 +111,6 @@ internal object ArchivePhotography {
     private var manifest: JSONObject? = null
 
     @Synchronized fun photo(context: Context, place: Place): ArchivePhoto? {
-        if (place.archiveScope() != "地点级") return null
         val data = manifest ?: JSONObject(context.assets.open("design/swiss-details/place-photos.json")
             .bufferedReader().use { it.readText() }).also { manifest = it }
         val row = data.optJSONObject(place.id) ?: return null

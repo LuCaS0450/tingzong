@@ -36,6 +36,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
+private const val DetailMapUrl = "https://details.tingzong.local/map/countries.json"
 private const val DetailPage = "file:///android_asset/design/swiss-details/index.html"
 
 /** The approved HTML/CSS is the rendering source of truth; data and actions remain native. */
@@ -124,6 +125,8 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
         },"TingzongDetail")
         webViewClient=object:WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                if (request.url.toString() == DetailMapUrl) return WebResourceResponse("application/json", "UTF-8", 200, "OK",
+                    mapOf("Access-Control-Allow-Origin" to "*"), context.assets.open("design/swiss-world/countries.json"))
                 // The file-backed document needs a CORS-enabled origin for bundled web fonts.
                 val name = when (request.url.toString()) {
                     DetailFontOrigin + "inter-variable.woff2" -> "inter-variable.woff2"
@@ -204,7 +207,7 @@ internal class SwissDetailMedia(private val context:Context) {
         .put("name", PlaceEditorialCopy.name(context, place)).put("city", place.city).put("country", place.country)
 
     fun archiveLink(link: MusicPlaceLink): JSONObject = archivePlaceIdentity(link.place)
-        .put("image", archivePhoto(link.place)?.asset.orEmpty())
+        .put("image", link.place.takeIf { it.archiveScope() == "地点级" }?.let(::archivePhoto)?.asset.orEmpty())
         .put("relations", JSONArray(link.scenes.map { it.archiveConnection().label }.distinct()))
 
     private fun connectionImage(scene: Scene): JSONObject? {
@@ -226,6 +229,7 @@ internal class SwissDetailMedia(private val context:Context) {
     fun placeArchive(place: Place, photo: ArchivePhoto?, entryScenes: Set<String>,
         targets: Map<String, MusicArchiveTarget>) = archivePlaceIdentity(place)
         .put("photo", photo?.json() ?: JSONObject.NULL).put("scope", place.archiveScope())
+        .put("latitude", place.latitude).put("longitude", place.longitude)
         .put("connections", place.archiveConnections(entryScenes, targets, ::connectionImage))
 
     fun place(place:Place,scene:Scene?=place.mapScene()):JSONObject=JSONObject()

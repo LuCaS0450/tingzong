@@ -9,6 +9,16 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/Abbey_Road_Studios_2012-03-03.jpg/960px-Abbey_Road_Studios_2012-03-03.jpg",
     "width": 960
   },
+  "aegean-sea-reference": {
+    "author": "Tango7174",
+    "description": "从爱琴海看圣托里尼岛 Ammoudi 湾",
+    "height": 384,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Santorini_AmmoudiBay_tango7174.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c6/Santorini_AmmoudiBay_tango7174.jpg/960px-Santorini_AmmoudiBay_tango7174.jpg",
+    "width": 960
+  },
   "akabanebashi-minami": {
     "author": "RuinDig/Yuki Uchida",
     "description": "赤羽桥南路口",
@@ -29,6 +39,46 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/Allegiant_Stadium.jpg/960px-Allegiant_Stadium.jpg",
     "width": 960
   },
+  "amsterdam-city-playlist-reference": {
+    "author": "Juke Schweizer",
+    "description": "阿姆斯特丹王子运河",
+    "height": 640,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Amsterdam_Prinsengracht_Wallpaper.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/70/Amsterdam_Prinsengracht_Wallpaper.jpg/960px-Amsterdam_Prinsengracht_Wallpaper.jpg",
+    "width": 960
+  },
+  "appian-way-reference": {
+    "author": "LuisaV72",
+    "description": "罗马阿庇亚古道",
+    "height": 721,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Paesaggio_dell%27Appia_antica.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3d/Paesaggio_dell%27Appia_antica.jpg/960px-Paesaggio_dell%27Appia_antica.jpg",
+    "width": 960
+  },
+  "babylon-historical-playlist-reference": {
+    "author": "U.S. Navy photo by Photographer's Mate 1st Class Arlo K. Abrahamson.",
+    "description": "伊拉克希拉的古巴比伦遗址（2003 年）",
+    "height": 630,
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:US_Navy_030529-N-5362A-001_A_U.S._Marine_Corps_Humvee_vehicle_drives_down_a_road_at_the_foot_of_Saddam_Hussein%27s_former_Summer_palace_with_ruins_of_ancient_Babylon_in_the_background.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:US_Navy_030529-N-5362A-001_A_U.S._Marine_Corps_Humvee_vehicle_drives_down_a_road_at_the_foot_of_Saddam_Hussein%27s_former_Summer_palace_with_ruins_of_ancient_Babylon_in_the_background.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/US_Navy_030529-N-5362A-001_A_U.S._Marine_Corps_Humvee_vehicle_drives_down_a_road_at_the_foot_of_Saddam_Hussein%27s_former_Summer_palace_with_ruins_of_ancient_Babylon_in_the_background.jpg/960px-thumbnail.jpg",
+    "width": 960
+  },
+  "baker-street-reference": {
+    "author": "DiscoA340",
+    "description": "伦敦贝克街街景",
+    "height": 640,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Baker_Street,_London_(January_2024)_01.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f2/Baker_Street%2C_London_%28January_2024%29_01.jpg/960px-Baker_Street%2C_London_%28January_2024%29_01.jpg",
+    "width": 960
+  },
   "beachy-head-playlist-reference": {
     "author": "Diliff , Papa Lima Whiskey (edit)",
     "description": "比奇角",
@@ -37,6 +87,26 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File:Beachy_Head_and_Lighthouse,_East_Sussex,_England_-_April_2010_crop_horizon_corrected.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/42/Beachy_Head_and_Lighthouse%2C_East_Sussex%2C_England_-_April_2010_crop_horizon_corrected.jpg/960px-Beachy_Head_and_Lighthouse%2C_East_Sussex%2C_England_-_April_2010_crop_horizon_corrected.jpg",
+    "width": 960
+  },
+  "beidahuang-reference": {
+    "author": "zhanyoun",
+    "description": "三江平原田野",
+    "height": 720,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E4%B8%89%E6%B1%9F%E5%B9%B3%E5%8E%9F_-_panoramio_-_zhanyoun.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/53/%E4%B8%89%E6%B1%9F%E5%B9%B3%E5%8E%9F_-_panoramio_-_zhanyoun.jpg/960px-%E4%B8%89%E6%B1%9F%E5%B9%B3%E5%8E%9F_-_panoramio_-_zhanyoun.jpg",
+    "width": 960
+  },
+  "beijing-city-playlist-reference": {
+    "author": "N509FZ",
+    "description": "北京中央商务区天际线",
+    "height": 640,
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Skyline_of_Beijing_CBD_with_B-5906_approaching_(20211016171955)_(1).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2d/Skyline_of_Beijing_CBD_with_B-5906_approaching_%2820211016171955%29_%281%29.jpg/960px-Skyline_of_Beijing_CBD_with_B-5906_approaching_%2820211016171955%29_%281%29.jpg",
     "width": 960
   },
   "bellagio-sharks-reference": {
@@ -79,6 +149,26 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/Elizabeth_Tower_and_the_north_front_of_the_Palace_of_Westminster%2C_London.jpg/960px-Elizabeth_Tower_and_the_north_front_of_the_Palace_of_Westminster%2C_London.jpg",
     "width": 675
   },
+  "boston-city-playlist-reference": {
+    "author": "Chris Rycroft",
+    "description": "波士顿后湾天际线",
+    "height": 640,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Boston_Back_Bay_skyline_by_Chris_Rycroft.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Boston_Back_Bay_skyline_by_Chris_Rycroft.jpg/960px-Boston_Back_Bay_skyline_by_Chris_Rycroft.jpg",
+    "width": 960
+  },
+  "boulder-city-playlist-reference": {
+    "author": "Lee Coursey",
+    "description": "博尔德 Pearl Street 步行街",
+    "height": 720,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Pearl_Street_Mall.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Pearl_Street_Mall.jpg/960px-Pearl_Street_Mall.jpg",
+    "width": 960
+  },
   "calton-hill-reference": {
     "author": "Saffron Blaze",
     "description": "卡尔顿山",
@@ -87,6 +177,16 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
     "source": "https://commons.wikimedia.org/wiki/File:Edinburgh_Calton_Hill.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a5/Edinburgh_Calton_Hill.jpg/960px-Edinburgh_Calton_Hill.jpg",
+    "width": 960
+  },
+  "cambridge-city-jay-reference": {
+    "author": "Jean-Christophe BENOIST",
+    "description": "从草地眺望剑桥国王学院",
+    "height": 640,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Cambridge_-_Kings_College_vue_des_backs.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/08/Cambridge_-_Kings_College_vue_des_backs.jpg/960px-Cambridge_-_Kings_College_vue_des_backs.jpg",
     "width": 960
   },
   "capitol-records-tower-reference": {
@@ -119,6 +219,26 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f3/Harajuku-Cat-street-02.jpg/960px-Harajuku-Cat-street-02.jpg",
     "width": 960
   },
+  "century-city-reference": {
+    "author": "Mike-Hope",
+    "description": "洛杉矶世纪城天际线",
+    "height": 561,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Century_City_by_Mike-Hope.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/99/Century_City_by_Mike-Hope.jpg/960px-Century_City_by_Mike-Hope.jpg",
+    "width": 960
+  },
+  "changan-city-jay-reference": {
+    "author": "ScareCriterion12",
+    "description": "西安钟楼",
+    "height": 581,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E8%A5%BF%E5%AE%89%E9%92%9F%E6%A5%BC2020_(1).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/44/%E8%A5%BF%E5%AE%89%E9%92%9F%E6%A5%BC2020_%281%29.jpg/960px-%E8%A5%BF%E5%AE%89%E9%92%9F%E6%A5%BC2020_%281%29.jpg",
+    "width": 960
+  },
   "chapelle-jeanne": {
     "author": "Ordifana75",
     "description": "Chapelle Sainte-Jeanne-d’Arc",
@@ -139,6 +259,16 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2a/20190816_Most_Karola_w_Pradze_1707_5398_DxO.jpg/960px-20190816_Most_Karola_w_Pradze_1707_5398_DxO.jpg",
     "width": 960
   },
+  "chengdu-city-playlist-reference": {
+    "author": "FISU",
+    "description": "雪山背景下的成都天际线",
+    "height": 540,
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E9%9B%AA%E5%B1%B1%E4%B8%8B%E7%9A%84%E6%88%90%E9%83%BD%E5%B8%82%E5%A4%A9%E9%99%85%E7%BA%BF_Chengdu_skyline_with_snow_capped_mountains.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/%E9%9B%AA%E5%B1%B1%E4%B8%8B%E7%9A%84%E6%88%90%E9%83%BD%E5%B8%82%E5%A4%A9%E9%99%85%E7%BA%BF_Chengdu_skyline_with_snow_capped_mountains.jpg/960px-%E9%9B%AA%E5%B1%B1%E4%B8%8B%E7%9A%84%E6%88%90%E9%83%BD%E5%B8%82%E5%A4%A9%E9%99%85%E7%BA%BF_Chengdu_skyline_with_snow_capped_mountains.jpg",
+    "width": 960
+  },
   "chong-nonsi-skywalk": {
     "author": "Chainwit.",
     "description": "钟那席人行空桥",
@@ -157,6 +287,26 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
     "source": "https://commons.wikimedia.org/wiki/File:Cliffs-Of-Moher-OBriens-From-South.JPG",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/Cliffs-Of-Moher-OBriens-From-South.JPG/960px-Cliffs-Of-Moher-OBriens-From-South.JPG",
+    "width": 960
+  },
+  "coconut-grove-careless-reference": {
+    "author": "Averette",
+    "description": "迈阿密椰林区街景",
+    "height": 701,
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Coconut_Grove_Street_20100321.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f3/Coconut_Grove_Street_20100321.jpg/960px-Coconut_Grove_Street_20100321.jpg",
+    "width": 960
+  },
+  "coffeyville-city-reference": {
+    "author": "Tony Webster from Minneapolis, Minnesota, United States",
+    "description": "Coffeyville 市中心第一国民银行旧楼",
+    "height": 640,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:First_National_Bank_Building_-_Coffeyville,_Kansas_(47967310342).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dd/First_National_Bank_Building_-_Coffeyville%2C_Kansas_%2847967310342%29.jpg/960px-First_National_Bank_Building_-_Coffeyville%2C_Kansas_%2847967310342%29.jpg",
     "width": 960
   },
   "crawley-boatshed-reference": {
@@ -189,6 +339,26 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/57/Dihua_Street_MiNe-5DII_103-2747UG_%288409439781%29.jpg/960px-Dihua_Street_MiNe-5DII_103-2747UG_%288409439781%29.jpg",
     "width": 960
   },
+  "damascus-marjeh-reference": {
+    "author": "Vyacheslav Argenberg",
+    "description": "大马士革市区全景",
+    "height": 540,
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Damascus,_Syria,_Panoramic_view_of_Damascus.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/53/Damascus%2C_Syria%2C_Panoramic_view_of_Damascus.jpg/960px-Damascus%2C_Syria%2C_Panoramic_view_of_Damascus.jpg",
+    "width": 960
+  },
+  "daxi-honeymoon-bay-reference": {
+    "author": "KasugaHuang",
+    "description": "宜兰大溪蜜月湾",
+    "height": 716,
+    "license": "CC BY 2.5",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:Honeymoon_Bay_summer_morning.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/70/Honeymoon_Bay_summer_morning.jpg/960px-Honeymoon_Bay_summer_morning.jpg",
+    "width": 960
+  },
   "dealey-plaza-playlist-reference": {
     "author": "Michael Barera",
     "description": "迪利广场",
@@ -197,6 +367,26 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Dallas_July_2015_06_(triple_underpass_and_grassy_knoll).jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/83/Dallas_July_2015_06_%28triple_underpass_and_grassy_knoll%29.jpg/960px-Dallas_July_2015_06_%28triple_underpass_and_grassy_knoll%29.jpg",
+    "width": 960
+  },
+  "deep-ellum-playlist-reference": {
+    "author": "Dutch788",
+    "description": "达拉斯 Deep Ellum 街景",
+    "height": 640,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:DeepEllum_2021-554.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/06/DeepEllum_2021-554.jpg/960px-DeepEllum_2021-554.jpg",
+    "width": 960
+  },
+  "dunhuang-city-reference": {
+    "author": "Laika ac from UK",
+    "description": "敦煌市区夜景",
+    "height": 720,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Dunhuang_(23971482995).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a3/Dunhuang_%2823971482995%29.jpg/960px-Dunhuang_%2823971482995%29.jpg",
     "width": 960
   },
   "edinburgh-castle-reference": {
@@ -218,6 +408,16 @@
     "source": "https://commons.wikimedia.org/wiki/File:Tour_Eiffel_Wikimedia_Commons_(cropped).jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg/960px-Tour_Eiffel_Wikimedia_Commons_%28cropped%29.jpg",
     "width": 720
+  },
+  "florence-city-jay-reference": {
+    "author": "Giorgio Galeotti",
+    "description": "从米开朗基罗广场眺望佛罗伦萨",
+    "height": 641,
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Firenze_-_Piazzale_Michelangelo,_Firenze,_Italy_-_April_6,_2015_02.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3a/Firenze_-_Piazzale_Michelangelo%2C_Firenze%2C_Italy_-_April_6%2C_2015_02.jpg/960px-Firenze_-_Piazzale_Michelangelo%2C_Firenze%2C_Italy_-_April_6%2C_2015_02.jpg",
+    "width": 960
   },
   "former-mcburney-ymca-23rd-street-reference": {
     "author": "Beyond My Ken",
@@ -269,6 +469,36 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/19/Fuchu-Keiba-Seimon-mae-Station_20120506.jpg/960px-Fuchu-Keiba-Seimon-mae-Station_20120506.jpg",
     "width": 960
   },
+  "fuji-lyrics-reference": {
+    "author": "Suicasmo",
+    "description": "从大涌谷眺望富士山",
+    "height": 469,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:View_of_Mount_Fuji_from_%C5%8Cwakudani_20211202.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f8/View_of_Mount_Fuji_from_%C5%8Cwakudani_20211202.jpg/960px-View_of_Mount_Fuji_from_%C5%8Cwakudani_20211202.jpg",
+    "width": 960
+  },
+  "gadsden-city-playlist-reference": {
+    "author": "formulanone",
+    "description": "加兹登市区航拍",
+    "height": 640,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Gadsden,_Alabama_-_Aerial_(51157939914).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/03/Gadsden%2C_Alabama_-_Aerial_%2851157939914%29.jpg/960px-Gadsden%2C_Alabama_-_Aerial_%2851157939914%29.jpg",
+    "width": 960
+  },
+  "galveston-city-playlist-reference": {
+    "author": "Nsaum75",
+    "description": "加尔维斯顿滨海城市天际线",
+    "height": 490,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Galveston_Texas_Skyline.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f3/Galveston_Texas_Skyline.jpg/960px-Galveston_Texas_Skyline.jpg",
+    "width": 960
+  },
   "giza-pyramids": {
     "author": "KennyOMG",
     "description": "吉萨金字塔群",
@@ -277,6 +507,26 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Pyramids_of_the_Giza_Necropolis.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/Pyramids_of_the_Giza_Necropolis.jpg/960px-Pyramids_of_the_Giza_Necropolis.jpg",
+    "width": 960
+  },
+  "grand-canyon-hualapai": {
+    "author": "Balazs Barnucz",
+    "description": "大峡谷西缘 Guano Point",
+    "height": 641,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Grand_Canyon_West_-_Guano_Point.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/41/Grand_Canyon_West_-_Guano_Point.jpg/960px-Grand_Canyon_West_-_Guano_Point.jpg",
+    "width": 960
+  },
+  "great-wall-reference": {
+    "author": "Ermell",
+    "description": "八达岭长城",
+    "height": 720,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Peking_Grosse_Mauer-20071019-RM-115708.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/57/Peking_Grosse_Mauer-20071019-RM-115708.jpg/960px-Peking_Grosse_Mauer-20071019-RM-115708.jpg",
     "width": 960
   },
   "greenpoint-franklin-st-brooklyn": {
@@ -289,6 +539,46 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/2024-05-22_14_51_51_View_southeast_along_Broadway_and_the_BMT_Jamaica_Line_%28overhead%29_at_the_overpass_for_Interstate_278_%28Brooklyn-Queens_Expressway%29_in_Brooklyn%2C_New_York_City%2C_New_York.jpg/960px-thumbnail.jpg",
     "width": 960
   },
+  "greenwich": {
+    "author": "Katie Chan",
+    "description": "格林威治公园眺望皇后宫与旧皇家海军学院",
+    "height": 370,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Greenwich_Park_panorama_2023-06.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/Greenwich_Park_panorama_2023-06.jpg/960px-Greenwich_Park_panorama_2023-06.jpg",
+    "width": 960
+  },
+  "guangzhou-city-playlist-reference": {
+    "author": "Tim Wu",
+    "description": "广州塔与珠江两岸",
+    "height": 640,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Canton_Tower_20241027.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/24/Canton_Tower_20241027.jpg/960px-Canton_Tower_20241027.jpg",
+    "width": 960
+  },
+  "guling-street-reference": {
+    "author": "玄史生",
+    "description": "台北牯岭街街景",
+    "height": 720,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Guling_Street_20090801b.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/Guling_Street_20090801b.jpg/960px-Guling_Street_20090801b.jpg",
+    "width": 960
+  },
+  "hartford-ok-computer-cover-city-reference": {
+    "author": "Quintin Soloviev",
+    "description": "哈特福德城市天际线",
+    "height": 480,
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Hartford,_CT_skyline_(cropped).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/Hartford%2C_CT_skyline_%28cropped%29.jpg/960px-Hartford%2C_CT_skyline_%28cropped%29.jpg",
+    "width": 960
+  },
   "hermosa-beach-pier": {
     "author": "Laura Alier",
     "description": "赫莫萨海滩码头",
@@ -297,6 +587,16 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Hermosa_Beach_Pier_at_Sunset.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Hermosa_Beach_Pier_at_Sunset.jpg/960px-Hermosa_Beach_Pier_at_Sunset.jpg",
+    "width": 960
+  },
+  "hintertux-glacier-playlist-reference": {
+    "author": "Tiia Monto",
+    "description": "奥地利欣特图克斯冰川",
+    "height": 495,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Hintertux_glacier.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9f/Hintertux_glacier.jpg/960px-Hintertux_glacier.jpg",
     "width": 960
   },
   "hohenhaus-tenne-hintertux-playlist-reference": {
@@ -309,6 +609,86 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/Hohenhaus_Tenne.jpg/960px-Hohenhaus_Tenne.jpg",
     "width": 960
   },
+  "hollywood-reference": {
+    "author": "Michael E. Arth",
+    "description": "从好莱坞标志所在的李山眺望好莱坞",
+    "height": 458,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:View_from_behind_Hollywood_Sign_overlooking_LA.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/View_from_behind_Hollywood_Sign_overlooking_LA.jpg/960px-View_from_behind_Hollywood_Sign_overlooking_LA.jpg",
+    "width": 960
+  },
+  "hong-kong-city-playlist-reference": {
+    "author": "Base64 , retouched by CarolSpears",
+    "description": "香港维多利亚港夜景",
+    "height": 411,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Hong_Kong_Night_Skyline.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/Hong_Kong_Night_Skyline.jpg/960px-Hong_Kong_Night_Skyline.jpg",
+    "width": 960
+  },
+  "hongdong-county-reference": {
+    "author": "ncx",
+    "description": "山西洪洞县风景",
+    "height": 536,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Hongtong,_Linfen,_Shanxi,_China_-_panoramio.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/8/84/Hongtong%2C_Linfen%2C_Shanxi%2C_China_-_panoramio.jpg",
+    "width": 800
+  },
+  "houston-city-reference": {
+    "author": "Katie Haugland Brown",
+    "description": "休斯敦得州医疗中心夜景",
+    "height": 639,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Texas_medical_center.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a3/Texas_medical_center.jpg/960px-Texas_medical_center.jpg",
+    "width": 960
+  },
+  "hualien-region-playlist-reference": {
+    "author": "MickeyDisney",
+    "description": "花莲七星潭海岸",
+    "height": 640,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:2004.02.01.%E4%B8%83%E6%98%9F%E6%BD%AD_-_panoramio.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/2004.02.01.%E4%B8%83%E6%98%9F%E6%BD%AD_-_panoramio.jpg/960px-2004.02.01.%E4%B8%83%E6%98%9F%E6%BD%AD_-_panoramio.jpg",
+    "width": 960
+  },
+  "hudson-river-park-christopher-waterfront-reference": {
+    "author": "Jim.henderson",
+    "description": "纽约西村的哈德逊河公园滨水步道",
+    "height": 720,
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:Hudson_River_Park_West_Village_jeh.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Hudson_River_Park_West_Village_jeh.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Hudson_River_Park_West_Village_jeh.jpg/960px-Hudson_River_Park_West_Village_jeh.jpg",
+    "width": 960
+  },
+  "hutt-lagoon-reference": {
+    "author": "Samuel Orchard ( Muel2002 ( talk ))",
+    "description": "赫特潟湖湖岸",
+    "height": 540,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Hutt_Lagoon,_Western_Australia.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Hutt_Lagoon%2C_Western_Australia.jpg/960px-Hutt_Lagoon%2C_Western_Australia.jpg",
+    "width": 960
+  },
+  "istanbul-reference": {
+    "author": "Hunanuk",
+    "description": "伊斯坦布尔历史半岛与博斯普鲁斯海峡",
+    "height": 464,
+    "license": "CC0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File:Historical_peninsula_and_modern_skyline_of_Istanbul.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Historical_peninsula_and_modern_skyline_of_Istanbul.jpg/960px-Historical_peninsula_and_modern_skyline_of_Istanbul.jpg",
+    "width": 960
+  },
   "jewel-changi": {
     "author": "LN9267",
     "description": "星耀樟宜",
@@ -317,6 +697,26 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Jewel_Changi_Airport_13-11-2023(1).jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5a/Jewel_Changi_Airport_13-11-2023%281%29.jpg/960px-Jewel_Changi_Airport_13-11-2023%281%29.jpg",
+    "width": 960
+  },
+  "jianan-plain-reference": {
+    "author": "*嘟*",
+    "description": "嘉南平原稻田",
+    "height": 427,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Chianan.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/19/Chianan.jpg/960px-Chianan.jpg",
+    "width": 960
+  },
+  "joshua-tree-reference": {
+    "author": "Jarek Tuszyński",
+    "description": "约书亚树国家公园的黎明",
+    "height": 443,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Joshua_Tree_-_Cyclops_%2B_Potato_Head_-_Sunrise.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f9/Joshua_Tree_-_Cyclops_%2B_Potato_Head_-_Sunrise.jpg/960px-Joshua_Tree_-_Cyclops_%2B_Potato_Head_-_Sunrise.jpg",
     "width": 960
   },
   "kaohsiung-arena-reference": {
@@ -339,6 +739,26 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/Kaohsiung_Music_Center_and_Great_Tiger_Bridge_during_2022_Taiwan_Lantern_Festival.jpg/960px-Kaohsiung_Music_Center_and_Great_Tiger_Bridge_during_2022_Taiwan_Lantern_Festival.jpg",
     "width": 960
   },
+  "kathmandu-city-playlist-reference": {
+    "author": "Gerd Eichmann",
+    "description": "加德满都杜巴广场",
+    "height": 594,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kathmandu-Durbar_Square-06-Mahavishnu-Kuh-Vishnu-Pratapamalla-Jagannath-2007-gje.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/35/Kathmandu-Durbar_Square-06-Mahavishnu-Kuh-Vishnu-Pratapamalla-Jagannath-2007-gje.jpg/960px-Kathmandu-Durbar_Square-06-Mahavishnu-Kuh-Vishnu-Pratapamalla-Jagannath-2007-gje.jpg",
+    "width": 960
+  },
+  "keelung-city-reference": {
+    "author": "Taiwankengo",
+    "description": "从狮球岭眺望基隆港",
+    "height": 638,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E7%8D%85%E7%90%83%E5%B6%BA%E7%9C%BA%E6%9C%9B%E5%9F%BA%E9%9A%86%E6%B8%AF2017.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/15/%E7%8D%85%E7%90%83%E5%B6%BA%E7%9C%BA%E6%9C%9B%E5%9F%BA%E9%9A%86%E6%B8%AF2017.jpg/960px-%E7%8D%85%E7%90%83%E5%B6%BA%E7%9C%BA%E6%9C%9B%E5%9F%BA%E9%9A%86%E6%B8%AF2017.jpg",
+    "width": 960
+  },
   "keelung-miaokou-playlist-reference": {
     "author": "中華民國總統府",
     "description": "基隆廟口夜市",
@@ -357,6 +777,46 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
     "source": "https://commons.wikimedia.org/wiki/File:Kurushimakaikyou_ohashi01.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a1/Kurushimakaikyou_ohashi01.jpg/960px-Kurushimakaikyou_ohashi01.jpg",
+    "width": 960
+  },
+  "kyoto-city-reference": {
+    "author": "Martin Falbisoner",
+    "description": "京都清水寺与秋景",
+    "height": 634,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Kiyomizu-dera,_Kyoto,_November_2016_-02.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/Kiyomizu-dera%2C_Kyoto%2C_November_2016_-02.jpg/960px-Kiyomizu-dera%2C_Kyoto%2C_November_2016_-02.jpg",
+    "width": 960
+  },
+  "lahaina-city-reference": {
+    "author": "en:User:Calbear22",
+    "description": "拉海纳滨水旧景",
+    "height": 720,
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:L%C4%81hain%C4%81_oceanfront.JPG",
+    "source": "https://commons.wikimedia.org/wiki/File:L%C4%81hain%C4%81_oceanfront.JPG",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a5/L%C4%81hain%C4%81_oceanfront.JPG/960px-L%C4%81hain%C4%81_oceanfront.JPG",
+    "width": 960
+  },
+  "lake-como-reference": {
+    "author": "Luca Casartelli",
+    "description": "科莫湖山水",
+    "height": 600,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Sentiero_del_Viandante_DSC_6340_(14020554463).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cc/Sentiero_del_Viandante_DSC_6340_%2814020554463%29.jpg/960px-Sentiero_del_Viandante_DSC_6340_%2814020554463%29.jpg",
+    "width": 960
+  },
+  "lake-pergusa-reference": {
+    "author": "Salvatore Ingala 's sister",
+    "description": "西西里佩尔古萨湖岸",
+    "height": 720,
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:Lago_di_Pergusa.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Lago_di_Pergusa.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/Lago_di_Pergusa.jpg/960px-Lago_di_Pergusa.jpg",
     "width": 960
   },
   "lantau-mountain-camp": {
@@ -409,6 +869,46 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c5/Lion_Rock_5.jpg/960px-Lion_Rock_5.jpg",
     "width": 960
   },
+  "london-city-lyrics-reference": {
+    "author": "Ilya Grigorik",
+    "description": "伦敦泰晤士河与塔桥夜景",
+    "height": 540,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:London_Skyline_(125508655).jpeg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/London_Skyline_%28125508655%29.jpeg/960px-London_Skyline_%28125508655%29.jpeg",
+    "width": 960
+  },
+  "louisiana-state-lyric-reference": {
+    "author": "U.S. Army Corps of Engineers, photographer not specified or unknown",
+    "description": "路易斯安那州阿查法拉亚盆地水域",
+    "height": 641,
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:Atchafalaya_Basin.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Atchafalaya_Basin.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7e/Atchafalaya_Basin.jpg/960px-Atchafalaya_Basin.jpg",
+    "width": 960
+  },
+  "lukang-town-playlist-reference": {
+    "author": "林高志",
+    "description": "鹿港老街",
+    "height": 637,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E9%B9%BF%E6%B8%AF%E8%80%81%E8%A1%97%E5%B0%8F%E5%B7%B707.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/%E9%B9%BF%E6%B8%AF%E8%80%81%E8%A1%97%E5%B0%8F%E5%B7%B707.jpg/960px-%E9%B9%BF%E6%B8%AF%E8%80%81%E8%A1%97%E5%B0%8F%E5%B7%B707.jpg",
+    "width": 960
+  },
+  "luoyang-city-reference": {
+    "author": "Rongcan Lu",
+    "description": "洛阳丽景门",
+    "height": 720,
+    "license": "CC0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File:Lijing_Gate,Luoyang_in_2025.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/Lijing_Gate%2CLuoyang_in_2025.jpg/960px-Lijing_Gate%2CLuoyang_in_2025.jpg",
+    "width": 960
+  },
   "malecon": {
     "author": "Eduardo Manchon",
     "description": "马拉贡滨海大道",
@@ -419,6 +919,16 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/25/Malecon_de_la_Habana_-_panoramio_-_Eduardo_Manchon.jpg/960px-Malecon_de_la_Habana_-_panoramio_-_Eduardo_Manchon.jpg",
     "width": 960
   },
+  "malibu-city-reference": {
+    "author": "The original uploader was Tillman at English Wikipedia .",
+    "description": "马里布沿海航拍",
+    "height": 720,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:MalibuAir.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4f/MalibuAir.jpg/960px-MalibuAir.jpg",
+    "width": 960
+  },
   "mandalay-bay-shark-reef-reference": {
     "author": "Coughdrop12",
     "description": "Mandalay Bay 鲨鱼礁水族馆入口",
@@ -427,6 +937,16 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Shark_Reef_Aquarium_Entrance.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5a/Shark_Reef_Aquarium_Entrance.jpg/960px-Shark_Reef_Aquarium_Entrance.jpg",
+    "width": 960
+  },
+  "mandalay-moat-road-reference": {
+    "author": "Vyacheslav Argenberg",
+    "description": "曼德勒皇宫",
+    "height": 720,
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Mandalay_Palace,_Myanmar.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/Mandalay_Palace%2C_Myanmar.jpg/960px-Mandalay_Palace%2C_Myanmar.jpg",
     "width": 960
   },
   "maughan-library-jay-reference": {
@@ -459,6 +979,26 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/Melbourne_Old_Post_Office_%28Shopping_Mall_Interior%29.jpg/960px-Melbourne_Old_Post_Office_%28Shopping_Mall_Interior%29.jpg",
     "width": 960
   },
+  "memphis-city-playlist-reference": {
+    "author": "Quintin Soloviev",
+    "description": "孟菲斯市区与密西西比河",
+    "height": 480,
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Skyline_of_Memphis,_TN.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/03/Skyline_of_Memphis%2C_TN.jpg/960px-Skyline_of_Memphis%2C_TN.jpg",
+    "width": 960
+  },
+  "miami-bayfront-careless-city-reference": {
+    "author": "Joe deSousa",
+    "description": "从迈阿密港眺望城市天际线",
+    "height": 540,
+    "license": "CC0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File:Miami_Sunset_(45863661094).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d2/Miami_Sunset_%2845863661094%29.jpg/960px-Miami_Sunset_%2845863661094%29.jpg",
+    "width": 960
+  },
   "milan-duomo-reference": {
     "author": "Jiuguang Wang",
     "description": "米兰 · 大教堂广场",
@@ -477,6 +1017,16 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
     "source": "https://commons.wikimedia.org/wiki/File:Miramar_Entertainment_Park_in_the_evening.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/88/Miramar_Entertainment_Park_in_the_evening.jpg/960px-Miramar_Entertainment_Park_in_the_evening.jpg",
+    "width": 960
+  },
+  "mongolian-plateau-reference": {
+    "author": "Francisco Anzola",
+    "description": "蒙古高原草原聚落",
+    "height": 720,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Settlement_on_the_Mongolian_steppes_(2541042210).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1e/Settlement_on_the_Mongolian_steppes_%282541042210%29.jpg/960px-Settlement_on_the_Mongolian_steppes_%282541042210%29.jpg",
     "width": 960
   },
   "mont-saint-michel": {
@@ -498,6 +1048,76 @@
     "source": "https://commons.wikimedia.org/wiki/File:Snowy_Morristown_Station_(12411623674).jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/10/Snowy_Morristown_Station_%2812411623674%29.jpg/960px-Snowy_Morristown_Station_%2812411623674%29.jpg",
     "width": 960
+  },
+  "mount-song-reference": {
+    "author": "张骐",
+    "description": "河南登封嵩山山体",
+    "height": 598,
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:Songshan.JPG",
+    "source": "https://commons.wikimedia.org/wiki/File:Songshan.JPG",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/b/bb/Songshan.JPG",
+    "width": 900
+  },
+  "mount-tai-reference": {
+    "author": "xiquinhosilva",
+    "description": "泰山山体",
+    "height": 629,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:50304-Taishan_(49055660366).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/50304-Taishan_%2849055660366%29.jpg/960px-50304-Taishan_%2849055660366%29.jpg",
+    "width": 960
+  },
+  "nanjing-city-reference": {
+    "author": "xiquinhosilva",
+    "description": "从城墙眺望南京市区",
+    "height": 640,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Nanjing_CBD_from_City_Wall.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/82/Nanjing_CBD_from_City_Wall.jpg/960px-Nanjing_CBD_from_City_Wall.jpg",
+    "width": 960
+  },
+  "new-york-city-playlist-reference": {
+    "author": "Dllu",
+    "description": "从洛克菲勒中心眺望曼哈顿",
+    "height": 540,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:View_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_(cropped).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7a/View_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_%28cropped%29.jpg/960px-View_of_Empire_State_Building_from_Rockefeller_Center_New_York_City_dllu_%28cropped%29.jpg",
+    "width": 960
+  },
+  "new-york-washington-heights-mv-reference": {
+    "author": "Shannon from New York",
+    "description": "从纽约华盛顿高地眺望哈莱姆河一带",
+    "height": 639,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Washington_Heights_seen_from_174th_Street.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Washington_Heights_seen_from_174th_Street.jpg/960px-Washington_Heights_seen_from_174th_Street.jpg",
+    "width": 960
+  },
+  "nile-river-reference": {
+    "author": "Chabe01",
+    "description": "尼罗河卢克索段夜景",
+    "height": 720,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Fleuve_Nil_-_Louxor_(EG)_-_2025-12-03_-_7.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d2/Fleuve_Nil_-_Louxor_%28EG%29_-_2025-12-03_-_7.jpg/960px-Fleuve_Nil_-_Louxor_%28EG%29_-_2025-12-03_-_7.jpg",
+    "width": 960
+  },
+  "nippori-tokyo-playlist-reference": {
+    "author": "SuFlyer",
+    "description": "从夕阳阶梯看东京谷中银座",
+    "height": 1200,
+    "license": "CC0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File:Yanaka_Ginza_Street_from_Yuyake_Dandan_(Oct_2024).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/Yanaka_Ginza_Street_from_Yuyake_Dandan_%28Oct_2024%29.jpg/960px-Yanaka_Ginza_Street_from_Yuyake_Dandan_%28Oct_2024%29.jpg",
+    "width": 800
   },
   "notting-hill-bookshop-jay-reference": {
     "author": "Sanshiro KUBOTA",
@@ -549,6 +1169,16 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Paramount_Ranch_Western_Town_%2836665423431%29.jpg/960px-Paramount_Ranch_Western_Town_%2836665423431%29.jpg",
     "width": 960
   },
+  "paris-city-playlist-reference": {
+    "author": "Yann Caradec from Paris, France",
+    "description": "从圣雅克塔眺望巴黎",
+    "height": 600,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:La_Tour_Eiffel_vue_de_la_Tour_Saint-Jacques,_Paris_ao%C3%BBt_2014_(2).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/La_Tour_Eiffel_vue_de_la_Tour_Saint-Jacques%2C_Paris_ao%C3%BBt_2014_%282%29.jpg/960px-La_Tour_Eiffel_vue_de_la_Tour_Saint-Jacques%2C_Paris_ao%C3%BBt_2014_%282%29.jpg",
+    "width": 960
+  },
   "piha-beach": {
     "author": "Follash",
     "description": "皮哈黑沙滩",
@@ -567,6 +1197,16 @@
     "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
     "source": "https://commons.wikimedia.org/wiki/File:Pont_Alexandre_III_from_pont_de_la_Concorde,_Paris_17_May_2012.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Pont_Alexandre_III_from_pont_de_la_Concorde%2C_Paris_17_May_2012.jpg/960px-Pont_Alexandre_III_from_pont_de_la_Concorde%2C_Paris_17_May_2012.jpg",
+    "width": 960
+  },
+  "providence-city-reference": {
+    "author": "Quintin Soloviev",
+    "description": "Providence 市区与跨河桥梁",
+    "height": 651,
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Providence_RI_skyline.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ec/Providence_RI_skyline.jpg/960px-Providence_RI_skyline.jpg",
     "width": 960
   },
   "ramrod-west-street-former-reference": {
@@ -609,6 +1249,46 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1d/Reebokstadium_inside.jpg/960px-Reebokstadium_inside.jpg",
     "width": 960
   },
+  "renai-road-reference": {
+    "author": "Tianmu peter",
+    "description": "台北仁爱路林荫大道",
+    "height": 720,
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E4%BB%81%E6%84%9B%E8%B7%AF%E6%9E%97%E8%94%AD%E5%A4%A7%E9%81%93_-_panoramio.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/48/%E4%BB%81%E6%84%9B%E8%B7%AF%E6%9E%97%E8%94%AD%E5%A4%A7%E9%81%93_-_panoramio.jpg/960px-%E4%BB%81%E6%84%9B%E8%B7%AF%E6%9E%97%E8%94%AD%E5%A4%A7%E9%81%93_-_panoramio.jpg",
+    "width": 960
+  },
+  "rhone-arles-reference": {
+    "author": "Gzen92",
+    "description": "隆河阿尔勒段与河岸城镇",
+    "height": 720,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Rh%C3%B4ne_(Arles)_(3).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6a/Rh%C3%B4ne_%28Arles%29_%283%29.jpg/960px-Rh%C3%B4ne_%28Arles%29_%283%29.jpg",
+    "width": 960
+  },
+  "rome-city-reference": {
+    "author": "Diliff",
+    "description": "罗马特雷维喷泉",
+    "height": 638,
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Trevi_Fountain,_Rome,_Italy_2_-_May_2007.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7e/Trevi_Fountain%2C_Rome%2C_Italy_2_-_May_2007.jpg/960px-Trevi_Fountain%2C_Rome%2C_Italy_2_-_May_2007.jpg",
+    "width": 960
+  },
+  "rottnest-island-reference": {
+    "author": "Cookaa",
+    "description": "罗特尼斯岛 Pinky’s Beach",
+    "height": 720,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Pinky%27s_Bay_Rottnest_Island_WA.JPG",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9b/Pinky%27s_Bay_Rottnest_Island_WA.JPG/960px-Pinky%27s_Bay_Rottnest_Island_WA.JPG",
+    "width": 960
+  },
   "salute-venice-reference": {
     "author": "Hans Peter Schaefer",
     "description": "安康圣母教堂",
@@ -629,6 +1309,26 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/La_Samaritaine_rue_de_la_Monnaie_2.jpg/960px-La_Samaritaine_rue_de_la_Monnaie_2.jpg",
     "width": 960
   },
+  "san-antonio-main-plaza-city-reference": {
+    "author": "A. Michael Uhlmann",
+    "description": "圣安东尼奥阿拉莫夜景",
+    "height": 640,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Alamo_Mission_San_Antonio_at_Night.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/Alamo_Mission_San_Antonio_at_Night.jpg/960px-Alamo_Mission_San_Antonio_at_Night.jpg",
+    "width": 960
+  },
+  "san-francisco-city-playlist-reference": {
+    "author": "Sebastien Gabriel sgabriel",
+    "description": "旧金山市区天际线",
+    "height": 640,
+    "license": "CC0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File:San_Francisco_skyline_(Unsplash).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c5/San_Francisco_skyline_%28Unsplash%29.jpg/960px-San_Francisco_skyline_%28Unsplash%29.jpg",
+    "width": 960
+  },
   "san-marco": {
     "author": "Matthias Süßen",
     "description": "圣马可广场",
@@ -637,6 +1337,66 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Piazza_San_Marco_(Venice)_at_night-msu-2021-6449-.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/17/Piazza_San_Marco_%28Venice%29_at_night-msu-2021-6449-.jpg/960px-Piazza_San_Marco_%28Venice%29_at_night-msu-2021-6449-.jpg",
+    "width": 960
+  },
+  "santorini-oia-reference": {
+    "author": "TomasEE",
+    "description": "圣托里尼岛伊亚村落日",
+    "height": 639,
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Oia_sunset_-_panoramio_(2).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/37/Oia_sunset_-_panoramio_%282%29.jpg/960px-Oia_sunset_-_panoramio_%282%29.jpg",
+    "width": 960
+  },
+  "sanzhi-district-unconditional-mv-reference": {
+    "author": "Prattflora",
+    "description": "新北三芝海岸",
+    "height": 720,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Sanjhih-Beach.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/Sanjhih-Beach.jpg/960px-Sanjhih-Beach.jpg",
+    "width": 960
+  },
+  "seine-paris-reference": {
+    "author": "Maxime Homme",
+    "description": "从埃菲尔铁塔眺望塞纳河巴黎段",
+    "height": 720,
+    "license": "CC0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File:Vue_du_troisi%C3%A8me_%C3%A9tage_de_la_Tour_Effeil_07.JPG",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Vue_du_troisi%C3%A8me_%C3%A9tage_de_la_Tour_Effeil_07.JPG/960px-Vue_du_troisi%C3%A8me_%C3%A9tage_de_la_Tour_Effeil_07.JPG",
+    "width": 960
+  },
+  "seydisfjardur-route-93-gufufoss": {
+    "author": "David Stanley from Nanaimo, Canada",
+    "description": "冰岛塞济斯菲厄泽古芙瀑布",
+    "height": 720,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Gufufoss,_Seydisfjordur_(4899627742).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/00/Gufufoss%2C_Seydisfjordur_%284899627742%29.jpg/960px-Gufufoss%2C_Seydisfjordur_%284899627742%29.jpg",
+    "width": 960
+  },
+  "shanghai-city-reference": {
+    "author": "King of Hearts",
+    "description": "上海浦东陆家嘴天际线",
+    "height": 480,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Pudong_Shanghai_November_2017_panorama.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/df/Pudong_Shanghai_November_2017_panorama.jpg/960px-Pudong_Shanghai_November_2017_panorama.jpg",
+    "width": 960
+  },
+  "shezi-island-reference": {
+    "author": "MiNe",
+    "description": "台北社子岛岛头公园一带航拍",
+    "height": 720,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:2020-04-30_Shezidao_01.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/15/2020-04-30_Shezidao_01.jpg/960px-2020-04-30_Shezidao_01.jpg",
     "width": 960
   },
   "shihsanhang-museum": {
@@ -669,6 +1429,16 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/50/Shuiyuan_Market_Entrance.jpg/960px-Shuiyuan_Market_Entrance.jpg",
     "width": 960
   },
+  "sicily-reference": {
+    "author": "Carsten Steger",
+    "description": "西西里塔奥尔米纳海岸",
+    "height": 640,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Aerial_image_of_the_coast_of_Taormina_(view_from_the_southeast).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5b/Aerial_image_of_the_coast_of_Taormina_%28view_from_the_southeast%29.jpg/960px-Aerial_image_of_the_coast_of_Taormina_%28view_from_the_southeast%29.jpg",
+    "width": 960
+  },
   "songshan-cultural-park": {
     "author": "寺人孟子",
     "description": "松山文创园区",
@@ -699,6 +1469,46 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/St_Patrick%27s_Cathedral%2C_Melbourne%2C_northwest_view_20230219_1.jpg/960px-St_Patrick%27s_Cathedral%2C_Melbourne%2C_northwest_view_20230219_1.jpg",
     "width": 960
   },
+  "studland-bay-coldplay-reference": {
+    "author": "Graham Hogg",
+    "description": "多塞特 Studland Bay 的 Knoll Beach",
+    "height": 480,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Knoll_Beach_-_geograph.org.uk_-_7251011.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/2/20/Knoll_Beach_-_geograph.org.uk_-_7251011.jpg",
+    "width": 640
+  },
+  "surabaya-city-playlist-reference": {
+    "author": "consigliere ivan",
+    "description": "泗水市中心天际线",
+    "height": 480,
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Central_Surabaya_view_taken_from_JW_Marriott_Surabaya.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/09/Central_Surabaya_view_taken_from_JW_Marriott_Surabaya.jpg/960px-Central_Surabaya_view_taken_from_JW_Marriott_Surabaya.jpg",
+    "width": 960
+  },
+  "suzhou-creek-playlist-reference": {
+    "author": "Daniel Case",
+    "description": "从外白渡桥看上海苏州河",
+    "height": 563,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Suzhou_Creek_from_Waibaidu_Bridge,_Shanghai.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2e/Suzhou_Creek_from_Waibaidu_Bridge%2C_Shanghai.jpg/960px-Suzhou_Creek_from_Waibaidu_Bridge%2C_Shanghai.jpg",
+    "width": 960
+  },
+  "swiss-alps-reference": {
+    "author": "Jackph",
+    "description": "伯尔尼阿尔卑斯山日落",
+    "height": 576,
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:BerneseAlps.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:BerneseAlps.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/7/77/BerneseAlps.jpg",
+    "width": 768
+  },
   "taipei-101": {
     "author": "CEphoto, Uwe Aranas",
     "description": "台北 101",
@@ -717,6 +1527,16 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Taipei_Arena_20230529.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6c/Taipei_Arena_20230529.jpg/960px-Taipei_Arena_20230529.jpg",
+    "width": 960
+  },
+  "taipei-city-reference": {
+    "author": "毛貓大少爺",
+    "description": "台北市天际线",
+    "height": 640,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Taipei_Skyline_2022.06.29.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Taipei_Skyline_2022.06.29.jpg/960px-Taipei_Skyline_2022.06.29.jpg",
     "width": 960
   },
   "taipei-guest-house": {
@@ -769,6 +1589,26 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/42/%E6%B7%A1%E6%B1%9F%E4%B8%AD%E5%AD%B8%E5%A4%A7%E7%A6%AE%E6%8B%9C%E5%A0%82_20240822.jpg/960px-%E6%B7%A1%E6%B1%9F%E4%B8%AD%E5%AD%B8%E5%A4%A7%E7%A6%AE%E6%8B%9C%E5%A0%82_20240822.jpg",
     "width": 960
   },
+  "tamsui-north-coast-reference": {
+    "author": "peellden",
+    "description": "台湾北海岸野柳岬",
+    "height": 720,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Yehliu_Cape_20041113.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Yehliu_Cape_20041113.jpg/960px-Yehliu_Cape_20041113.jpg",
+    "width": 960
+  },
+  "tamsui-riverfront-playlist-reference": {
+    "author": "Ianbu",
+    "description": "淡水海关码头与淡水河",
+    "height": 720,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E6%B7%A1%E6%B0%B4%E6%B5%B7%E9%97%9C%E7%A2%BC%E9%A0%AD.JPG",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/%E6%B7%A1%E6%B0%B4%E6%B5%B7%E9%97%9C%E7%A2%BC%E9%A0%AD.JPG/960px-%E6%B7%A1%E6%B0%B4%E6%B5%B7%E9%97%9C%E7%A2%BC%E9%A0%AD.JPG",
+    "width": 960
+  },
   "taoyuan-dome": {
     "author": "Padai",
     "description": "桃园巨蛋",
@@ -809,6 +1649,16 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/26/GraumansChineseTheatre01.JPG/960px-GraumansChineseTheatre01.JPG",
     "width": 960
   },
+  "thames-london-reference": {
+    "author": "Diliff",
+    "description": "泰晤士河伦敦段与南岸伦敦眼",
+    "height": 629,
+    "license": "CC BY 2.5",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.5",
+    "source": "https://commons.wikimedia.org/wiki/File:London_Eye_Jan_2006.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fc/London_Eye_Jan_2006.jpg/960px-London_Eye_Jan_2006.jpg",
+    "width": 960
+  },
   "the-portland-public-house": {
     "author": "Prosperosity",
     "description": "奥克兰 Kingsland 的 Portland Buildings，The Portland Public House 所在建筑",
@@ -817,6 +1667,26 @@
     "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Portland_Buildings,_Kingsland_20230325_082326.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Portland_Buildings%2C_Kingsland_20230325_082326.jpg/960px-Portland_Buildings%2C_Kingsland_20230325_082326.jpg",
+    "width": 960
+  },
+  "tianshan-tianchi-reference": {
+    "author": "Caitriana Nicholson from 北京 ~ Beijing, 中国 ~ China",
+    "description": "新疆天山天池",
+    "height": 720,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:The_Heavenly_Lake_%E5%A4%A9%E6%B1%A0_(8064381762).jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f0/The_Heavenly_Lake_%E5%A4%A9%E6%B1%A0_%288064381762%29.jpg/960px-The_Heavenly_Lake_%E5%A4%A9%E6%B1%A0_%288064381762%29.jpg",
+    "width": 960
+  },
+  "tigris-baghdad-playlist-reference": {
+    "author": "Don Christie",
+    "description": "底格里斯河巴格达段（1958 年）",
+    "height": 635,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Tigris_in_Baghdad_1958_04.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/35/Tigris_in_Baghdad_1958_04.jpg/960px-Tigris_in_Baghdad_1958_04.jpg",
     "width": 960
   },
   "tjfsu-machang-campus": {
@@ -839,6 +1709,36 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/TNUA_administration_buildings_and_Arts_forum_20240324.jpg/960px-TNUA_administration_buildings_and_Arts_forum_20240324.jpg",
     "width": 960
   },
+  "tobadill-trisanna-bridge-regional-reference": {
+    "author": "Siegele Roland",
+    "description": "托巴迪尔附近的 Trisanna 铁路桥",
+    "height": 720,
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:Trisannabruecke_3.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Trisannabruecke_3.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/99/Trisannabruecke_3.jpg/960px-Trisannabruecke_3.jpg",
+    "width": 960
+  },
+  "tokyo-city-lyrics-reference": {
+    "author": "Morio",
+    "description": "东京新宿天际线与远处富士山",
+    "height": 511,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "source": "https://commons.wikimedia.org/wiki/File:Skyscrapers_of_Shinjuku_2009_January.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/Skyscrapers_of_Shinjuku_2009_January.jpg/960px-Skyscrapers_of_Shinjuku_2009_January.jpg",
+    "width": 960
+  },
+  "tokyo-yamanote-reference": {
+    "author": "Syced",
+    "description": "代代木附近的东京山手线铁路桥",
+    "height": 720,
+    "license": "CC0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "source": "https://commons.wikimedia.org/wiki/File:Yamanote_line_bridge_near_Yoyogi_station.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/Yamanote_line_bridge_near_Yoyogi_station.jpg/960px-Yamanote_line_bridge_near_Yoyogi_station.jpg",
+    "width": 960
+  },
   "tower-view-street": {
     "author": "くろふね",
     "description": "Tower View 通街景",
@@ -849,6 +1749,26 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/aa/%E6%9D%B1%E4%BA%AC%E3%82%B9%E3%82%AB%E3%82%A4%E3%83%84%E3%83%AA%E3%83%BC%EF%BC%88%E3%82%BF%E3%83%AF%E3%83%BC%E3%83%93%E3%83%A5%E3%83%BC%E9%80%9A%E3%82%8A%EF%BC%8920241103-P1059239.jpg/960px-%E6%9D%B1%E4%BA%AC%E3%82%B9%E3%82%AB%E3%82%A4%E3%83%84%E3%83%AA%E3%83%BC%EF%BC%88%E3%82%BF%E3%83%AF%E3%83%BC%E3%83%93%E3%83%A5%E3%83%BC%E9%80%9A%E3%82%8A%EF%BC%8920241103-P1059239.jpg",
     "width": 900
   },
+  "tucson-city-playlist-reference": {
+    "author": "John Diebolt",
+    "description": "从 Sentinel Peak 眺望图森",
+    "height": 720,
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:View_of_Tucson_from_Sentinel_Peak_2.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:View_of_Tucson_from_Sentinel_Peak_2.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/View_of_Tucson_from_Sentinel_Peak_2.jpg/960px-View_of_Tucson_from_Sentinel_Peak_2.jpg",
+    "width": 960
+  },
+  "vienna-city-playlist-reference": {
+    "author": "MrPanyGoff",
+    "description": "从美景宫花园眺望维也纳",
+    "height": 280,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Panorama_from_Belvedere_-_Vienna.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/08/Panorama_from_Belvedere_-_Vienna.jpg/960px-Panorama_from_Belvedere_-_Vienna.jpg",
+    "width": 960
+  },
   "villa-saporiti-jay-reference": {
     "author": "Zionsecond",
     "description": "Villa Saporiti",
@@ -857,6 +1777,36 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:Villa_Saporiti.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8b/Villa_Saporiti.jpg/960px-Villa_Saporiti.jpg",
+    "width": 960
+  },
+  "virginia-key-careless-reference": {
+    "author": "Digital photo taken by Marc Averette.",
+    "description": "迈阿密弗吉尼亚岛海岸",
+    "height": 720,
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Virginiakeybeach.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Virginiakeybeach.jpg/960px-Virginiakeybeach.jpg",
+    "width": 960
+  },
+  "vladivostok": {
+    "author": "Alexxx1979",
+    "description": "海参崴市中心古姆百货",
+    "height": 640,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Vladivostok._GUM_Department_Store_P8070703_2200.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/62/Vladivostok._GUM_Department_Store_P8070703_2200.jpg/960px-Vladivostok._GUM_Department_Store_P8070703_2200.jpg",
+    "width": 960
+  },
+  "wanhua-reference": {
+    "author": "Goranq",
+    "description": "万华艋舺龙山寺",
+    "height": 640,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:%E5%8F%B0%E5%8C%97%E5%B8%82%E8%89%8B%E8%88%BA%E9%BE%8D%E5%B1%B1%E5%AF%BA.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/%E5%8F%B0%E5%8C%97%E5%B8%82%E8%89%8B%E8%88%BA%E9%BE%8D%E5%B1%B1%E5%AF%BA.jpg/960px-%E5%8F%B0%E5%8C%97%E5%B8%82%E8%89%8B%E8%88%BA%E9%BE%8D%E5%B1%B1%E5%AF%BA.jpg",
     "width": 960
   },
   "waterloo-bridge-coldplay-reference": {
@@ -869,6 +1819,16 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/River_Thames_and_Waterloo_Bridge%2C_London-17Aug2009.jpg/960px-River_Thames_and_Waterloo_Bridge%2C_London-17Aug2009.jpg",
     "width": 960
   },
+  "westminster-abbey-reference": {
+    "author": "Antiquary",
+    "description": "伦敦西敏寺西立面",
+    "height": 1200,
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Westminster_Abbey,_Westminster.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/47/Westminster_Abbey%2C_Westminster.jpg/960px-Westminster_Abbey%2C_Westminster.jpg",
+    "width": 597
+  },
   "white-house-reference": {
     "author": "Carol M. Highsmith / 美国国会图书馆",
     "description": "白宫及其庭院的航拍",
@@ -879,6 +1839,16 @@
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/99/Aerial_view_of_the_White_House.jpg/960px-Aerial_view_of_the_White_House.jpg",
     "width": 960
   },
+  "winslow-city-reference": {
+    "author": "TimothyMN",
+    "description": "Winslow 旧城区的 66 号公路街角",
+    "height": 720,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Arizona_US_66_Standing_on_the_Corner_Park_Winslow_Arizona.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Arizona_US_66_Standing_on_the_Corner_Park_Winslow_Arizona.jpg/960px-Arizona_US_66_Standing_on_the_Corner_Park_Winslow_Arizona.jpg",
+    "width": 960
+  },
   "xitang": {
     "author": "Chensiyuan",
     "description": "西塘古镇",
@@ -887,6 +1857,46 @@
     "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
     "source": "https://commons.wikimedia.org/wiki/File:1_xitang_zhejiang_2023.jpg",
     "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/46/1_xitang_zhejiang_2023.jpg/960px-1_xitang_zhejiang_2023.jpg",
+    "width": 960
+  },
+  "yangmingshan-playlist-reference": {
+    "author": "Men-Huan Chao",
+    "description": "阳明山国家公园山脊与云海",
+    "height": 652,
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:YangmingshanNP_MenHuanChao_001.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/aa/YangmingshanNP_MenHuanChao_001.jpg/960px-YangmingshanNP_MenHuanChao_001.jpg",
+    "width": 960
+  },
+  "yangmingshan-reference": {
+    "author": "Wei-Te Wong",
+    "description": "阳明山七星山",
+    "height": 640,
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Mount_Qixing_under_clear_sky_on_13th_February_2016.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/21/Mount_Qixing_under_clear_sky_on_13th_February_2016.jpg/960px-Mount_Qixing_under_clear_sky_on_13th_February_2016.jpg",
+    "width": 960
+  },
+  "yangtze-river-reference": {
+    "author": "Fllee",
+    "description": "武汉长江大桥与长江",
+    "height": 720,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Wuhan_Yangtze_River_Bridge-1.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c5/Wuhan_Yangtze_River_Bridge-1.jpg/960px-Wuhan_Yangtze_River_Bridge-1.jpg",
+    "width": 960
+  },
+  "yellow-river-reference": {
+    "author": "RThiele",
+    "description": "黄河兰州段与两岸城区",
+    "height": 642,
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Lanzhou_von_Westen.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/Lanzhou_von_Westen.jpg/960px-Lanzhou_von_Westen.jpg",
     "width": 960
   },
   "yongma-land": {

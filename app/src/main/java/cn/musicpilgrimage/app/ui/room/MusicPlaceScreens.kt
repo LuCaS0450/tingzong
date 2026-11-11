@@ -76,6 +76,13 @@ import cn.musicpilgrimage.app.ui.ViewModelStatus
                         RoomSourceLink("${photo.license} · 已缩放与转码",photo.licenseUrl)
                     }
                 }
+                else item {
+                    Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                        Text("地图示意",fontSize=18.sp,color=RoomColors.Ink)
+                        if(place.coordinateSource.startsWith("https://"))RoomSourceLink("查看参考位置依据",place.coordinateSource)
+                        RoomSourceLink("Natural Earth 地图轮廓", "https://www.naturalearthdata.com/about/terms-of-use/")
+                    }
+                }
                 items(place.scenes.filter(Scene::publiclyVisible).distinctBy{listOf(it.artistId,it.work,it.kind,it.associationSourceUrl.ifBlank{it.sourceUrl})},key={it.id}){scene->Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     HorizontalDivider(color=RoomColors.Line)
                     Text("${scene.work} · ${scene.artistName}",fontSize=18.sp,lineHeight=27.sp,color=RoomColors.Ink)
