@@ -188,10 +188,10 @@ internal class SwissDetailMedia(private val context:Context) {
         if(art?.approved!=true)return ""
         return reviewed.optString(art.id).ifBlank{BundledCovers.model(context,art.id,art.imageUrl).orEmpty()}
     }
-    fun scene(scene:Scene?):String {
+    fun scene(scene:Scene?, preferReleaseArtwork:Boolean=true):String {
         if(scene?.imageApproved!=true)return ""
         reviewed.optString(scene.id).takeIf{it.isNotBlank()}?.let{return it}
-        if(scene.referenceKind=="release_cover")scene.displayCover?.takeIf{it.approved}?.let{return artwork(it)}
+        if(preferReleaseArtwork&&scene.referenceKind=="release_cover")scene.displayCover?.takeIf{it.approved}?.let{return artwork(it)}
         val source=scene.imageUrl.orEmpty()
         BundledCovers.model(context,"reference-${scene.id}",source)?.takeIf{it!=source}?.let{return it}
         return source
@@ -207,19 +207,26 @@ internal class SwissDetailMedia(private val context:Context) {
         .put("image", archivePhoto(link.place)?.asset.orEmpty())
         .put("relations", JSONArray(link.scenes.map { it.archiveConnection().label }.distinct()))
 
-    private fun mvFrame(scene: Scene): JSONObject? {
-        if (!scene.imageApproved || scene.referenceKind != "mv_frame") return null
-        val image = scene(scene)
+    private fun connectionImage(scene: Scene): JSONObject? {
+        if (!scene.imageApproved) return null
+        val label = when (scene.referenceKind) {
+            "mv_frame" -> "MV 截图"
+            "release_cover" -> "发行封面"
+            "album_photo" -> "专辑内页"
+            else -> return null
+        }
+        val image = scene(scene, preferReleaseArtwork = false)
         val original = scene.imageUrl.orEmpty()
         if (image != original && original.startsWith("https://")) fallbacks.put(image, original)
-        return JSONObject().put("image", image).put("timestamp", scene.timestampSeconds)
+        return JSONObject().put("image", image).put("label", label).put("isMv", scene.referenceKind == "mv_frame")
+            .put("timestamp", scene.timestampSeconds.takeIf { scene.referenceKind == "mv_frame" })
             .put("credit", scene.imageCredit.orEmpty())
     }
 
-    fun placeArchive(place: Place, photo: ArchivePhoto?, entryScenes: Set<String>, entryTitle: String,
+    fun placeArchive(place: Place, photo: ArchivePhoto?, entryScenes: Set<String>,
         targets: Map<String, MusicArchiveTarget>) = archivePlaceIdentity(place)
         .put("photo", photo?.json() ?: JSONObject.NULL).put("scope", place.archiveScope())
-        .put("connections", place.archiveConnections(entryScenes, targets, ::mvFrame)).put("entryTitle", entryTitle)
+        .put("connections", place.archiveConnections(entryScenes, targets, ::connectionImage))
 
     fun place(place:Place,scene:Scene?=place.mapScene()):JSONObject=JSONObject()
         .put("id",place.id).put("name",PlaceEditorialCopy.name(context,place)).put("city",place.city).put("country",place.country)

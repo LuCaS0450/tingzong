@@ -29,7 +29,7 @@ import cn.musicpilgrimage.app.ui.ContentCard
 import cn.musicpilgrimage.app.ui.ViewModelStatus
 
 @Composable internal fun RoomPlaceDetail(
-    place:Place,entryScenes:Set<String>,entryTitle:String,vm:PlaceViewModel,session:SessionViewModel,
+    place:Place,entryScenes:Set<String>,vm:PlaceViewModel,session:SessionViewModel,
     favorite:Boolean,favoriteBusy:Boolean,onFavorite:()->Unit,onLogin:()->Unit,
     onForm:(String,String,ContentItem?)->Unit,onDelete:(ContentItem)->Unit,onCommunity:()->Unit,onAdd:()->Unit,
     catalog:MusicCatalogue,onMusicArchive:(MusicArchiveTarget)->Unit,
@@ -48,7 +48,7 @@ import cn.musicpilgrimage.app.ui.ViewModelStatus
     var sources by rememberSaveable(place.id){mutableStateOf(false)}
     var referenceReady by remember(recreation?.id){mutableStateOf(false)}
     val targets=remember(catalog,place.id){catalog.placeArchiveTargets(place.id)}
-    val archivePlace=remember(place,photo,entryScenes,entryTitle,targets){media.placeArchive(place,photo,entryScenes,entryTitle,targets)}
+    val archivePlace=remember(place,photo,entryScenes,targets){media.placeArchive(place,photo,entryScenes,targets)}
     val data=swissDetailData("place",place.id).put("places",org.json.JSONArray().put(archivePlace))
         .put("favorites",org.json.JSONArray(if(favorite)listOf(place.id)else emptyList<String>())).put("fallbacks",media.fallbacks)
     SwissWebDetail(data){action,args->when(action) {

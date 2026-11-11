@@ -20,16 +20,15 @@
   function releaseHero(r,label){
     return archiveHero({image:r.image,width:r.imageWidth,height:r.imageHeight,credit:r.credit},label,r.title);
   }
-  function connectionRow(link,entryTitle){
-    const frame=link.frame;
-    const timestamp=frame?.timestamp==null?'':fmt(frame.timestamp);
-    const frameLabel=`查看《${link.work}》MV 截图${timestamp?' · '+timestamp:''}`;
-    const thumb=frame?.image?`<button class="connection-thumb" type="button" data-action="image" disabled
-      data-credit="${esc(frame.credit)}" aria-label="${esc(frameLabel)}">
-      <img src="${esc(frame.image)}" alt="${esc(`《${link.work}》MV 截图`)}" loading="lazy" decoding="async" draggable="false">
+  function connectionRow(link){
+    const media=link.media;
+    const timestamp=media?.timestamp==null?'':fmt(media.timestamp);
+    const label=`《${link.work}》${media?.label||''}`;
+    const thumb=media?.image?`<button class="connection-thumb${media.isMv?'':' connection-photo'}" type="button" data-action="image" disabled
+      data-credit="${esc(media.credit)}" aria-label="${esc(`查看${label}${timestamp?' · '+timestamp:''}`)}">
+      <img src="${esc(media.image)}" alt="${esc(label)}" loading="lazy" decoding="async" draggable="false">
       ${timestamp?`<span aria-hidden="true">${esc(timestamp)}</span>`:''}</button>`:'';
-    const copy=`<span class="connection-copy"><strong>${esc(link.work)}</strong><small>${esc(link.artist)}</small>
-      ${link.entry&&entryTitle?`<small class="entry-association">来自《${esc(entryTitle)}》</small>`:''}</span>`;
+    const copy=`<span class="connection-copy"><strong>${esc(link.work)}</strong><small>${esc(link.artist)}</small></span>`;
     const title=link.actionId?`<button class="connection-link" type="button" data-action="connection" data-id="${esc(link.actionId)}">
       ${copy}${icon('chevron')}</button>`:copy;
     return `<li>${thumb}${title}</li>`;
@@ -37,7 +36,7 @@
   function placeConnections(p){
     return (p.connections||[]).map(group=>`<section class="connection-group">
       <h3>${esc(group.label)}</h3>
-      <ul>${group.rows.map(link=>connectionRow(link,p.entryTitle)).join('')}</ul>
+      <ul>${group.rows.map(connectionRow).join('')}</ul>
     </section>`).join('');
   }
   function favoriteButton(id,label='收藏'){const saved=state.favorites.has(id);return `<button type="button" class="${saved?'saved':''}" data-action="favorite" data-id="${esc(id)}" aria-pressed="${saved}">${icon('heart')}<span>${saved?'已收藏':label}</span></button>`;}

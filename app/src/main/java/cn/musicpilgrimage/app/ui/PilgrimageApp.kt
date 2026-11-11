@@ -201,11 +201,10 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      handoffArchive(popping=true){nav.popBackStack(target,inclusive=false)}
     }else navigateTo(target,origin)
    }
-   fun openArchivePlace(source:NavBackStackEntry,id:String,title:String,links:List<MusicPlaceLink>) {
+   fun openArchivePlace(source:NavBackStackEntry,id:String,links:List<MusicPlaceLink>) {
     if(nav.currentBackStackEntry!=source)return
     val link=links.find{it.place.id==id}?:return
     val origin=Bundle().apply {
-     putString("title",title)
      putStringArrayList("scenes",ArrayList(link.scenes.map(Scene::id)))
     }
     followMusicArchiveLink(source,"place/${Uri.encode(id)}",origin)
@@ -330,7 +329,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      page("catalogue"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
      page("album/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
       RoomAlbum(release,release.id in musicFavorites.releases,{music.toggleFavorite(release.id,true)},
-       {followMusicArchiveLink(e,"song/${Uri.encode(it.id)}")},{openArchivePlace(e,it,release.title,release.places)},
+       {followMusicArchiveLink(e,"song/${Uri.encode(it.id)}")},{openArchivePlace(e,it,release.places)},
        onBack=back,onSearch={navigate("release-search/${Uri.encode(release.id)}")})
      }}
      page("search"){RoomSearch(musicCatalog){navigate("song/${Uri.encode(it.id)}")}}
@@ -343,7 +342,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
       LaunchedEffect(work.id,libraryOwner){music.browseWork(work.id)}
       val play=playable.find{it.title==work.title&&it.artist==work.artist}
       RoomSong(work,musicCatalog.releases.find{it.id==work.releaseId}?.title.orEmpty(),work.id in musicFavorites.songs,{music.toggleFavorite(work.id)},
-       {openArchivePlace(e,it,work.title,work.places)},play?.let{song->{navigate("perform/${Uri.encode(song.id)}")}},
+       {openArchivePlace(e,it,work.places)},play?.let{song->{navigate("perform/${Uri.encode(song.id)}")}},
        onBack=back,onRelease={followMusicArchiveLink(e,"album/${Uri.encode(work.releaseId)}")})
      }}
      page("explore"){e->
@@ -412,7 +411,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      page("account-profile"){profileScreen(owner.orEmpty())}
      page("place/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->
       val origin=e.savedStateHandle.get<Bundle>(PlaceArchiveEntry)
-      RoomPlaceDetail(place,origin?.getStringArrayList("scenes").orEmpty().toSet(),origin?.getString("title").orEmpty(),
+      RoomPlaceDetail(place,origin?.getStringArrayList("scenes").orEmpty().toSet(),
        viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,archive::deleteVisitContent,
        {navigate("place-community/${Uri.encode(place.id)}")},{addToTrip(place)},musicCatalog,
        onMusicArchive={target->followMusicArchiveLink(e,"${if(target.isRelease)"album" else "song"}/${Uri.encode(target.id)}")},

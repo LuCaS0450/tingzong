@@ -78,19 +78,23 @@ internal fun MusicCatalogue.placeArchiveTargets(placeId: String): Map<String, Mu
 }
 
 internal fun Place.archiveConnections(
-    entryScenes: Set<String>, targets: Map<String, MusicArchiveTarget>, mvFrame: (Scene) -> JSONObject?,
+    entryScenes: Set<String>, targets: Map<String, MusicArchiveTarget>, connectionImage: (Scene) -> JSONObject?,
 ): JSONArray {
     val scenesByType = scenes.filter(Scene::publiclyVisible).groupBy(Scene::archiveConnection)
     return JSONArray(ArchiveConnection.entries.mapNotNull { type ->
         val rows = scenesByType[type]?.groupBy { targets[it.id]?.id ?: "${it.artistId}|${musicTerm(it.work)}" }
-            ?.values?.map { records ->
+            ?.values?.sortedByDescending { records -> records.any { it.id in entryScenes } }?.map { records ->
                 val scene = records.firstOrNull { it.id in entryScenes } ?: records.first()
                 val target = targets[scene.id]
+                val image = when (type) {
+                    ArchiveConnection.MusicVideo, ArchiveConnection.ReleasePhoto ->
+                        connectionImage(scene) ?: records.firstNotNullOfOrNull(connectionImage)
+                    else -> null
+                }
                 JSONObject().put("work", target?.title ?: scene.work).put("artist", scene.artistName)
-                    .put("entry", records.any { it.id in entryScenes })
                     .put("actionId", scene.id.takeIf { target != null })
-                    .put("frame", if (type == ArchiveConnection.MusicVideo) records.firstNotNullOfOrNull(mvFrame) else null)
-            }?.sortedByDescending { it.getBoolean("entry") } ?: return@mapNotNull null
+                    .put("media", image)
+            } ?: return@mapNotNull null
         JSONObject().put("label", type.label).put("rows", JSONArray(rows))
     })
 }
