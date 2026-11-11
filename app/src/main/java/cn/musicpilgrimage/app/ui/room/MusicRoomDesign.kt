@@ -1,5 +1,6 @@
 package cn.musicpilgrimage.app.ui.room
 
+import cn.musicpilgrimage.app.ui.AppMotionDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import android.graphics.BitmapFactory
@@ -104,7 +105,7 @@ internal object BundledCovers {
 @Composable internal fun RoomHeroArtwork(artwork:ReleaseArtwork?,title:String) {
     var expanded by remember(artwork?.id){mutableStateOf(false)}
     RoomCover(artwork,title,Modifier.fillMaxWidth().aspectRatio(artwork?.aspectRatio?:1f).clickable{expanded=true}.testTag("swiss-detail-artwork"),shadow=false)
-    if(expanded)androidx.compose.ui.window.Dialog({expanded=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)) {
+    if(expanded)AppMotionDialog({expanded=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false),image=true) {
         Box(Modifier.fillMaxSize().background(RoomColors.Ink).windowInsetsPadding(WindowInsets.safeDrawing)) {
             RoomCover(artwork,title,Modifier.align(Alignment.Center).fillMaxWidth().aspectRatio(artwork?.aspectRatio?:1f),shadow=false)
             IconButton({expanded=false},Modifier.align(Alignment.TopEnd).padding(12.dp)){Icon(Icons.Outlined.Close,"关闭大图",tint=RoomColors.Paper)}

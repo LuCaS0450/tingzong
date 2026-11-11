@@ -61,7 +61,7 @@ import kotlin.math.roundToInt
     }
     if(deleting!=null) {
         val close={deleteId=null;revealedId=null;vm.dismissError()}
-        TripPanel("删除行程？",state.busy,close) {
+        TripPanel("删除行程？",state.busy,close,animated=false) {
             Text("「${deleting.name}」及每天的全部安排都会被删除。此操作无法撤销。",
                 color=RoomColors.Ink,fontSize=15.sp,lineHeight=24.sp)
             TripError(state.error)

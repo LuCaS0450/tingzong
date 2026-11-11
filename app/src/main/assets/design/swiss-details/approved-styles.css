@@ -29,3 +29,5 @@
 .trip-day-action{color:var(--muted);font-size:12px}
 .trip-day-empty{display:block;margin-top:7px;color:var(--muted);font-size:13px;font-weight:400}
 .trip-day .trip-stop{padding-left:12px;padding-right:12px}
+
+.reduce-motion *,.reduce-motion *::before,.reduce-motion *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}

@@ -384,6 +384,7 @@
   }
   function normalize(p){return {...p,lat:Number(p.lat??p.latitude),lon:Number(p.lon??p.longitude)};}
   function applyNative(data) {
+    root.classList.toggle('reduce-motion',data.motion===false);
     favorites=new Set(data.favorites||[]);visits=new Set(data.visits||[]);favoriteBusy=Boolean(data.favoriteBusy);
     if(!initialized){pendingBoot=data;startWhenSized();return;}
     if(data.places){places=data.places.map(normalize);byId=new Map(places.map(p=>[p.id,p]));refreshSources();}

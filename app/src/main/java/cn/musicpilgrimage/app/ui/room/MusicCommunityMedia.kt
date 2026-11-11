@@ -28,6 +28,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import cn.musicpilgrimage.app.data.AppServices
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
+import cn.musicpilgrimage.app.ui.appMotionEasing
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -83,14 +84,18 @@ import coil.request.ImageRequest
     val close by rememberUpdatedState(onClosed)
     val alpha=remember{Animatable(0f)}
     LaunchedEffect(closing){
-        alpha.animateTo(if(closing)0f else 1f,tween(if(motion)if(closing)140 else 190 else 0))
+        alpha.animateTo(if(closing)0f else 1f,tween(if(motion)if(closing)150 else 200 else 0,easing=appMotionEasing))
         if(closing)close()
     }
     Dialog(onDismissRequest={closing=true},properties=DialogProperties(usePlatformDefaultWidth=false)) {
         val view=LocalView.current
         SideEffect{(view.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)}
         Box(Modifier.fillMaxSize().background(Color(0xFF1C2B38).copy(alpha=.35f*alpha.value)).clickable{closing=true}.padding(20.dp),contentAlignment=Alignment.Center) {
-            RoomPaper(Modifier.fillMaxWidth().widthIn(max=480.dp).graphicsLayer{this.alpha=alpha.value}.testTag("room-community-photo-viewer").pointerInput(Unit){detectTapGestures{}},woodEdge=false) {
+            RoomPaper(Modifier.fillMaxWidth().widthIn(max=480.dp).graphicsLayer{
+                this.alpha=alpha.value
+                scaleX=.985f+.015f*alpha.value
+                scaleY=scaleX
+            }.testTag("room-community-photo-viewer").pointerInput(Unit){detectTapGestures{}},woodEdge=false) {
                 Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Text(description,Modifier.weight(1f),color=RoomColors.Ink,fontSize=14.sp)

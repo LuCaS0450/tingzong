@@ -83,15 +83,17 @@ internal val SwissWallMuted=Color(0xFF5C625C)
     }
 }
 
-@Composable internal fun SwissWallTabs(section:Int,onChoose:(String)->Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal=24.dp).padding(bottom=8.dp).testTag("three-walls-tabs")) {
+internal val SwissWallTabsHeight=69.dp
+
+@Composable internal fun SwissWallTabs(section:Int,onChoose:(String)->Unit,enabled:Boolean=true) {
+    Column(Modifier.fillMaxWidth().height(SwissWallTabsHeight).padding(horizontal=24.dp).padding(bottom=8.dp).testTag("three-walls-tabs")) {
         Box(Modifier.fillMaxWidth().height(3.dp)) {
             HorizontalDivider(Modifier.align(Alignment.Center),color=Color(0xFFACB5A8),thickness=.5.dp)
             Row(Modifier.fillMaxSize()) {repeat(4){index->Box(Modifier.weight(1f).fillMaxHeight(),contentAlignment=Alignment.Center){if(index==section)Box(Modifier.width(16.dp).height(3.dp).background(SwissRed))}}}
         }
         Row(Modifier.fillMaxWidth()) {listOf("音乐","世界","演奏","我的").forEachIndexed{index,label->
             Box(Modifier.weight(1f).height(58.dp).semantics{selected=index==section}.testTag("wall-tab-$index")
-                .clickable(interactionSource=null,indication=null,role=Role.Tab){onChoose(listOf("room","explore","performance","me")[index])},contentAlignment=Alignment.Center) {
+                .clickable(interactionSource=null,indication=null,enabled=enabled,role=Role.Tab){onChoose(listOf("room","explore","performance","me")[index])},contentAlignment=Alignment.Center) {
                 Text(label,color=if(index==section)SwissInk else SwissWallMuted,fontSize=16.sp,fontWeight=if(index==section)FontWeight.Bold else FontWeight.Normal)
             }
         }}

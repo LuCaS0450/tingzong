@@ -3,7 +3,7 @@ package cn.musicpilgrimage.app.ui
 import android.net.Uri
 import android.content.Intent
 import androidx.compose.animation.*
-import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.flow.first
@@ -29,7 +29,9 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NamedNavArgument
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -44,28 +46,52 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
-private val wallTabEasing=CubicBezierEasing(.22f,.61f,.36f,1f)
-internal const val WallTabFadeMillis=160
-
-private fun wallSection(route:String?)=when(route) {
- "room","catalogue"->0
- "explore"->1
- "performance"->2
- "me"->3
- else->null
-}
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.switchesWallTabs():Boolean {
- val from=wallSection(initialState.destination.route)
- val to=wallSection(targetState.destination.route)
- return from!=null&&to!=null&&from!=to
-}
-
 @Composable private fun NativeWallTab(section:Int,onSearch:()->Unit,content:@Composable ()->Unit) {
- RoomShelfWall(Modifier.fillMaxSize()) {
-  Column(Modifier.fillMaxSize()) {
-   SwissWallHeader(section,onSearch)
-   Box(Modifier.fillMaxWidth().weight(1f)){content()}
+ Column(Modifier.fillMaxSize()) {
+  SwissWallHeader(section,onSearch)
+  Box(Modifier.fillMaxWidth().weight(1f)){content()}
+ }
+}
+
+private fun isArchiveRoute(route:String?)=route=="archive/{kind}"||route=="music-favorites/{kind}"
+
+private fun isWebDetailRoute(route:String?)=when(route) {
+ "album/{id}","song/{id}","place/{id}","trip/{id}"->true
+ else->false
+}
+
+@Composable private fun RoomRouteFrame(
+ destination:NavBackStackEntry,performanceImmersive:Boolean,headerEnabled:Boolean,onBack:()->Unit,
+ content:@Composable ()->Unit,
+) {
+ val route=destination.destination.route
+ val tab=wallSection(route)!=null
+ val edgeToEdge=isWebDetailRoute(route)||route=="perform/{song}"&&performanceImmersive
+ val title=when(route) {
+  "search","release-search/{id}"->"搜索"
+  "place-community/{id}"->"地点社区"
+  "trips"->"我的行程"
+  "archive/{kind}","music-favorites/{kind}"->"资料册"
+  "account-profile","edit-profile","profile/{id}"->"个人资料"
+  "settings"->"设置"
+  "account-email"->"邮箱账号"
+  "account-privacy"->"位置与公开范围"
+  "account-storage"->"本机草稿与图片"
+  "account-about"->"关于听踪"
+  "submissions"->"我的投稿"
+  "admin"->"管理中心"
+  "form/{kind}/{target}"->destination.arguments?.getString("kind")
+   ?.takeIf{it in listOf("message","visit","recreation")}?.let(::roomRecordTitle)
+  else->null
+ }
+ RoomWall(Modifier.fillMaxSize(),baseColor=if(isArchiveRoute(route))RoomColors.ArchiveWall else RoomColors.Wall) {
+  Box(Modifier.fillMaxSize().then(if(edgeToEdge)Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing))) {
+   if(tab)RoomShelfWall(Modifier.matchParentSize())
+   Column(Modifier.fillMaxSize()) {
+    if(title!=null)RoomHeader(title,onBack=onBack,onSpace={},enabled=headerEnabled)
+    Box(Modifier.fillMaxWidth().weight(1f)){content()}
+    if(tab)Spacer(Modifier.height(SwissWallTabsHeight))
+   }
   }
  }
 }
@@ -74,11 +100,19 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.switchesWallTabs()
  val owner by session.signedIn.collectAsStateWithLifecycle()
  val ready by session.services.authReady.collectAsStateWithLifecycle()
  val account:MusicAccountViewModel=viewModel()
+ val motion=LocalPhysicalMotion.current
+ var showedSignIn by remember{mutableStateOf(false)}
  if(!ready || requireAccount&&owner==null) {
+  if(ready)SideEffect{showedSignIn=true}
   PilgrimageTheme {RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
    if(!ready)CircularProgressIndicator(Modifier.align(Alignment.Center),color=RoomColors.Navy)
    else RoomEmailLoginRoute(account)
   }}
+ } else if(showedSignIn) {
+  val visible=remember{MutableTransitionState(false).apply{targetState=true}}
+  AnimatedVisibility(visibleState=visible,enter=if(motion)AppRouteMotion.Search.enter()else EnterTransition.None) {
+   MusicSpaceContent(session,account,requireAccount)
+  }
  } else MusicSpaceContent(session,account,requireAccount)
 }
 
@@ -218,9 +252,8 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.switchesWallTabs()
     }
     previousOwner=owner
    }
-   val roomTitle=when(route){"room"->"听踪";"catalogue"->"唱片架";"album/{id}"->"发行档案";"song/{id}"->"作品档案";"search","release-search/{id}"->"搜索";"place/{id}"->"地点档案";"place-community/{id}"->"地点社区";"trips"->"我的行程";"trip/{id}"->"行程档案";"music-favorites/{kind}","archive/{kind}"->"资料册";"performance"->"演奏";"me"->"我的";"account-profile"->"个人资料";"edit-profile"->"个人资料";"settings"->"设置";"account-email"->"邮箱账号";"account-privacy"->"位置与公开范围";"account-storage"->"本机草稿与图片";"account-about"->"关于听踪";"submissions"->"我的投稿";"admin"->"管理中心";"profile/{id}"->"个人资料";"form/{kind}/{target}"->entry?.arguments?.getString("kind")?.takeIf{it in listOf("message","visit","recreation")}?.let(::roomRecordTitle);else->null}
-   val archiveRoute=route in listOf("archive/{kind}","music-favorites/{kind}")
-   val webDetailRoute=route in listOf("album/{id}","song/{id}","place/{id}","trip/{id}")
+   val archiveRoute=isArchiveRoute(route)
+   val webDetailRoute=isWebDetailRoute(route)
    val gameFullscreen=route=="perform/{song}"&&performanceImmersive
    DisposableEffect(gameFullscreen,context) {
     val window=(context as? Activity)?.window
@@ -229,67 +262,61 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.switchesWallTabs()
     onDispose{if(gameFullscreen)controller?.show(WindowInsetsCompat.Type.systemBars())}
    }
    val wallSection=wallSection(route)
-   RoomWall(Modifier.fillMaxSize().background(RoomColors.Wall).then(if(gameFullscreen||webDetailRoute)Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)),baseColor=if(archiveRoute)RoomColors.ArchiveWall else RoomColors.Wall) {
-   if(wallSection!=null)RoomShelfWall(Modifier.matchParentSize())
-   Scaffold(containerColor=Color.Transparent,contentWindowInsets=WindowInsets(0,0,0,0),
-    bottomBar={if(wallSection!=null)SwissWallTabs(wallSection,chooseModule)},
-    topBar={if(wallSection==null&&roomTitle!=null&&!webDetailRoute)RoomHeader(if(route=="room")"唱片架" else roomTitle,if(route in listOf("room","me"))null else back,
-       if(route in listOf("room","catalogue")){ {navigate("search")} }else null,
-       onSpace={},enabled=!(route=="edit-profile"&&draft.saving)&&!recordSaving,
-       onTitleClick=if(route=="room"){ {navigate("catalogue")} }else null)}) {padding->
-    NavHost(navController=nav,startDestination="room",modifier=Modifier.padding(padding).consumeWindowInsets(padding),
-     enterTransition={when {
-      !motion->EnterTransition.None
-      switchesWallTabs()->fadeIn(tween(WallTabFadeMillis,easing=wallTabEasing))
-      else->fadeIn(tween(180))+slideInHorizontally(tween(260)){it/16}
-     }},
-     exitTransition={when {
-      !motion->ExitTransition.None
-      switchesWallTabs()->ExitTransition.KeepUntilTransitionsFinished
-      else->fadeOut(tween(120))
-     }},
-     popEnterTransition={when {
-      !motion->EnterTransition.None
-      switchesWallTabs()->EnterTransition.None
-      else->fadeIn(tween(180))+slideInHorizontally(tween(260)){-it/28}
-     }},
-     popExitTransition={when {
-      !motion->ExitTransition.None
-      switchesWallTabs()->fadeOut(tween(WallTabFadeMillis,easing=wallTabEasing))
-      else->fadeOut(tween(100))
-     }}) {
-     composable("room"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
-     composable("catalogue"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
-     composable("album/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
+   var lastWallSection by remember {mutableIntStateOf(wallSection?:0)}
+   SideEffect {wallSection?.let{lastWallSection=it}}
+
+   fun NavGraphBuilder.page(
+    path:String,arguments:List<NamedNavArgument> = emptyList(),
+    content:@Composable AnimatedContentScope.(NavBackStackEntry)->Unit,
+   ) {
+    composable(path,arguments=arguments){destination->
+     RoomRouteFrame(destination,performanceImmersive,!(path=="edit-profile"&&draft.saving)&&!recordSaving,back) {
+      content(destination)
+     }
+    }
+   }
+
+   RoomWall(Modifier.fillMaxSize()) {
+    NavHost(navController=nav,startDestination="room",modifier=Modifier.fillMaxSize(),
+     enterTransition={
+      if(motion)routeMotion(initialState.destination.route,targetState.destination.route,popping=false).enter()
+      else EnterTransition.None
+     },
+     exitTransition={if(motion)ExitTransition.KeepUntilTransitionsFinished else ExitTransition.None},
+     popEnterTransition={EnterTransition.None},
+     popExitTransition={
+      if(motion)routeMotion(initialState.destination.route,targetState.destination.route,popping=true).exit()
+      else ExitTransition.None
+     }) {
+     page("room"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
+     page("catalogue"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
+     page("album/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
       RoomAlbum(release,release.id in musicFavorites.releases,{music.toggleFavorite(release.id,true)},
        {followMusicArchiveLink(e,"song/${Uri.encode(it.id)}")},{navigate("place/${Uri.encode(it)}")},
        onBack=back,onSearch={navigate("release-search/${Uri.encode(release.id)}")})
      }}
-     composable("search"){RoomSearch(musicCatalog){navigate("song/${Uri.encode(it.id)}")}}
-     composable("release-search/{id}"){e->RoomSearch(musicCatalog,musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.title.orEmpty()){navigate("song/${Uri.encode(it.id)}")}}
+     page("search"){RoomSearch(musicCatalog){navigate("song/${Uri.encode(it.id)}")}}
+     page("release-search/{id}"){e->RoomSearch(musicCatalog,musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.title.orEmpty()){navigate("song/${Uri.encode(it.id)}")}}
      composable("music-favorites/{kind}"){e->
       val kind=if(e.arguments?.getString("kind")=="releases")"releases" else "songs"
       LaunchedEffect(kind){nav.navigate("archive/$kind"){popUpTo("music-favorites/{kind}"){inclusive=true};launchSingleTop=true}}
      }
-     composable("song/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.works.find{it.id==e.arguments?.getString("id")}?.let {work->
+     page("song/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.works.find{it.id==e.arguments?.getString("id")}?.let {work->
       LaunchedEffect(work.id,libraryOwner){music.browseWork(work.id)}
       val play=playable.find{it.title==work.title&&it.artist==work.artist}
       RoomSong(work,musicCatalog.releases.find{it.id==work.releaseId}?.title.orEmpty(),work.id in musicFavorites.songs,{music.toggleFavorite(work.id)},
        {navigate("place/${Uri.encode(it)}")},play?.let{song->{navigate("perform/${Uri.encode(song.id)}")}},
        onBack=back,onRelease={followMusicArchiveLink(e,"album/${Uri.encode(work.releaseId)}")})
      }}
-     composable("explore",enterTransition={if(switchesWallTabs())null else EnterTransition.None},
-      exitTransition={if(switchesWallTabs())null else ExitTransition.None},
-      popEnterTransition={if(switchesWallTabs())null else EnterTransition.None},
-      popExitTransition={if(switchesWallTabs())null else ExitTransition.None}){e->
+     page("explore"){e->
       SwissWorldWall(sourceCatalog,wallBrowse,archiveState.places.toSet(),archiveState.loading,
        {navigate("place/${Uri.encode(it)}")},togglePlace,openTrips,{navigate("archive/footprints")},addToTrip,
        {navigate("search")},back,archiveState.visits.map{it.location}.toSet(),active=entry==e)
      }
-     composable("performance"){NativeWallTab(2,{navigate("search")}){
+     page("performance"){NativeWallTab(2,{navigate("search")}){
       SwissPlayWall(performanceEntries,performanceArtwork,performanceLibraryUi.loaded,wallBrowse,performanceLibraryUi.downloads,{navigate("perform/${Uri.encode(it)}")},{performanceLibrary.prepareAll(retry=true)})
      }}
-     composable("perform/{song}"){e->
+     page("perform/{song}"){e->
       val performanceEntry=performanceEntries.find{it.song.id==e.arguments?.getString("song")}
       if(performanceEntry!=null)key(libraryOwner){
         val song=performanceEntry.song
@@ -320,7 +347,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.switchesWallTabs()
      listOf("library" to "me","archive-more" to "archive/footprints","account-scores" to "me","account-publications" to "submissions","account-badges" to "me").forEach { (old,destination)->
       composable(old){LaunchedEffect(Unit){nav.navigate(destination){popUpTo(old){inclusive=true};launchSingleTop=true}}}
      }
-     composable("archive/{kind}"){e->key(libraryOwner) {
+     page("archive/{kind}"){e->key(libraryOwner) {
       val kind=e.arguments?.getString("kind").orEmpty()
       val places=sourceCatalog.publicOnly().places
       val openPlace:(String)->Unit={navigate("place/${Uri.encode(it)}")}
@@ -339,30 +366,30 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.switchesWallTabs()
         }
       })
      }}
-     composable("me"){
+     page("me"){
       NativeWallTab(3,{navigate("search")}){
        SwissPersonalWall(profile?.takeIf{it.optString("id")==owner},owner!=null,session.services.accountAvatar(owner),login,openTrips,navigate)
       }
      }
-     composable("account-profile"){profileScreen(owner.orEmpty())}
-     composable("place/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->
+     page("account-profile"){profileScreen(owner.orEmpty())}
+     page("place/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->
       RoomPlaceDetail(place,mapWork,viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,archive::deleteVisitContent,{navigate("place-community/${Uri.encode(place.id)}")},{addToTrip(place)},onBack=back,onMap={wallBrowse.focusWorld(place.id);navigate("explore")})
      }?:Text("这个地点暂未收录，请返回重试。",Modifier.padding(24.dp))}
-     composable("place-community/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->RoomPlaceCommunity(place,viewModel(key="community-$owner-${place.id}"),session,login,openForm,openProfile){navigate("archive/footprints")}}}
-     composable("trips"){if(owner==null)LaunchedEffect(Unit){login()}else key(libraryOwner){RoomTripList(tripState,libraryOwner,tripCities,trips){navigate("trip/${Uri.encode(it)}")}}}
-     composable("trip/{id}"){e->if(owner==null)LaunchedEffect(Unit){login()}else key(libraryOwner){tripState.trips.find{it.id==e.arguments?.getString("id")}?.let{RoomTripDetailWeb(it,tripState,libraryOwner,trips,{id->navigate("place/${Uri.encode(id)}")},onBack=back,onDiscover={chooseModule("explore")},catalog=sourceCatalog.publicOnly())}?:Text(if(tripState.busy)"正在载入行程…"else "这个行程暂不可用，请返回重试。",Modifier.padding(24.dp))}}
-     composable("auth"){if(recovery)AuthScreen(session,{authPending=false;pendingForm=null;back()})else RoomEmailLoginRoute(account,{account.otp.reset();authPending=false;pendingForm=null;back()})}
-     composable("edit-profile"){
+     page("place-community/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->RoomPlaceCommunity(place,viewModel(key="community-$owner-${place.id}"),session,login,openForm,openProfile){navigate("archive/footprints")}}}
+     page("trips"){if(owner==null)LaunchedEffect(Unit){login()}else key(libraryOwner){RoomTripList(tripState,libraryOwner,tripCities,trips){navigate("trip/${Uri.encode(it)}")}}}
+     page("trip/{id}"){e->if(owner==null)LaunchedEffect(Unit){login()}else key(libraryOwner){tripState.trips.find{it.id==e.arguments?.getString("id")}?.let{RoomTripDetailWeb(it,tripState,libraryOwner,trips,{id->navigate("place/${Uri.encode(id)}")},onBack=back,onDiscover={chooseModule("explore")},catalog=sourceCatalog.publicOnly())}?:Text(if(tripState.busy)"正在载入行程…"else "这个行程暂不可用，请返回重试。",Modifier.padding(24.dp))}}
+     page("auth"){if(recovery)AuthScreen(session,{authPending=false;pendingForm=null;back()})else RoomEmailLoginRoute(account,{account.otp.reset();authPending=false;pendingForm=null;back()})}
+     page("edit-profile"){e->
       LaunchedEffect(owner){editor.load(true)}
       RoomProfileEditor(draft,editor::nickname,editor::choosePhoto,editor::removePhoto,{
        editor.save {updated->if(updated.optString("id")==owner){session.profile.value=updated;val task=pendingForm;pendingForm=null;nav.popBackStack();if(task!=null)navigate(task)else savedNotice="个人资料已更新"}}
       },{editor.load(true)})
-      BackHandler(onBack=back)
+      BackHandler(enabled=entry?.id==e.id,onBack=back)
      }
-     composable("settings"){RoomSettings(pref,owner!=null,sessionBusy,sessionError,
+     page("settings"){RoomSettings(pref,owner!=null,sessionBusy,sessionError,
        {value->scope.launch{runCatching{preferences.setMuted(value)}.onFailure{session.error.value="无法保存设置，请重试"}}},{value->scope.launch{runCatching{preferences.setReducedMotion(value)}.onFailure{session.error.value="无法保存设置，请重试"}}},navigate,
        {session.signOut{if(!requireAccount)nav.navigate("auth"){popUpTo(nav.graph.id){inclusive=true}}}})}
-     listOf("email","privacy","storage","about").forEach{kind->composable("account-$kind"){
+     listOf("email","privacy","storage","about").forEach{kind->page("account-$kind"){
       RoomAccountInfo(kind,session.services.accountEmail(owner),owner!=null,sessionBusy,sessionError,
        {session.deleteAccount{if(!requireAccount)nav.navigate("auth"){popUpTo(nav.graph.id){inclusive=true}}}},login)
      }}
@@ -373,13 +400,13 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.switchesWallTabs()
        nav.navigate(destination){popUpTo("mine/{kind}"){inclusive=true};launchSingleTop=true}
       }
      }
-     composable("profile/{id}"){profileScreen(it.arguments?.getString("id").orEmpty())}
-     composable("submissions"){
+     page("profile/{id}"){profileScreen(it.arguments?.getString("id").orEmpty())}
+     page("submissions"){
       val canManage=owner!=null&&profile?.optString("id")==owner&&profile?.optString("role")=="admin"
       RoomSubmissions(viewModel(key="submissions-$owner"),onAdmin=if(canManage){{navigate("admin")}}else null){openForm("new_location","new",null)}
      }
-     composable("admin"){AdminScreen(viewModel(key="admin-$owner"),back)}
-     composable("form/{kind}/{target}"){e->
+     page("admin"){AdminScreen(viewModel(key="admin-$owner"),back)}
+     page("form/{kind}/{target}"){e->
       val vm:FormViewModel=viewModel(key="form-$owner");val kind=e.arguments?.getString("kind").orEmpty();val target=e.arguments?.getString("target").orEmpty()
       val editing=remember(e,owner){nav.previousBackStackEntry?.savedStateHandle?.get<String>("editing")?.takeIf{it.isNotBlank()}?.let{ContentItem(JSONObject(it))}?.takeIf{it.owner==owner}}
       val photo by e.savedStateHandle.getStateFlow<String?>("camera_photo",null).collectAsState()
@@ -392,20 +419,30 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.switchesWallTabs()
       else if(kind in listOf("new_location","correction"))RoomSubmissionForm(kind,target,editing,vm,back)
       else LaunchedEffect(Unit){nav.navigate("me"){popUpTo("room");launchSingleTop=true}}
       // Use the destination lifecycle, alongside NavHost's own back callback.
-      BackHandler(enabled=kind in listOf("message","visit","recreation"),onBack=back)
+      BackHandler(enabled=entry?.id==e.id&&kind in listOf("message","visit","recreation"),onBack=back)
      }
-     composable("camera/{scene}"){e->
+     page("camera/{scene}"){e->
       val catalog by session.services.catalog.collectAsState();val scene=catalog.places.flatMap{it.scenes}.find{it.id==e.arguments?.getString("scene")}
       CameraScreen(scene,back){uri->nav.previousBackStackEntry?.savedStateHandle?.set("camera_photo",uri.toString());nav.popBackStack()}
      }
     }
-   }
+    AnimatedVisibility(
+     visible=wallSection!=null,
+     modifier=Modifier.align(Alignment.BottomCenter)
+      .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal+WindowInsetsSides.Bottom)),
+     enter=if(motion)fadeIn(tween(140,easing=appMotionEasing))else EnterTransition.None,
+     exit=if(motion)fadeOut(tween(110,easing=appMotionEasing))else ExitTransition.None,
+    ) {
+     SwissWallTabs(wallSection?:lastWallSection,chooseModule,enabled=wallSection!=null)
+    }
+    Box(Modifier.matchParentSize().then(if(gameFullscreen||webDetailRoute)Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing))) {
    if(archiveRoute||route in listOf("explore","place/{id}")) {
     if(archiveRoute)musicUndo?.let{undo->RoomUndoNotice(undo.label,undo.token,{music.undoRemoval(undo.token)},{music.dismissUndo(undo.token)},Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())}
     placeUndo?.takeIf{it.owner==owner}?.let{undo->RoomUndoNotice("已取消地点收藏",undo.token,{archive.undoRemoval(undo.token)},{archive.dismissUndo(undo.token)},Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())}
    }
    if(savedNotice!=null&&(route in listOf("me","place/{id}","place-community/{id}","profile/{id}","mine/{kind}")||archiveRoute))Surface(Modifier.align(Alignment.BottomCenter).padding(20.dp),color=RoomColors.Navy,shape=RoundedCornerShape(6.dp)){Text(savedNotice.orEmpty(),Modifier.padding(16.dp),color=RoomColors.Paper)}
    if(route in listOf("explore","place/{id}")&&archiveState.error!=null)Surface(Modifier.align(Alignment.BottomCenter).padding(16.dp),color=RoomColors.Paper,shape=RoundedCornerShape(6.dp),shadowElevation=4.dp){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Text(archiveState.error.orEmpty(),Modifier.weight(1f),color=RoomColors.Ink);TextButton(archive::reload){Text("重试")}}}
+   }
    }
    sourceCatalog.publicOnly().places.find{it.id==addTripPlace}?.let{place->RoomAddToTripDialog(place,tripState,libraryOwner,tripCities,trips){addTripPlace=null}}
    if(discardAction!=null)RoomDiscardProfileDialog({discardAction=null},{val action=discardAction;discardAction=null;editor.discard();action?.invoke()})

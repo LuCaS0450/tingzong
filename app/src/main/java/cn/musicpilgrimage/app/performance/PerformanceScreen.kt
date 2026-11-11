@@ -2,8 +2,11 @@ package cn.musicpilgrimage.app.performance
 
 import android.app.Activity
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -33,6 +36,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.musicpilgrimage.app.data.ReleaseArtwork
+import cn.musicpilgrimage.app.ui.AppRouteMotion
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.room.*
 import coil.compose.AsyncImage
@@ -40,7 +44,8 @@ import kotlinx.coroutines.isActive
 
 /** Existing frame-clock gameplay, with the approved flat controls and room result page. */
 @Composable internal fun PerformanceScreen(controller:PerformanceController,onPrepare:()->Unit,
-    artwork:ReleaseArtwork?=null,onExplore:(()->Unit)?=null,onSpace:()->Unit=onPrepare,onSpaceOrigin:(Offset)->Unit={}) {
+    artwork:ReleaseArtwork?=null,onExplore:(()->Unit)?=null,onSpace:()->Unit=onPrepare,onSpaceOrigin:(Offset)->Unit={},
+    revealStage:Boolean=true) {
     val ui by controller.ui.collectAsStateWithLifecycle()
     val song=controller.song
     val lifecycle=LocalLifecycleOwner.current
@@ -48,8 +53,8 @@ import kotlinx.coroutines.isActive
     val view=LocalView.current
     var exitConfirm by rememberSaveable(controller.song.id){mutableStateOf(false)}
     val live=ui.state!=PlayState.FINISHED
-    val reveal=remember(controller){Animatable(0f)}
-    LaunchedEffect(controller,motion){if(motion)reveal.animateTo(1f,tween(180))else reveal.snapTo(1f)}
+    val reveal=remember(controller,revealStage){Animatable(if(revealStage&&motion)0f else 1f)}
+    LaunchedEffect(controller,motion,revealStage){if(revealStage&&motion)reveal.animateTo(1f,tween(110))else reveal.snapTo(1f)}
     DisposableEffect(view,live) {
         val bars=(view.context as? Activity)?.window?.let{WindowCompat.getInsetsController(it,view)}
         val oldStatus=bars?.isAppearanceLightStatusBars
@@ -70,11 +75,14 @@ import kotlinx.coroutines.isActive
     }
     LaunchedEffect(controller){while(isActive){withFrameNanos{controller.frame()}}}
     if(ui.state==PlayState.FINISHED) {
-        RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {Column {
-            RoomHeader("本次演奏",onBack=onPrepare,onSpace=onSpace,onSpaceOrigin=onSpaceOrigin)
-            RoomPerformanceResult(song,ui,artwork,controller.options.mode!=PlayMode.PLAY,
-                {controller.restart();controller.start()},onExplore,controller::retrySave)
-        }}
+        val visible=remember{MutableTransitionState(false).apply{targetState=true}}
+        AnimatedVisibility(visibleState=visible,enter=if(motion)AppRouteMotion.Live.enter()else EnterTransition.None) {
+            RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {Column {
+                RoomHeader("本次演奏",onBack=onPrepare,onSpace=onSpace,onSpaceOrigin=onSpaceOrigin)
+                RoomPerformanceResult(song,ui,artwork,controller.options.mode!=PlayMode.PLAY,
+                    {controller.restart();controller.start()},onExplore,controller::retrySave)
+            }}
+        }
         return
     }
     val drawLanes=ui.state in listOf(PlayState.PLAYING,PlayState.PAUSED,PlayState.STARTING,PlayState.RECOVERING,PlayState.AUDIO_FAILED)

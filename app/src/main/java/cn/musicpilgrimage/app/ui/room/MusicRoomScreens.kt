@@ -34,8 +34,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import cn.musicpilgrimage.app.data.*
 import coil.compose.AsyncImage
+import kotlinx.coroutines.flow.first
 
 @Composable internal fun RoomHome(catalog:MusicCatalogue,onCatalogue:()->Unit,onMap:()->Unit,onPerformance:()->Unit) {
     val featured=remember(catalog) {
@@ -106,7 +109,11 @@ import coil.compose.AsyncImage
     var query by rememberSaveable(initialQuery) { mutableStateOf(initialQuery) }
     val requester=remember { FocusRequester() }
     val keyboard=LocalSoftwareKeyboardController.current
-    LaunchedEffect(Unit) { requester.requestFocus() }
+    val lifecycle=LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle) {
+        lifecycle.currentStateFlow.first{it.isAtLeast(Lifecycle.State.RESUMED)}
+        requester.requestFocus()
+    }
     val hits=remember(catalog,query){catalog.search(query)}
     Column(Modifier.fillMaxSize().testTag("room-search")) {
         OutlinedTextField(query,{query=it},Modifier.fillMaxWidth().padding(horizontal=24.dp).focusRequester(requester).testTag("room-search-input"),

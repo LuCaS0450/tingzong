@@ -4,7 +4,27 @@ const release=id=>D.releases.find(r=>r.id===id)||D.releases[0];
 const place=id=>D.places.find(p=>p.id===id)||D.places[0];
 const view=document.getElementById('app-view');
 const post=(action,extra={})=>TingzongDetail.postMessage(JSON.stringify({action,...extra}));
-function closeNativeImage(){document.getElementById('overlay-root').innerHTML='';post('__image-closed');}
+let detailMotion=true;
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
+const motionEasing='cubic-bezier(.22,.61,.36,1)';
+function setDetailMotion(enabled){detailMotion=enabled;document.documentElement.classList.toggle('reduce-motion',!enabled);}
+function animateImage(shade,opening){
+  const image=shade.querySelector('img');
+  const opacity=opening?[0,1]:[Number(getComputedStyle(shade).opacity),0];
+  const transform=opening?['scale(.985)','scale(1)']:[getComputedStyle(image).transform,'scale(.985)'];
+  const timing={duration:opening?200:150,easing:motionEasing,fill:'both'};
+  shade.getAnimations({subtree:true}).forEach(animation=>animation.cancel());
+  image.animate({transform},timing);
+  return shade.animate({opacity},timing);
+}
+function closeNativeImage(){
+  const shade=document.querySelector('#overlay-root .image-shade');
+  if(!shade||shade.inert)return;
+  shade.inert=true;
+  post('__image-closed');
+  if(detailMotion&&!reduceMotion.matches)animateImage(shade,false).finished.then(()=>shade.remove(),()=>{});
+  else shade.remove();
+}
 function sizeDetail(){
   if(innerWidth<=0||innerHeight<=0)return;
   const scale=innerWidth/360,phone=document.getElementById('phone');
@@ -41,6 +61,7 @@ document.addEventListener('click',event=>{
   if(node.dataset.action==='image'){
     const img=node.querySelector('img');
     document.getElementById('overlay-root').innerHTML=`<div class="modal-shade image-shade" role="dialog" aria-modal="true" aria-label="完整图片"><img src="${esc(attrs.src)}" alt="${esc(img?.alt||'完整原作图片')}"><button class="icon-button" type="button" data-action="native-close-image" aria-label="关闭大图">${icon('close')}</button><div class="image-credit">${esc(shortCredit(attrs.credit))}<br><a class="source-link" data-action="sources" href="#" style="color:inherit">资料来源 ↗</a></div></div>`;
+    if(detailMotion&&!reduceMotion.matches)animateImage(document.querySelector('#overlay-root .image-shade'),true);
     post('__image-opened');return;
   }
   const action=node.dataset.action;

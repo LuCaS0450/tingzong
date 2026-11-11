@@ -1,5 +1,6 @@
 package cn.musicpilgrimage.app.ui.room
 
+import cn.musicpilgrimage.app.ui.AppMotionDialog
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -53,7 +54,7 @@ import cn.musicpilgrimage.app.ui.ViewModelStatus
         "record-new"->if(owner==null)onLogin()else onForm("visit",place.id,null)
         "community"->onCommunity();"sources"->sources=true;"hero-ready"->imageReady=true
     }}
-    if(sources)androidx.compose.ui.window.Dialog({sources=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)) {
+    if(sources)AppMotionDialog({sources=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)) {
         RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {Column {
             RoomHeader("资料来源",onBack={sources=false},onSpace={})
             LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(25.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {

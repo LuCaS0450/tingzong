@@ -29,17 +29,18 @@ import cn.musicpilgrimage.app.data.MusicTrip
 import cn.musicpilgrimage.app.data.MusicTripCity
 import cn.musicpilgrimage.app.data.MusicTripStop
 import cn.musicpilgrimage.app.data.Place
+import cn.musicpilgrimage.app.ui.AppMotionDialog
 
 @Composable internal fun TripPanel(
     title:String,
     busy:Boolean,
     onClose:()->Unit,
+    animated:Boolean=true,
     content:@Composable ColumnScope.()->Unit
 ) {
-    Dialog(
-        onDismissRequest={if(!busy)onClose()},
-        properties=DialogProperties(decorFitsSystemWindows=false)
-    ) {
+    val dismiss={if(!busy)onClose()}
+    val properties=DialogProperties(decorFitsSystemWindows=false)
+    val panel:@Composable ()->Unit={
         Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(vertical=12.dp)) {
             RoomPaper(Modifier.fillMaxWidth()) {
                 Column(
@@ -52,6 +53,8 @@ import cn.musicpilgrimage.app.data.Place
             }
         }
     }
+    if(animated)AppMotionDialog(dismiss,properties,content=panel)
+    else Dialog(dismiss,properties,content=panel)
 }
 
 @Composable internal fun TripError(error:String?) {

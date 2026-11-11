@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppDialogNoMotion">
+        <item name="android:windowEnterAnimation">@null</item>
+        <item name="android:windowExitAnimation">@null</item>
+    </style>
+    <style name="AppDialogSheetMotion" parent="AppDialogNoMotion">
+        <item name="android:windowExitAnimation">@anim/app_dialog_sheet_exit</item>
+    </style>
+    <style name="AppDialogImageMotion" parent="AppDialogNoMotion">
+        <item name="android:windowExitAnimation">@anim/app_dialog_image_exit</item>
+    </style>
+</resources>

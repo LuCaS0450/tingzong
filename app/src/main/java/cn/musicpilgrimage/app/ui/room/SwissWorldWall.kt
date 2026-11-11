@@ -133,15 +133,16 @@ internal data class WorldPlaceData(val byId: Map<String, Place>, val json: JSONA
     onBack: () -> Unit, visits: Set<String>, active: Boolean,
 ) {
     val owner = LocalLifecycleOwner.current
+    val motion = LocalPhysicalMotion.current
     val pendingFocus = remember(scene) { browse.takeWorldFocus()?.let { it to android.os.SystemClock.elapsedRealtimeNanos().toString() } }
     val placeData by produceState(scene.cachedPlaces(catalog), scene, catalog, active) {
         if (active) value = scene.preparePlaces(catalog)
     }
     val byId = placeData?.byId.orEmpty()
-    val json = remember(placeData, favorites, favoriteBusy, visits, pendingFocus) {
+    val json = remember(placeData, favorites, favoriteBusy, visits, pendingFocus, motion) {
         placeData?.let { prepared -> JSONObject().put("places", prepared.json).put("favorites", JSONArray(favorites.toList()))
             .put("visits", JSONArray(visits.toList())).put("favoriteBusy", favoriteBusy)
-            .put("state", scene.initialCamera)
+            .put("state", scene.initialCamera).put("motion", motion)
             .apply { pendingFocus?.let { put("focus", it.first); put("focusToken", it.second) } }.toString()
         }
     }

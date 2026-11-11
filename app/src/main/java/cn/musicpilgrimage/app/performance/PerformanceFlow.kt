@@ -76,7 +76,15 @@ internal class PerformanceSessionViewModel:ViewModel() {
                 controller.start()
             }
         }
-        PerformanceScreen(controller,{controller.pause();if(controller.ui.value.state==PlayState.FAILED)session.reset();entered=false;startRequested=false;if(directStart)onExit()},artwork,onExplore,onSpace,origin)
+        PerformanceScreen(controller,{
+            controller.pause()
+            startRequested=false
+            if(directStart)onExit()
+            else {
+                if(controller.ui.value.state==PlayState.FAILED)session.reset()
+                entered=false
+            }
+        },artwork,onExplore,onSpace,origin,revealStage=!directStart)
     } else {
         LaunchedEffect(Unit){onFullscreen(false)}
         Column(Modifier.fillMaxSize()) {

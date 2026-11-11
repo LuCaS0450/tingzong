@@ -1,5 +1,7 @@
 package cn.musicpilgrimage.app.ui.room
 
+import cn.musicpilgrimage.app.ui.AppMotionDialog
+import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.JavascriptInterface
@@ -31,6 +33,8 @@ private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
 @SuppressLint("SetJavaScriptEnabled")
 @Composable internal fun SwissWebDetail(data:JSONObject,onAction:(String,JSONObject)->Unit) {
     val context=LocalContext.current
+    val motion=LocalPhysicalMotion.current
+    val latestMotion by rememberUpdatedState(motion)
     val latestAction by rememberUpdatedState(onAction)
     val json=data.toString()
     val latestJson by rememberUpdatedState(json)
@@ -39,6 +43,7 @@ private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
     val rendered=remember(web){arrayOf<String?>(null)}
     var ready by remember(web){mutableStateOf(false)}
     var imageOpen by remember(web){mutableStateOf(false)}
+    LaunchedEffect(web,ready,motion){if(ready)web.evaluateJavascript("setDetailMotion($motion)",null)}
     BackHandler(imageOpen){web.evaluateJavascript("closeNativeImage()",null)}
     DisposableEffect(web) {onDispose{web.removeJavascriptInterface("TingzongDetail");web.stopLoading();web.destroy()}}
     AndroidView(factory={web.apply {
@@ -82,6 +87,7 @@ private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
             override fun onPageFinished(view:WebView,url:String) {
                 if(url!="file:///android_asset/design/swiss-details/index.html")return
                 android.util.Log.d("SwissDetail","Approved local page ready")
+                view.evaluateJavascript("setDetailMotion($latestMotion)",null)
                 ready=true;rendered[0]=latestJson;view.renderDetail(latestJson,archiveScroll)
             }
             override fun onReceivedError(view:WebView,request:WebResourceRequest,error:WebResourceError) {
@@ -170,7 +176,7 @@ internal fun swissDetailData(page:String,id:String)=JSONObject().put("page",page
 }
 
 @Composable private fun SwissArtworkSources(art:ReleaseArtwork?,title:String,onClose:()->Unit) {
-    androidx.compose.ui.window.Dialog(onClose,properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)) {
+    AppMotionDialog(onClose,properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)) {
         RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {Column {
             RoomHeader("资料来源",onBack=onClose,onSpace={})
             Column(Modifier.fillMaxWidth().padding(25.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
