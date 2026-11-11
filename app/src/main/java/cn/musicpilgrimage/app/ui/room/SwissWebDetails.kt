@@ -207,9 +207,19 @@ internal class SwissDetailMedia(private val context:Context) {
         .put("image", archivePhoto(link.place)?.asset.orEmpty())
         .put("relations", JSONArray(link.scenes.map { it.archiveConnection().label }.distinct()))
 
-    fun placeArchive(place: Place, photo: ArchivePhoto?, entryScenes: Set<String>, entryTitle: String) = archivePlaceIdentity(place)
+    private fun mvFrame(scene: Scene): JSONObject? {
+        if (!scene.imageApproved || scene.referenceKind != "mv_frame") return null
+        val image = scene(scene)
+        val original = scene.imageUrl.orEmpty()
+        if (image != original && original.startsWith("https://")) fallbacks.put(image, original)
+        return JSONObject().put("image", image).put("timestamp", scene.timestampSeconds)
+            .put("credit", scene.imageCredit.orEmpty())
+    }
+
+    fun placeArchive(place: Place, photo: ArchivePhoto?, entryScenes: Set<String>, entryTitle: String,
+        targets: Map<String, MusicArchiveTarget>) = archivePlaceIdentity(place)
         .put("photo", photo?.json() ?: JSONObject.NULL).put("scope", place.archiveScope())
-        .put("connections", place.archiveConnections(entryScenes)).put("entryTitle", entryTitle)
+        .put("connections", place.archiveConnections(entryScenes, targets, ::mvFrame)).put("entryTitle", entryTitle)
 
     fun place(place:Place,scene:Scene?=place.mapScene()):JSONObject=JSONObject()
         .put("id",place.id).put("name",PlaceEditorialCopy.name(context,place)).put("city",place.city).put("country",place.country)

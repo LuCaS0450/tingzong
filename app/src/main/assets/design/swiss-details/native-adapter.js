@@ -48,13 +48,15 @@ function updateNativeDetail(data,initialScroll=0){
   }
   view.querySelectorAll('img').forEach(img=>{
     const hero=img.closest('.archive-hero');
+    const imageButton=img.closest('button[data-action="image"]');
     img.onerror=()=>{
       const source=img.getAttribute('src'),fallback=D.fallbacks?.[source];
       if(fallback&&source!==fallback){img.src=fallback;return;}
       if(hero)hero.remove();
+      else if(imageButton)imageButton.remove();
       else if(img.closest('.list-row'))img.remove();
     };
-    if(hero)img.onload=()=>hero.querySelector('button').disabled=false;
+    if(imageButton)img.onload=()=>imageButton.disabled=false;
     if(img.complete){
       if(img.naturalWidth)img.onload?.();
       else if(img.getAttribute('src'))img.onerror();
@@ -75,7 +77,7 @@ document.addEventListener('click',event=>{
     post('__image-opened');return;
   }
   const action=node.dataset.action;
-  if(action==='work'||action==='release'||action==='search-release'||action==='place')attrs.scrollTop=view.querySelector('.scroll-content').scrollTop;
+  if(['work','release','search-release','place','connection'].includes(action))attrs.scrollTop=view.querySelector('.scroll-content').scrollTop;
   post(action,attrs);
 });
 // Preserve direct itinerary reordering; all writes still go through MusicTripViewModel.

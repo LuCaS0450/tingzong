@@ -20,12 +20,24 @@
   function releaseHero(r,label){
     return archiveHero({image:r.image,width:r.imageWidth,height:r.imageHeight,credit:r.credit},label,r.title);
   }
+  function connectionRow(link,entryTitle){
+    const frame=link.frame;
+    const timestamp=frame?.timestamp==null?'':fmt(frame.timestamp);
+    const frameLabel=`查看《${link.work}》MV 截图${timestamp?' · '+timestamp:''}`;
+    const thumb=frame?.image?`<button class="connection-thumb" type="button" data-action="image" disabled
+      data-credit="${esc(frame.credit)}" aria-label="${esc(frameLabel)}">
+      <img src="${esc(frame.image)}" alt="${esc(`《${link.work}》MV 截图`)}" loading="lazy" decoding="async" draggable="false">
+      ${timestamp?`<span aria-hidden="true">${esc(timestamp)}</span>`:''}</button>`:'';
+    const copy=`<span class="connection-copy"><strong>${esc(link.work)}</strong><small>${esc(link.artist)}</small>
+      ${link.entry&&entryTitle?`<small class="entry-association">来自《${esc(entryTitle)}》</small>`:''}</span>`;
+    const title=link.actionId?`<button class="connection-link" type="button" data-action="connection" data-id="${esc(link.actionId)}">
+      ${copy}${icon('chevron')}</button>`:copy;
+    return `<li>${thumb}${title}</li>`;
+  }
   function placeConnections(p){
     return (p.connections||[]).map(group=>`<section class="connection-group">
       <h3>${esc(group.label)}</h3>
-      <ul>${group.rows.map(link=>`<li><div><strong>${esc(link.work)}</strong>
-        <small>${[link.artist,link.scope].filter(Boolean).map(esc).join(' · ')}</small></div>
-        ${link.entry&&p.entryTitle?`<span class="entry-association">来自《${esc(p.entryTitle)}》</span>`:''}</li>`).join('')}</ul>
+      <ul>${group.rows.map(link=>connectionRow(link,p.entryTitle)).join('')}</ul>
     </section>`).join('');
   }
   function favoriteButton(id,label='收藏'){const saved=state.favorites.has(id);return `<button type="button" class="${saved?'saved':''}" data-action="favorite" data-id="${esc(id)}" aria-pressed="${saved}">${icon('heart')}<span>${saved?'已收藏':label}</span></button>`;}

@@ -195,11 +195,11 @@ private fun isWebDetailRoute(route:String?)=when(route) {
     if(isArchiveHandoffPath(path))handoffArchive(change=change)else change()
    }
    val navigate:(String)->Unit={navigateTo(it)}
-   fun followMusicArchiveLink(source:NavBackStackEntry,target:String) {
+   fun followMusicArchiveLink(source:NavBackStackEntry,target:String,origin:Bundle?=null) {
     if(nav.currentBackStackEntry!=source)return
     if(runCatching{nav.getBackStackEntry(target)}.getOrNull()!=null) {
      handoffArchive(popping=true){nav.popBackStack(target,inclusive=false)}
-    }else navigate(target)
+    }else navigateTo(target,origin)
    }
    fun openArchivePlace(source:NavBackStackEntry,id:String,title:String,links:List<MusicPlaceLink>) {
     if(nav.currentBackStackEntry!=source)return
@@ -208,7 +208,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      putString("title",title)
      putStringArrayList("scenes",ArrayList(link.scenes.map(Scene::id)))
     }
-    navigateTo("place/${Uri.encode(id)}",origin)
+    followMusicArchiveLink(source,"place/${Uri.encode(id)}",origin)
    }
    fun leaveProfile(action:()->Unit) {
     if(route=="form/{kind}/{target}"&&recordSaving)return
@@ -414,7 +414,9 @@ private fun isWebDetailRoute(route:String?)=when(route) {
       val origin=e.savedStateHandle.get<Bundle>(PlaceArchiveEntry)
       RoomPlaceDetail(place,origin?.getStringArrayList("scenes").orEmpty().toSet(),origin?.getString("title").orEmpty(),
        viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,archive::deleteVisitContent,
-       {navigate("place-community/${Uri.encode(place.id)}")},{addToTrip(place)},onBack=back,onMap={wallBrowse.focusWorld(place.id);navigate("explore")})
+       {navigate("place-community/${Uri.encode(place.id)}")},{addToTrip(place)},musicCatalog,
+       onMusicArchive={target->followMusicArchiveLink(e,"${if(target.isRelease)"album" else "song"}/${Uri.encode(target.id)}")},
+       onBack=back,onMap={wallBrowse.focusWorld(place.id);navigate("explore")})
      }?:Text("这个地点暂未收录，请返回重试。",Modifier.padding(24.dp))}
      page("place-community/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->RoomPlaceCommunity(place,viewModel(key="community-$owner-${place.id}"),session,login,openForm,openProfile){navigate("archive/footprints")}}}
      page("trips"){if(owner==null)LaunchedEffect(Unit){login()}else key(libraryOwner){RoomTripList(tripState,libraryOwner,tripCities,trips){navigate("trip/${Uri.encode(it)}")}}}

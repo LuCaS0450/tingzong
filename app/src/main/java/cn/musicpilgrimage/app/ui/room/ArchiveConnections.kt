@@ -1,6 +1,7 @@
 package cn.musicpilgrimage.app.ui.room
 
 import android.content.Context
+import cn.musicpilgrimage.app.data.MusicCatalogue
 import cn.musicpilgrimage.app.data.MusicPlaceLink
 import cn.musicpilgrimage.app.data.Place
 import cn.musicpilgrimage.app.data.Scene
@@ -57,19 +58,38 @@ internal fun archiveAdmissionReason(links: List<MusicPlaceLink>, name: (Place) -
     }.joinToString("；").takeIf(String::isNotBlank)?.plus("。").orEmpty()
 }
 
-internal fun Place.archiveConnections(entryScenes: Set<String>): JSONArray {
+internal data class MusicArchiveTarget(val id: String, val title: String, val isRelease: Boolean)
+
+internal fun MusicCatalogue.placeArchiveTargets(placeId: String): Map<String, MusicArchiveTarget> = buildMap {
+    for (work in works) {
+        work.places.find { it.place.id == placeId }?.scenes?.forEach { scene ->
+            if (scene.archiveConnection() != ArchiveConnection.ReleasePhoto) {
+                put(scene.id, MusicArchiveTarget(work.id, work.title, isRelease = false))
+            }
+        }
+    }
+    for (release in releases) {
+        release.places.find { it.place.id == placeId }?.scenes?.forEach { scene ->
+            if (scene.archiveConnection() == ArchiveConnection.ReleasePhoto) {
+                put(scene.id, MusicArchiveTarget(release.id, release.title, isRelease = true))
+            }
+        }
+    }
+}
+
+internal fun Place.archiveConnections(
+    entryScenes: Set<String>, targets: Map<String, MusicArchiveTarget>, mvFrame: (Scene) -> JSONObject?,
+): JSONArray {
     val scenesByType = scenes.filter(Scene::publiclyVisible).groupBy(Scene::archiveConnection)
     return JSONArray(ArchiveConnection.entries.mapNotNull { type ->
-        val rows = scenesByType[type]?.groupBy { it.artistId to musicTerm(it.work) }
+        val rows = scenesByType[type]?.groupBy { targets[it.id]?.id ?: "${it.artistId}|${musicTerm(it.work)}" }
             ?.values?.map { records ->
                 val scene = records.firstOrNull { it.id in entryScenes } ?: records.first()
-                JSONObject().put("work", scene.work).put("artist", scene.artistName)
+                val target = targets[scene.id]
+                JSONObject().put("work", target?.title ?: scene.work).put("artist", scene.artistName)
                     .put("entry", records.any { it.id in entryScenes })
-                    .put("scope", when (scene.associationPrecision) {
-                        "city" -> "城市级"
-                        "region" -> "区域级"
-                        else -> ""
-                    })
+                    .put("actionId", scene.id.takeIf { target != null })
+                    .put("frame", if (type == ArchiveConnection.MusicVideo) records.firstNotNullOfOrNull(mvFrame) else null)
             }?.sortedByDescending { it.getBoolean("entry") } ?: return@mapNotNull null
         JSONObject().put("label", type.label).put("rows", JSONArray(rows))
     })

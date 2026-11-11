@@ -42,7 +42,14 @@
 .admission-reason p{margin:0;font-size:14px;line-height:1.7}
 .connection-group{padding:12px 0;border-top:1px solid var(--line)}
 .connection-group ul{list-style:none;margin:0;padding:0}
-.connection-group li{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:5px 0;overflow-wrap:anywhere}
+.connection-group li{display:flex;align-items:center;gap:12px;padding:5px 0;overflow-wrap:anywhere}
 .connection-group strong{display:block;font-size:14px;line-height:1.5;font-weight:500}
-.connection-group small,.entry-association{font-size:11px;line-height:1.6;color:var(--muted)}
-.entry-association{flex-shrink:0;max-width:42%;color:var(--red);text-align:right}
+.connection-copy{flex:1;min-width:0}
+.connection-group small{display:block;font-size:11px;line-height:1.6;color:var(--muted)}
+.connection-group .entry-association{color:var(--red);margin-top:2px}
+.connection-link{display:flex;align-items:center;gap:8px;flex:1;min-width:0;min-height:44px;padding:2px 0;background:none;border:0;text-align:left}
+.connection-link .icon{width:16px;height:16px;flex:none;color:var(--muted)}
+.connection-link:active{opacity:.65}
+.connection-thumb{position:relative;flex:none;width:88px;height:50px;padding:0;border:0;overflow:hidden;background:#e9e6dd}
+.connection-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.connection-thumb span{position:absolute;right:3px;bottom:3px;padding:1px 3px;background:#111c;color:#fff;font-size:9px;line-height:1.3}

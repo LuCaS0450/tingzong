@@ -32,6 +32,7 @@ import cn.musicpilgrimage.app.ui.ViewModelStatus
     place:Place,entryScenes:Set<String>,entryTitle:String,vm:PlaceViewModel,session:SessionViewModel,
     favorite:Boolean,favoriteBusy:Boolean,onFavorite:()->Unit,onLogin:()->Unit,
     onForm:(String,String,ContentItem?)->Unit,onDelete:(ContentItem)->Unit,onCommunity:()->Unit,onAdd:()->Unit,
+    catalog:MusicCatalogue,onMusicArchive:(MusicArchiveTarget)->Unit,
     onBack:()->Unit={},onMap:()->Unit={}
 ) {
     val owner by session.signedIn.collectAsStateWithLifecycle()
@@ -46,10 +47,12 @@ import cn.musicpilgrimage.app.ui.ViewModelStatus
         ?:place.scenes.firstOrNull{it.canRecreate}}
     var sources by rememberSaveable(place.id){mutableStateOf(false)}
     var referenceReady by remember(recreation?.id){mutableStateOf(false)}
-    val archivePlace=remember(place,photo,entryScenes,entryTitle){media.placeArchive(place,photo,entryScenes,entryTitle)}
+    val targets=remember(catalog,place.id){catalog.placeArchiveTargets(place.id)}
+    val archivePlace=remember(place,photo,entryScenes,entryTitle,targets){media.placeArchive(place,photo,entryScenes,entryTitle,targets)}
     val data=swissDetailData("place",place.id).put("places",org.json.JSONArray().put(archivePlace))
         .put("favorites",org.json.JSONArray(if(favorite)listOf(place.id)else emptyList<String>())).put("fallbacks",media.fallbacks)
-    SwissWebDetail(data){action,_->when(action) {
+    SwissWebDetail(data){action,args->when(action) {
+        "connection"->targets[args.optString("id")]?.let(onMusicArchive)
         "back"->onBack();"favorite"->if(!favoriteBusy)onFavorite();"add-trip"->onAdd();"map-place"->onMap()
         "record-new"->if(owner==null)onLogin()else onForm("visit",place.id,null)
         "community"->onCommunity();"sources"->sources=true
