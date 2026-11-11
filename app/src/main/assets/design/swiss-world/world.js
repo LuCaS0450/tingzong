@@ -241,7 +241,9 @@
   function updateVisual() {
     frame=0;if(!map)return;
     const z=map.getZoom(),compact=z>=3;
-    hint.hidden=z>globeZoom(map.getCenter().lat)+0.01;
+    const enlarged=z>globeZoom(map.getCenter().lat)+0.01;
+    hint.hidden=enlarged;
+    root.classList.toggle('globe-enlarged',enlarged);
     if(compact!==layoutCompact){
       layoutCompact=compact;root.classList.toggle('compact',compact);
       // The canvas never resizes at a zoom threshold. Header changes cannot interrupt a flight.
