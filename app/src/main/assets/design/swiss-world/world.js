@@ -5,6 +5,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const root = $('world');
+  const hint = $('hint');
   const native = typeof TingzongWorld !== 'undefined';
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -240,6 +241,7 @@
   function updateVisual() {
     frame=0;if(!map)return;
     const z=map.getZoom(),compact=z>=3;
+    hint.hidden=z>globeZoom(map.getCenter().lat)+0.01;
     if(compact!==layoutCompact){
       layoutCompact=compact;root.classList.toggle('compact',compact);
       // The canvas never resizes at a zoom threshold. Header changes cannot interrupt a flight.
