@@ -113,8 +113,8 @@
   function baseStyle() {
     return {version:8,projection:{type:'globe'},
       // A resident z0 tile covers the whole sphere while the detail source changes LOD.
-      sources:{'earth-base':{type:'raster',tiles:[new URL('earth/0/0/0.jpg?v=3',location.href).href],tileSize:512,minzoom:0,maxzoom:0},
-        earth:{type:'raster',tiles:[new URL('earth/{z}/{x}/{y}.jpg?v=3',location.href).href.replaceAll('%7B','{').replaceAll('%7D','}')],tileSize:512,minzoom:0,maxzoom:3},
+      sources:{'earth-base':{type:'raster',tiles:[new URL('earth/0/0/0.jpg?v=4',location.href).href],tileSize:512,minzoom:0,maxzoom:0},
+        earth:{type:'raster',tiles:[new URL('earth/{z}/{x}/{y}.jpg?v=4',location.href).href.replaceAll('%7B','{').replaceAll('%7D','}')],tileSize:512,minzoom:0,maxzoom:3},
         'earth-hd':{type:'raster',tiles:['opus-earth://{z}/{x}/{y}'],tileSize:256,minzoom:3,maxzoom:9},
         places:{type:'geojson',data:featureSet(places.filter(p=>p.id!==selected)),cluster:true,clusterRadius:32,clusterMaxZoom:17,clusterMinPoints:2},
         selection:{type:'geojson',data:byId.has(selected)?featureSet([byId.get(selected)]):empty}},

@@ -4,10 +4,10 @@ const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3
 const pow=Float64Array.from({length:256},(_,i)=>Math.pow(i/255,.6));
 const controllers=new Map();
 const deep=[118,172,194],shallow=[178,214,214],paper=[247,246,242],tint=[1.03,1,.93];
-const naturalDeep=[24,66,101],naturalShallow=[68,151,145];
+const naturalDeep=[29,80,111],naturalShallow=[68,151,145];
 let oceanAtlas;
 function loadOceanAtlas() {
-  if(!oceanAtlas)oceanAtlas=fetch('ocean-colors.png?v=3').then(response=>{
+  if(!oceanAtlas)oceanAtlas=fetch('ocean-colors.png?v=4').then(response=>{
     if(!response.ok)return null;
     return response.blob().then(blob=>createImageBitmap(blob));
   }).catch(()=>null);
