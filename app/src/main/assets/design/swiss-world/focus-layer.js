@@ -12,11 +12,20 @@ window.TingzongFocusLayer=function(globeBounds){
     void main(){
       if(render_pass>1.5){
         vec2 p=(uv*resolution-globe_light.xy)/globe_light.z;
-        if(dot(p,p)>1.0)discard;
-        vec2 position=vec2(.5+.5*p.x,.5-.5*p.y);
-        vec2 ellipse=(position-vec2(.28,.22))/(vec2(.72,.78)*(.48*sqrt(2.0)));
-        float alpha=globe_light.w*max(0.0,1.0-length(ellipse));
-        color=vec4(alpha);
+        float r2=dot(p,p);
+        if(r2>1.0)discard;
+        // The light stays fixed as the geography rotates beneath it.
+        vec3 normal=vec3(p,sqrt(1.0-r2));
+        float facing=dot(normal,vec3(-.49,.55,.68));
+        float shadow=.24*(1.0-smoothstep(-.26,.72,facing));
+        float specular=max(0.0,(facing-.45)/.55);
+        float highlight=.115*specular*specular;
+        float edge=sqrt(r2);
+        float rim=smoothstep(.972,.995,edge)*(1.0-smoothstep(.995,1.0,edge));
+        rim*=.32*smoothstep(.10,.92,dot(p,vec2(-.665,.747)));
+        vec3 light=mix(vec3(highlight),vec3(.63,.81,.89),rim);
+        float alpha=mix(shadow+(1.0-shadow)*highlight,1.0,rim);
+        color=vec4(light,alpha)*globe_light.w;
         return;
       }
       vec4 soft=texture(source,uv)*.227027027;
@@ -47,7 +56,7 @@ window.TingzongFocusLayer=function(globeBounds){
     const ratio=w/map.getCanvas().clientWidth;
     g.useProgram(program);g.bindVertexArray(vao);
     g.uniform2f(uniform.resolution,w,h);
-    g.uniform4f(uniform.globe_light,x*ratio,h-y*ratio,r*ratio,.25*Math.min(1,(4-z)/2));
+    g.uniform4f(uniform.globe_light,x*ratio,h-y*ratio,r*ratio,Math.min(1,(4-z)/2.8));
     g.uniform1f(uniform.render_pass,2);
     g.drawArrays(g.TRIANGLES,0,3);
     g.bindVertexArray(null);

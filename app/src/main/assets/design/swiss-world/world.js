@@ -259,11 +259,13 @@
     const name=z>=13?'街道':z>=7?'城市':z>=3?'国家':'地球';
     $('level').textContent=name;
     $('level').style.top=`${clamp((15-z)/14.5,0,1)*72+4}px`;
-    $('halo').hidden=$('shadow').hidden=z>=4;
+    const shadow=$('shadow');
+    shadow.hidden=z>=4;
     if(z<4){const g=globeBounds();
-      const halo=$('halo');
-      halo.style.width=halo.style.height=`${g.r*2}px`;halo.style.left=`${g.x-g.r}px`;halo.style.top=`${g.y-g.r}px`;halo.style.opacity=String(clamp(1-(z-2)/2,0,1));
-      $('shadow').style.top=`${g.y+g.r+14}px`;$('shadow').style.opacity=String(clamp(1-z/3,0,1));
+      shadow.style.width=`${g.r*1.24}px`;
+      shadow.style.left=`${g.x+g.r*.16}px`;
+      shadow.style.top=`${g.y+g.r+14}px`;
+      shadow.style.opacity=String(clamp((3.2-z)/2,0,1));
     }
     if(earthPreview&&!earthPreview.hidden&&z<4){const g=globeBounds(),p=$('globe-preview');p.style.width=`${g.r*2}px`;p.style.height=`${g.r*2}px`;p.style.left=`${g.x-g.r}px`;p.style.top=`${g.y-g.r}px`;earthPreview.draw();}
     const metersPerPixel=40075016.686*Math.cos(radians(map.getCenter().lat))/(512*2**z);

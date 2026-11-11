@@ -119,7 +119,17 @@ private fun drawStartupGlobe(context: Context, longitude: Double, latitude: Doub
         val v = .5 - asin((y * cosTilt + z * sinTilt).coerceIn(-1.0, 1.0)) / PI
         val color = pixels[(v * height).toInt().coerceIn(0, height - 1) * width + (u * width).toInt().coerceIn(0, width - 1)]
         val alpha = ((1 - sqrt(distance)) * size / 2 * 255).toInt().coerceAtMost(255)
-        globe[row * size + column] = (alpha shl 24) or (color and 0xffffff)
+        // Match the WebView preview's sphere lighting before it takes over.
+        val facing = -.49 * x + .55 * y + .68 * z
+        val t = ((facing + .26) / .98).coerceIn(0.0, 1.0)
+        val shadow = .24 * (1 - t * t * (3 - 2 * t))
+        val specular = ((facing - .45) / .55).coerceAtLeast(0.0)
+        val highlight = .115 * specular * specular
+        val light = (1 - shadow) * (1 - highlight)
+        val red = ((color ushr 16 and 255) * light + 255 * highlight).roundToInt()
+        val green = ((color ushr 8 and 255) * light + 255 * highlight).roundToInt()
+        val blue = ((color and 255) * light + 255 * highlight).roundToInt()
+        globe[row * size + column] = (alpha shl 24) or (red shl 16) or (green shl 8) or blue
     }
     return Bitmap.createBitmap(globe, size, size, Bitmap.Config.ARGB_8888).asImageBitmap()
 }
