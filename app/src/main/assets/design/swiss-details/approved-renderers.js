@@ -28,13 +28,14 @@
     return `<div class="place-visual">
       ${archiveHero(p.photo,'查看完整地点照片',p.photo?.description||p.name,true)}${caption}
       <figure class="place-map" ${p.photo?'hidden':''}>
-        <svg viewBox="0 0 720 354" role="img" aria-label="${esc(p.name)}参考位置">
+        ${p.locator?`<img class="place-map-local" src="${esc(p.locator)}" width="720" height="354" alt="${esc(p.name)}的街区地图，红点标示参考位置">`:''}
+        <svg viewBox="0 0 720 354" role="img" aria-label="${esc(p.name)}参考位置" ${p.locator?'hidden':''}>
           <g class="place-map-land"></g>
           <path class="place-map-grid" d="M120 0V354M240 0V354M360 0V354M480 0V354M600 0V354M0 59H720M0 118H720M0 177H720M0 236H720M0 295H720"/>
           <circle class="place-map-halo" cx="360" cy="177" r="24"/>
           <circle class="place-map-point" cx="360" cy="177" r="8"/>
         </svg>
-        <figcaption class="place-visual-caption"><span>地图示意</span><span>${coords}</span></figcaption>
+        <figcaption class="place-visual-caption"><span class="place-map-kind">${p.locator?'街区地图示意':'地图示意'}</span><span>${coords}</span></figcaption>
       </figure>
     </div>`;
   }

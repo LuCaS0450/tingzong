@@ -329,6 +329,8 @@ import org.json.JSONObject
                     AboutSource("MapTiler","底图服务与版权说明","https://www.maptiler.com/copyright/")
                     HorizontalDivider(color=RoomColors.Line)
                     AboutSource("OpenStreetMap","地图数据许可说明","https://www.openstreetmap.org/copyright")
+                    HorizontalDivider(color=RoomColors.Line)
+                    AboutSource("OpenMapTiles","街区地图矢量数据处理 · 由 OpenFreeMap 提供","https://openmaptiles.org/about/")
                 }
                 AccountSection("02","地球影像与海洋数据") {
                     AboutSource("NASA Earth Observatory","地球影像 · Blue Marble Next Generation",

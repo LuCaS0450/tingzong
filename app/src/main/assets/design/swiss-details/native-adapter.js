@@ -32,7 +32,7 @@ function sizeDetail(){
 }
 let archiveCountries;
 function paintPlaceMap(figure){
-  if(!figure||figure.hidden)return;
+  if(!figure||figure.hidden||figure.querySelector('.place-map-local'))return;
   const {latitude:lat,longitude:lon}=place(D.payload.id);
   if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
   archiveCountries??=fetch('https://details.tingzong.local/map/countries.json').then(response=>response.json());
@@ -79,7 +79,13 @@ function updateNativeDetail(data,initialScroll=0){
     img.onerror=()=>{
       const source=img.getAttribute('src'),fallback=D.fallbacks?.[source];
       if(fallback&&source!==fallback){img.src=fallback;return;}
-      if(hero){
+      if(img.classList.contains('place-map-local')){
+        const figure=img.closest('.place-map');
+        img.remove();
+        figure.querySelector('svg').removeAttribute('hidden');
+        figure.querySelector('.place-map-kind').textContent='地图示意';
+        paintPlaceMap(figure);
+      }else if(hero){
         const visual=hero.closest('.place-visual'),map=visual?.querySelector('.place-map');
         hero.remove();
         if(map){

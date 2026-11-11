@@ -79,8 +79,12 @@ import cn.musicpilgrimage.app.ui.ViewModelStatus
                 else item {
                     Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
                         Text("地图示意",fontSize=18.sp,color=RoomColors.Ink)
-                        if(place.coordinateSource.startsWith("https://"))RoomSourceLink("查看参考位置依据",place.coordinateSource)
-                        RoomSourceLink("Natural Earth 地图轮廓", "https://www.naturalearthdata.com/about/terms-of-use/")
+                        val coordinateUrl=place.coordinateSource.substringBefore(' ').substringBefore('（')
+                        if(coordinateUrl.startsWith("https://"))RoomSourceLink("查看参考位置依据",coordinateUrl)
+                        if(archivePlace.has("locator")) {
+                            RoomSourceLink("街区地图数据 · OpenStreetMap", "https://www.openstreetmap.org/copyright")
+                            RoomSourceLink("矢量数据处理 · OpenMapTiles", "https://openmaptiles.org/about/")
+                        } else RoomSourceLink("Natural Earth 地图轮廓", "https://www.naturalearthdata.com/about/terms-of-use/")
                     }
                 }
                 items(place.scenes.filter(Scene::publiclyVisible).distinctBy{listOf(it.artistId,it.work,it.kind,it.associationSourceUrl.ifBlank{it.sourceUrl})},key={it.id}){scene->Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {

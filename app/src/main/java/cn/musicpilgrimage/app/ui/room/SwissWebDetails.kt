@@ -34,6 +34,7 @@ import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
 private const val DetailMapUrl = "https://details.tingzong.local/map/countries.json"
@@ -226,10 +227,17 @@ internal class SwissDetailMedia(private val context:Context) {
             .put("credit", scene.imageCredit.orEmpty())
     }
 
+    private fun locatorAsset(place: Place): String? {
+        val name = String.format(Locale.ROOT, "%s_%.6f_%.6f.webp", place.id, place.latitude, place.longitude)
+        val path = "design/swiss-details/media/place-locators/$name"
+        return runCatching { context.assets.open(path).use { "file:///android_asset/$path" } }.getOrNull()
+    }
+
     fun placeArchive(place: Place, photo: ArchivePhoto?, entryScenes: Set<String>,
         targets: Map<String, MusicArchiveTarget>) = archivePlaceIdentity(place)
         .put("photo", photo?.json() ?: JSONObject.NULL).put("scope", place.archiveScope())
         .put("latitude", place.latitude).put("longitude", place.longitude)
+        .put("locator", if (photo == null) locatorAsset(place) else null)
         .put("connections", place.archiveConnections(entryScenes, targets, ::connectionImage))
 
     fun place(place:Place,scene:Scene?=place.mapScene()):JSONObject=JSONObject()

@@ -22,6 +22,7 @@
 
 - `content/` 内的历史设计、研究记录、原始素材和来源证据。
 - 封面、MV 截图、照片及授权未明确的生成或加工美术，包括详情页 `media/`、音乐空间封面与场景图。
+- 地点档案的街区示意图保存在详情页 `media/place-locators/`。从 [OpenFreeMap](https://openfreemap.org/) 获取少量 [OpenMapTiles](https://openmaptiles.org/about/) 矢量瓦片，取用 [OpenStreetMap](https://www.openstreetmap.org/copyright) 的街道、铁路和地物，叠加目录参考点绘制。底图数据许可见 ODbL，署名收在 App「关于」和档案「资料来源」。瓦片版本与图幅保存在本机资料，地图副本随本机预览打包。
 - 歌曲包的 `song.json`、背景及完整或片段商业录音；谱面未因 JSON 格式而自动获得公开许可。
 - `app/src/debug/assets/` 内的历史演示素材。
 - 世界页内置地球加工纹理及经既有 MapTiler 服务取得的高清影像缓存；只公开渲染、调色、手势和衔接源码，不上传影像字节或服务配置。
