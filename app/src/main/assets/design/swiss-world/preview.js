@@ -1,7 +1,7 @@
 /* A bundled low-resolution, correctly centered Earth stays visible while WebGL/tiles initialize.
  * Only the initial CPU preview is rasterized; the interactive scene remains at full resolution.
  */
-window.TingzongEarthPreview=function(canvas,getCamera){
+window.TingzongEarthPreview=function(canvas,getCamera,onDraw){
   let pixels=null,width=0,height=0,last='',hidden=false;
   const image=new Image();image.src='earth-1024.jpg?v=3';
   image.onload=()=>{if(hidden)return;const source=document.createElement('canvas');source.width=image.width;source.height=image.height;const c=source.getContext('2d',{willReadFrequently:true});c.drawImage(image,0,0);pixels=c.getImageData(0,0,source.width,source.height).data;width=source.width;height=source.height;draw();};
@@ -24,6 +24,7 @@ window.TingzongEarthPreview=function(canvas,getCamera){
       dst[target+3]=Math.min(255,Math.max(0,(1-Math.sqrt(rr))*n/2)*255);
     }
     ctx.putImageData(out,0,0);
+    onDraw();
   }
-  return {draw,get hidden(){return hidden;},hide(){if(hidden)return;hidden=true;canvas.style.opacity='0';setTimeout(()=>{canvas.hidden=true;pixels=null;},220);}};
+  return {draw,get drawn(){return last!=='';},get hidden(){return hidden;},hide(){if(hidden)return;hidden=true;canvas.style.opacity='0';setTimeout(()=>{canvas.hidden=true;pixels=null;},220);}};
 };

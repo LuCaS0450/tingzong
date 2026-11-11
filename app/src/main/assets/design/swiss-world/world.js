@@ -14,10 +14,12 @@
   let map, gestures, earthPreview, earthTiles, focusLayer, selectedPin, places = [], byId = new Map(), selected = '', summaryOpen = false;
   let favorites = new Set(), visits = new Set(), favoriteBusy = false;
   let initialized = false, controlsReady = false, vectorsReady = false, vectorError = false, earthError=false, loadingSince = 0;
+  let visualReady = false;
   let frame = 0, layoutCompact = false, moving = false, chooserOptions = [];
   let styleRequest = null, saveTimer = 0, hdError=false;
   let lastRender = 0, frameGaps = [], projectionFrames = [], measuring = false, inputMoves = 0;
   let lastCamera = null;
+  let pendingBoot = null;
   let countries=[];
   const empty = { type:'FeatureCollection', features:[] };
   const imageNames = new Set();
@@ -39,6 +41,8 @@
   }
   sizeScene();
   window.addEventListener('resize',sizeScene);
+  const startupLayout = new ResizeObserver(startWhenSized);
+  startupLayout.observe($('stage'));
 
   function state() {
     if (!map) return lastCamera || {};
@@ -46,7 +50,7 @@
     return { longitude:wrap(c.lng), latitude:c.lat, zoom:map.getZoom(), selected, summaryOpen };
   }
   function emit(action, data = {}) {
-    if(map&&action!=='state'&&action!=='ready'){gestures?.cancel();map.stop();}
+    if(map&&action!=='state'&&action!=='ready'&&action!=='visual-ready'){gestures?.cancel();map.stop();}
     const payload = { action, ...data, state:state() };
     if (native) TingzongWorld.postMessage(JSON.stringify(payload));
     else if (action === 'state') {
@@ -381,10 +385,15 @@
   function normalize(p){return {...p,lat:Number(p.lat??p.latitude),lon:Number(p.lon??p.longitude)};}
   function applyNative(data) {
     favorites=new Set(data.favorites||[]);visits=new Set(data.visits||[]);favoriteBusy=Boolean(data.favoriteBusy);
-    if(!initialized)return boot(data);
+    if(!initialized){pendingBoot=data;startWhenSized();return;}
     if(data.places){places=data.places.map(normalize);byId=new Map(places.map(p=>[p.id,p]));refreshSources();}
     refreshFavorite();
     if(data.focus&&byId.has(data.focus)){const p=byId.get(data.focus);selected=p.id;summaryOpen=true;refreshSources();renderSummary();flyTo([p.lon,p.lat],15,selectionOffset());}
+  }
+  function startWhenSized() {
+    // WebView can deliver its page before the native tab has a measured map viewport.
+    if(!pendingBoot||!$('stage').clientWidth||!$('stage').clientHeight)return;
+    const data=pendingBoot;pendingBoot=null;startupLayout.disconnect();boot(data);
   }
   function boot(data) {
     if(initialized)return;initialized=true;
@@ -405,7 +414,7 @@
       maxTileCacheSize:128,refreshExpiredTiles:true,trackResize:false,pixelRatio:devicePixelRatio*sceneScale,padding:{top:0,bottom:bottomPadding,left:0,right:0},
       transformRequest:url=>{const u=new URL(url,location.href);return {url:u.hostname==='api.maptiler.com'?new URL('provider'+u.pathname+u.search,location.href).href:url};}});
     map.setVerticalFieldOfView(8);
-    earthPreview=TingzongEarthPreview($('globe-preview'),()=>({longitude:map.getCenter().lng,latitude:map.getCenter().lat}));
+    earthPreview=TingzongEarthPreview($('globe-preview'),()=>({longitude:map.getCenter().lng,latitude:map.getCenter().lat}),()=>map.triggerRepaint());
     if(Number(saved.zoom)>=4){$('globe-preview').hidden=true;earthPreview.hide();}
     gestures=TingzongWorldGestures(map,{reducedMotion:reduced,minimumZoom:globeZoom,onFocus:p=>focusLayer.focus(p),onStart:()=>{moving=true;},onEnd:()=>{moving=false;updateVisual();updateContext();persist();}});
     const initialCamera={center:[Number.isFinite(saved.longitude)?saved.longitude:35,Number.isFinite(saved.latitude)?saved.latitude:24],zoom:Number.isFinite(saved.zoom)?saved.zoom:globeZoom(saved.latitude),padding:{top:0,bottom:bottomPadding,left:0,right:0}};
@@ -436,7 +445,14 @@
     map.on('sourcedata',e=>{if(e.sourceId==='streets'||e.sourceId==='earth-hd')updateLoading();});
     map.on('error',e=>{if(e.sourceId==='earth'||String(e.error?.message).includes('/earth/'))earthError=true;if(e.sourceId==='earth-hd'){hdError=true;updateLoading();}if(e.sourceId==='streets'){vectorError=true;updateLoading();}});
     map.on('render',()=>{
-      if(earthPreview&&!earthPreview.hidden&&(map.getZoom()>=5||map.isSourceLoaded('earth-base')||(!earthError&&map.isSourceLoaded('earth'))))earthPreview.hide();
+      if(!earthPreview.hidden||!visualReady){
+        const earthReady=map.isSourceLoaded('earth-base')||(!earthError&&map.isSourceLoaded('earth'));
+        if(!earthPreview.hidden&&(map.getZoom()>=5||earthReady))earthPreview.hide();
+        if(controlsReady&&(earthReady||earthPreview.drawn||map.getZoom()>=5)){
+          if(!visualReady&&native)emit('visual-ready');
+          visualReady=true;
+        }
+      }
       if(!measuring)return;
       const now=performance.now();if(lastRender)frameGaps.push(now-lastRender);lastRender=now;
       if(projectionFrames.length<600){

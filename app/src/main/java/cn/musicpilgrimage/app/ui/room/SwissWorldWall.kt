@@ -2,12 +2,26 @@ package cn.musicpilgrimage.app.ui.room
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.view.ViewGroup
 import android.webkit.*
+import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.viewinterop.AndroidView
@@ -17,6 +31,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import cn.musicpilgrimage.app.BuildConfig
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.design.MapNetworking
+import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
+import cn.musicpilgrimage.app.ui.WallTabFadeMillis
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,38 +44,106 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FilterInputStream
+import kotlin.math.*
 
 /** The operative Opus prototype is also the Android scene; business actions remain native. */
 @Composable internal fun SwissWorldWall(
     catalog: Catalog, browse: RoomBrowseState, favorites: Set<String>, favoriteBusy: Boolean,
     onPlace: (String) -> Unit, onFavorite: (String) -> Unit, onTrips: () -> Unit,
     onFootprints: () -> Unit, onAdd: (Place) -> Unit, onSearch: () -> Unit,
-    onBack: () -> Unit, visits: Set<String>,
+    onBack: () -> Unit, visits: Set<String>, active: Boolean,
 ) {
     val context = LocalContext.current
-    val owner = LocalLifecycleOwner.current
-    val places = remember(catalog) { musicMapCities(catalog, null).flatMap { it.places }.distinctBy { it.id } }
-    val byId = remember(places) { places.associateBy { it.id } }
-    val media = remember(context) { SwissDetailMedia(context) }
-    val scene = remember(browse) { browse.worldScene ?: WorldScene(context, browse).also { browse.worldScene = it } }
-    val pendingFocus = remember(scene) { browse.takeWorldFocus()?.let { it to android.os.SystemClock.elapsedRealtimeNanos().toString() } }
-    val placeData = remember(places) {
-        JSONArray().also { array -> places.forEach { place ->
-            val item = media.place(place).put("lat", place.latitude).put("lon", place.longitude)
-            val image = item.optString("image")
-            if (image.isNotBlank()) {
-                scene.media[place.id] = image
-                item.put("image", WorldScene.ORIGIN + "media/" + Uri.encode(place.id))
-            }
-            array.put(item)
-        } }
+    val motion = LocalPhysicalMotion.current
+    var scene by remember(browse) { mutableStateOf(browse.worldScene) }
+    LaunchedEffect(browse, active) {
+        if (active && scene == null) {
+            // Finish the first tab handoff before creating the heavyweight WebView.
+            withFrameNanos { }
+            if (motion) delay(WallTabFadeMillis.toLong())
+            scene = browse.worldScene ?: WorldScene(context, browse).also { browse.worldScene = it }
+        }
     }
-    val json = remember(placeData, favorites, favoriteBusy, visits) {
-        JSONObject().put("places", placeData).put("favorites", JSONArray(favorites.toList()))
+    Box(Modifier.fillMaxSize().testTag("world-wall")) {
+        scene?.let {
+            WorldWebContent(it, catalog, browse, favorites, favoriteBusy, onPlace, onFavorite, onTrips,
+                onFootprints, onAdd, onSearch, onBack, visits, active)
+        }
+        AnimatedVisibility(visible = scene?.hasVisual != true, enter = EnterTransition.None,
+            exit = if (motion) fadeOut(tween(130)) else ExitTransition.None) {
+            WorldLoadingPreview(browse, onSearch)
+        }
+    }
+}
+
+@Composable private fun WorldLoadingPreview(browse: RoomBrowseState, onSearch: () -> Unit) {
+    val context = LocalContext.current
+    val longitude = remember(browse) { browse.worldState?.longitude ?: browse.globe.longitude.toDouble() }
+    val latitude = remember(browse) { browse.worldState?.latitude ?: browse.globe.latitude.toDouble() }
+    val preview by produceState<ImageBitmap?>(null, longitude, latitude) {
+        value = withContext(Dispatchers.Default) { drawStartupGlobe(context, longitude, latitude) }
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().background(RoomColors.Wall).testTag("world-loading-preview")) {
+        RoomShelfWall(Modifier.matchParentSize())
+        val diameter = maxWidth * (304f / 360)
+        val center = minOf(maxWidth * (352f / 360), (maxHeight + maxWidth * (64f / 360)) / 2)
+        preview?.let {
+            Image(it, contentDescription = null,
+                modifier = Modifier.align(Alignment.TopCenter).offset(y = center - diameter / 2).size(diameter))
+        }
+        SwissWallHeader(1, onSearch)
+    }
+}
+
+/** The orthographic preview uses the same bundled texture and camera as the WebView preview. */
+private fun drawStartupGlobe(context: Context, longitude: Double, latitude: Double): ImageBitmap? {
+    val texture = context.assets.open("design/swiss-world/earth-1024.jpg").use { BitmapFactory.decodeStream(it) } ?: return null
+    val width = texture.width
+    val height = texture.height
+    val pixels = IntArray(width * height)
+    texture.getPixels(pixels, 0, width, 0, 0, width, height)
+    texture.recycle()
+    val size = 224
+    val globe = IntArray(size * size)
+    val lon = Math.toRadians(longitude)
+    val tilt = Math.toRadians(latitude.coerceIn(-80.0, 80.0))
+    val sinTilt = sin(tilt)
+    val cosTilt = cos(tilt)
+    for (row in 0 until size) for (column in 0 until size) {
+        val x = (column + .5) * 2 / size - 1
+        val y = 1 - (row + .5) * 2 / size
+        val distance = x * x + y * y
+        if (distance >= 1) continue
+        val z = sqrt(1 - distance)
+        val u = ((lon + atan2(x, z * cosTilt - y * sinTilt)) / (2 * PI) + 1.5) % 1
+        val v = .5 - asin((y * cosTilt + z * sinTilt).coerceIn(-1.0, 1.0)) / PI
+        val color = pixels[(v * height).toInt().coerceIn(0, height - 1) * width + (u * width).toInt().coerceIn(0, width - 1)]
+        val alpha = ((1 - sqrt(distance)) * size / 2 * 255).toInt().coerceAtMost(255)
+        globe[row * size + column] = (alpha shl 24) or (color and 0xffffff)
+    }
+    return Bitmap.createBitmap(globe, size, size, Bitmap.Config.ARGB_8888).asImageBitmap()
+}
+
+internal data class WorldPlaceData(val byId: Map<String, Place>, val json: JSONArray)
+
+@Composable private fun WorldWebContent(
+    scene: WorldScene, catalog: Catalog, browse: RoomBrowseState, favorites: Set<String>, favoriteBusy: Boolean,
+    onPlace: (String) -> Unit, onFavorite: (String) -> Unit, onTrips: () -> Unit,
+    onFootprints: () -> Unit, onAdd: (Place) -> Unit, onSearch: () -> Unit,
+    onBack: () -> Unit, visits: Set<String>, active: Boolean,
+) {
+    val owner = LocalLifecycleOwner.current
+    val pendingFocus = remember(scene) { browse.takeWorldFocus()?.let { it to android.os.SystemClock.elapsedRealtimeNanos().toString() } }
+    val placeData by produceState(scene.cachedPlaces(catalog), scene, catalog, active) {
+        if (active) value = scene.preparePlaces(catalog)
+    }
+    val byId = placeData?.byId.orEmpty()
+    val json = remember(placeData, favorites, favoriteBusy, visits, pendingFocus) {
+        placeData?.let { prepared -> JSONObject().put("places", prepared.json).put("favorites", JSONArray(favorites.toList()))
             .put("visits", JSONArray(visits.toList())).put("favoriteBusy", favoriteBusy)
-            .put("state", browse.worldState?.json() ?: JSONObject()
-                .put("longitude", browse.globe.longitude.toDouble()).put("latitude", browse.globe.latitude.toDouble()))
+            .put("state", scene.initialCamera)
             .apply { pendingFocus?.let { put("focus", it.first); put("focusToken", it.second) } }.toString()
+        }
     }
     val latestAction by rememberUpdatedState<(String, String) -> Unit> { action, id ->
         when (action) {
@@ -68,9 +155,15 @@ import java.io.FilterInputStream
             "search" -> onSearch()
         }
     }
-    BackHandler { scene.web.evaluateJavascript("window.worldBack ? worldBack() : false") { handled -> if (handled != "true") onBack() } }
-    DisposableEffect(scene, owner) {
-        scene.onAction = { action, id -> latestAction(action, id) }
+    BackHandler(enabled = active) {
+        val source = scene.onAction
+        scene.web.evaluateJavascript("window.worldBack ? worldBack() : false") { handled ->
+            if (source != null && scene.onAction === source && handled != "true") onBack()
+        }
+    }
+    if (active) DisposableEffect(scene, owner) {
+        val handle: (String, String) -> Unit = { action, id -> latestAction(action, id) }
+        scene.onAction = handle
         scene.resume()
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -82,27 +175,43 @@ import java.io.FilterInputStream
         owner.lifecycle.addObserver(observer)
         onDispose {
             owner.lifecycle.removeObserver(observer)
-            scene.onAction = null
-            scene.pause()
+            if (scene.onAction === handle) {
+                scene.onAction = null
+                scene.pause()
+            }
         }
     }
-    AndroidView(factory = { scene.web }, modifier = Modifier.fillMaxSize().testTag("world-wall"),
-        onRelease = { /* Keep the GPU scene for an immediate, stationary details return. */ },
-        update = { scene.update(json) })
+    AndroidView(factory = { FrameLayout(it) }, modifier = Modifier.fillMaxSize(),
+        onRelease = { it.removeAllViews() }, update = { host ->
+            if (active) {
+                if (scene.web.parent !== host) {
+                    (scene.web.parent as? ViewGroup)?.removeView(scene.web)
+                    host.addView(scene.web)
+                }
+                json?.let(scene::update)
+            }
+        })
 }
 
 /** Root-screen lifetime; paused off-screen and destroyed with the root composition. */
 @SuppressLint("SetJavaScriptEnabled")
-internal class WorldScene(context: Context, private val browse: RoomBrowseState) {
+internal class WorldScene(private val context: Context, private val browse: RoomBrowseState) {
     companion object { const val ORIGIN = "https://world.tingzong.local/world/" }
     val media = java.util.concurrent.ConcurrentHashMap<String, String>()
+    // Camera updates are already live in this WebView. Only send its seed on boot.
+    val initialCamera: JSONObject = browse.worldState?.json() ?: JSONObject()
+        .put("longitude", browse.globe.longitude.toDouble()).put("latitude", browse.globe.latitude.toDouble())
     var onAction: ((String, String) -> Unit)? = null
+    var hasVisual by mutableStateOf(false)
+        private set
     private var ready = false
     private var alive = true
     private var latest = "{}"
     private var rendered: String? = null
     private var focusSent: String? = null
     private var visibilityGeneration = 0
+    private var preparedCatalog: Catalog? = null
+    private var preparedPlaces: WorldPlaceData? = null
     private val mapResources = WorldResources(context.applicationContext, media)
     val web = WebView(context).apply {
         layoutParams = android.view.ViewGroup.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
@@ -129,7 +238,11 @@ internal class WorldScene(context: Context, private val browse: RoomBrowseState)
                     if (alive) {
                         browse.world(snapshot)
                         val action = message.optString("action")
-                        if (action !in setOf("state", "ready")) onAction?.invoke(action, message.optString("id"))
+                        when (action) {
+                            "visual-ready" -> revealAfterDraw()
+                            "state", "ready" -> Unit
+                            else -> onAction?.invoke(action, message.optString("id"))
+                        }
                     }
                 }
             }
@@ -150,6 +263,33 @@ internal class WorldScene(context: Context, private val browse: RoomBrowseState)
             }
         }
         loadUrl(ORIGIN + "index.html")
+    }
+    fun cachedPlaces(catalog: Catalog) = preparedPlaces.takeIf { preparedCatalog === catalog }
+    suspend fun preparePlaces(catalog: Catalog): WorldPlaceData {
+        cachedPlaces(catalog)?.let { return it }
+        val data = withContext(Dispatchers.Default) {
+            val places = musicMapCities(catalog, null).flatMap { it.places }.distinctBy { it.id }
+            val detail = SwissDetailMedia(context)
+            val array = JSONArray()
+            places.forEach { place ->
+                val item = detail.place(place).put("lat", place.latitude).put("lon", place.longitude)
+                val image = item.optString("image")
+                if (image.isNotBlank()) {
+                    media[place.id] = image
+                    item.put("image", ORIGIN + "media/" + Uri.encode(place.id))
+                }
+                array.put(item)
+            }
+            WorldPlaceData(places.associateBy { it.id }, array)
+        }
+        preparedCatalog = catalog
+        preparedPlaces = data
+        return data
+    }
+    private fun revealAfterDraw() {
+        web.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
+            override fun onComplete(requestId: Long) { if (alive) hasVisual = true }
+        })
     }
     fun update(json: String) { latest = json; if (ready) render() }
     private fun render() {

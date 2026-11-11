@@ -3,6 +3,7 @@ package cn.musicpilgrimage.app.ui
 import android.net.Uri
 import android.content.Intent
 import androidx.compose.animation.*
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.flow.first
@@ -42,6 +43,32 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+
+private val wallTabEasing=CubicBezierEasing(.22f,.61f,.36f,1f)
+internal const val WallTabFadeMillis=160
+
+private fun wallSection(route:String?)=when(route) {
+ "room","catalogue"->0
+ "explore"->1
+ "performance"->2
+ "me"->3
+ else->null
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.switchesWallTabs():Boolean {
+ val from=wallSection(initialState.destination.route)
+ val to=wallSection(targetState.destination.route)
+ return from!=null&&to!=null&&from!=to
+}
+
+@Composable private fun NativeWallTab(section:Int,onSearch:()->Unit,content:@Composable ()->Unit) {
+ RoomShelfWall(Modifier.fillMaxSize()) {
+  Column(Modifier.fillMaxSize()) {
+   SwissWallHeader(section,onSearch)
+   Box(Modifier.fillMaxWidth().weight(1f)){content()}
+  }
+ }
+}
 
 @Composable fun PilgrimageApp(session:SessionViewModel,requireAccount:Boolean=true) {
  val owner by session.signedIn.collectAsStateWithLifecycle()
@@ -95,7 +122,6 @@ import org.json.JSONObject
    val storedArchive by archive.state.collectAsStateWithLifecycle()
    val placeUndo by archive.undo.collectAsStateWithLifecycle()
    val sourceCatalog by session.services.catalog.collectAsStateWithLifecycle()
-   var moduleMotion by remember {mutableStateOf(false)}
    val performanceLibrary:PerformanceLibraryViewModel=viewModel()
    val performanceLibraryUi by performanceLibrary.state.collectAsStateWithLifecycle()
    LaunchedEffect(route,performanceLibraryUi.loaded){
@@ -116,7 +142,7 @@ import org.json.JSONObject
    var addTripPlace by rememberSaveable(owner){mutableStateOf<String?>(null)}
    val musicFavorites=storedMusicFavorites.takeIf{it.owner==libraryOwner} ?: MusicFavorites()
    val archiveState=storedArchive.takeIf{it.owner==owner} ?: MusicArchiveState(owner=owner,loading=owner!=null)
-   val navigate:(String)->Unit={moduleMotion=false;focus.clearFocus();keyboard?.hide();nav.navigate(it){launchSingleTop=true}}
+   val navigate:(String)->Unit={focus.clearFocus();keyboard?.hide();nav.navigate(it){launchSingleTop=true}}
    fun followMusicArchiveLink(source:NavBackStackEntry,target:String) {
     if(nav.currentBackStackEntry!=source)return
     if(!nav.popBackStack(target,inclusive=false))navigate(target)
@@ -152,10 +178,16 @@ import org.json.JSONObject
    val motion=LocalPhysicalMotion.current
    val chooseModule:(String)->Unit={path->
     leaveProfile {
-    moduleMotion=true
-    focus.clearFocus();keyboard?.hide()
-    val target=if(path=="catalogue")"room"else path
-    nav.navigate(target){popUpTo(nav.graph.findStartDestination().id);launchSingleTop=true}
+     val target=if(path=="catalogue")"room"else path
+     if(wallSection(nav.currentDestination?.route)!=wallSection(target)) {
+      focus.clearFocus();keyboard?.hide()
+      if(target=="room")nav.popBackStack("room",inclusive=false,saveState=true)
+      else nav.navigate(target) {
+       popUpTo(nav.graph.findStartDestination().id){saveState=true}
+       launchSingleTop=true
+       restoreState=true
+      }
+     }
     }
    }
    val openRelease:(MusicRelease)->Unit={release->
@@ -196,22 +228,38 @@ import org.json.JSONObject
     if(gameFullscreen){controller?.systemBarsBehavior=WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE;controller?.hide(WindowInsetsCompat.Type.systemBars())}
     onDispose{if(gameFullscreen)controller?.show(WindowInsetsCompat.Type.systemBars())}
    }
-   val wallSection=when(route){"room","catalogue"->0;"explore"->1;"performance"->2;"me"->3;else->null}
+   val wallSection=wallSection(route)
    RoomWall(Modifier.fillMaxSize().background(RoomColors.Wall).then(if(gameFullscreen||webDetailRoute)Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing)),baseColor=if(archiveRoute)RoomColors.ArchiveWall else RoomColors.Wall) {
    if(wallSection!=null)RoomShelfWall(Modifier.matchParentSize())
    Scaffold(containerColor=Color.Transparent,contentWindowInsets=WindowInsets(0,0,0,0),
     bottomBar={if(wallSection!=null)SwissWallTabs(wallSection,chooseModule)},
-    topBar={if(wallSection!=null&&wallSection!=1)SwissWallHeader(wallSection,{navigate("search")})else if(wallSection==null&&roomTitle!=null&&!webDetailRoute)RoomHeader(if(route=="room")"唱片架" else roomTitle,if(route in listOf("room","me"))null else back,
+    topBar={if(wallSection==null&&roomTitle!=null&&!webDetailRoute)RoomHeader(if(route=="room")"唱片架" else roomTitle,if(route in listOf("room","me"))null else back,
        if(route in listOf("room","catalogue")){ {navigate("search")} }else null,
        onSpace={},enabled=!(route=="edit-profile"&&draft.saving)&&!recordSaving,
        onTitleClick=if(route=="room"){ {navigate("catalogue")} }else null)}) {padding->
     NavHost(navController=nav,startDestination="room",modifier=Modifier.padding(padding).consumeWindowInsets(padding),
-     enterTransition={fadeIn(tween(if(motion)if(moduleMotion)160 else 180 else 0))+slideInHorizontally(tween(if(motion&&!moduleMotion)260 else 0)){if(motion&&!moduleMotion)it/16 else 0}},
-     exitTransition={fadeOut(tween(if(motion)120 else 0))},
-     popEnterTransition={fadeIn(tween(if(motion)180 else 0))+slideInHorizontally(tween(if(motion)260 else 0)){if(motion)-it/28 else 0}},
-     popExitTransition={fadeOut(tween(if(motion)100 else 0))}) {
-     composable("room"){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}
-     composable("catalogue"){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}
+     enterTransition={when {
+      !motion->EnterTransition.None
+      switchesWallTabs()->fadeIn(tween(WallTabFadeMillis,easing=wallTabEasing))
+      else->fadeIn(tween(180))+slideInHorizontally(tween(260)){it/16}
+     }},
+     exitTransition={when {
+      !motion->ExitTransition.None
+      switchesWallTabs()->ExitTransition.KeepUntilTransitionsFinished
+      else->fadeOut(tween(120))
+     }},
+     popEnterTransition={when {
+      !motion->EnterTransition.None
+      switchesWallTabs()->EnterTransition.None
+      else->fadeIn(tween(180))+slideInHorizontally(tween(260)){-it/28}
+     }},
+     popExitTransition={when {
+      !motion->ExitTransition.None
+      switchesWallTabs()->fadeOut(tween(WallTabFadeMillis,easing=wallTabEasing))
+      else->fadeOut(tween(100))
+     }}) {
+     composable("room"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
+     composable("catalogue"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
      composable("album/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
       RoomAlbum(release,release.id in musicFavorites.releases,{music.toggleFavorite(release.id,true)},
        {followMusicArchiveLink(e,"song/${Uri.encode(it.id)}")},{navigate("place/${Uri.encode(it)}")},
@@ -230,8 +278,17 @@ import org.json.JSONObject
        {navigate("place/${Uri.encode(it)}")},play?.let{song->{navigate("perform/${Uri.encode(song.id)}")}},
        onBack=back,onRelease={followMusicArchiveLink(e,"album/${Uri.encode(work.releaseId)}")})
      }}
-     composable("explore",enterTransition={EnterTransition.None},exitTransition={ExitTransition.None},popEnterTransition={EnterTransition.None},popExitTransition={ExitTransition.None}){SwissWorldWall(sourceCatalog,wallBrowse,archiveState.places.toSet(),archiveState.loading,{navigate("place/${Uri.encode(it)}")},togglePlace,openTrips,{navigate("archive/footprints")},addToTrip,{navigate("search")},back,archiveState.visits.map{it.location}.toSet())}
-     composable("performance"){SwissPlayWall(performanceEntries,performanceArtwork,performanceLibraryUi.loaded,wallBrowse,performanceLibraryUi.downloads,{navigate("perform/${Uri.encode(it)}")},{performanceLibrary.prepareAll(retry=true)})}
+     composable("explore",enterTransition={if(switchesWallTabs())null else EnterTransition.None},
+      exitTransition={if(switchesWallTabs())null else ExitTransition.None},
+      popEnterTransition={if(switchesWallTabs())null else EnterTransition.None},
+      popExitTransition={if(switchesWallTabs())null else ExitTransition.None}){e->
+      SwissWorldWall(sourceCatalog,wallBrowse,archiveState.places.toSet(),archiveState.loading,
+       {navigate("place/${Uri.encode(it)}")},togglePlace,openTrips,{navigate("archive/footprints")},addToTrip,
+       {navigate("search")},back,archiveState.visits.map{it.location}.toSet(),active=entry==e)
+     }
+     composable("performance"){NativeWallTab(2,{navigate("search")}){
+      SwissPlayWall(performanceEntries,performanceArtwork,performanceLibraryUi.loaded,wallBrowse,performanceLibraryUi.downloads,{navigate("perform/${Uri.encode(it)}")},{performanceLibrary.prepareAll(retry=true)})
+     }}
      composable("perform/{song}"){e->
       val performanceEntry=performanceEntries.find{it.song.id==e.arguments?.getString("song")}
       if(performanceEntry!=null)key(libraryOwner){
@@ -283,7 +340,9 @@ import org.json.JSONObject
       })
      }}
      composable("me"){
-      SwissPersonalWall(profile?.takeIf{it.optString("id")==owner},owner!=null,session.services.accountAvatar(owner),login,openTrips,navigate)
+      NativeWallTab(3,{navigate("search")}){
+       SwissPersonalWall(profile?.takeIf{it.optString("id")==owner},owner!=null,session.services.accountAvatar(owner),login,openTrips,navigate)
+      }
      }
      composable("account-profile"){profileScreen(owner.orEmpty())}
      composable("place/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->

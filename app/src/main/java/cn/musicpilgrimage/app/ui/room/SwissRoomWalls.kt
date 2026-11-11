@@ -91,7 +91,7 @@ internal val SwissWallMuted=Color(0xFF5C625C)
         }
         Row(Modifier.fillMaxWidth()) {listOf("音乐","世界","演奏","我的").forEachIndexed{index,label->
             Box(Modifier.weight(1f).height(58.dp).semantics{selected=index==section}.testTag("wall-tab-$index")
-                .clickable(role=Role.Tab){if(index!=section)onChoose(listOf("room","explore","performance","me")[index])},contentAlignment=Alignment.Center) {
+                .clickable(interactionSource=null,indication=null,role=Role.Tab){onChoose(listOf("room","explore","performance","me")[index])},contentAlignment=Alignment.Center) {
                 Text(label,color=if(index==section)SwissInk else SwissWallMuted,fontSize=16.sp,fontWeight=if(index==section)FontWeight.Bold else FontWeight.Normal)
             }
         }}
