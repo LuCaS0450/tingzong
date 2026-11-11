@@ -47,8 +47,18 @@ function updateNativeDetail(data,initialScroll=0){
     },{once:true});
   }
   view.querySelectorAll('img').forEach(img=>{
-    img.onerror=()=>{const fallback=D.fallbacks?.[img.getAttribute('src')];if(fallback&&img.src!==fallback)img.src=fallback;};
-    if(img.classList.contains('hero-image')){img.onload=()=>post('hero-ready');if(img.complete&&img.naturalWidth)post('hero-ready');}
+    const hero=img.closest('.archive-hero');
+    img.onerror=()=>{
+      const source=img.getAttribute('src'),fallback=D.fallbacks?.[source];
+      if(fallback&&source!==fallback){img.src=fallback;return;}
+      if(hero)hero.remove();
+      else if(img.closest('.list-row'))img.remove();
+    };
+    if(hero)img.onload=()=>hero.querySelector('button').disabled=false;
+    if(img.complete){
+      if(img.naturalWidth)img.onload?.();
+      else if(img.getAttribute('src'))img.onerror();
+    }
   });
   view.querySelectorAll('.trip-stop').forEach(el=>{const index=Number(el.querySelector('[data-action="move-stop"]').dataset.index);el.dataset.stop=D.trip.stops[index]?.id||'';el.querySelector('.stop-index').style.touchAction='none';});
 }
@@ -60,12 +70,12 @@ document.addEventListener('click',event=>{
   if(node.dataset.action==='native-close-image'){closeNativeImage();return;}
   if(node.dataset.action==='image'){
     const img=node.querySelector('img');
-    document.getElementById('overlay-root').innerHTML=`<div class="modal-shade image-shade" role="dialog" aria-modal="true" aria-label="完整图片"><img src="${esc(attrs.src)}" alt="${esc(img?.alt||'完整原作图片')}"><button class="icon-button" type="button" data-action="native-close-image" aria-label="关闭大图">${icon('close')}</button><div class="image-credit">${esc(shortCredit(attrs.credit))}<br><a class="source-link" data-action="sources" href="#" style="color:inherit">资料来源 ↗</a></div></div>`;
+    document.getElementById('overlay-root').innerHTML=`<div class="modal-shade image-shade" role="dialog" aria-modal="true" aria-label="完整图片"><img src="${esc(img?.currentSrc||attrs.src)}" alt="${esc(img?.alt||'完整图片')}"><button class="icon-button" type="button" data-action="native-close-image" aria-label="关闭大图">${icon('close')}</button><div class="image-credit">${esc(shortCredit(attrs.credit))}<br><a class="source-link" data-action="sources" href="#" style="color:inherit">资料来源 ↗</a></div></div>`;
     if(detailMotion&&!reduceMotion.matches)animateImage(document.querySelector('#overlay-root .image-shade'),true);
     post('__image-opened');return;
   }
   const action=node.dataset.action;
-  if(action==='work'||action==='release'||action==='search-release')attrs.scrollTop=view.querySelector('.scroll-content').scrollTop;
+  if(action==='work'||action==='release'||action==='search-release'||action==='place')attrs.scrollTop=view.querySelector('.scroll-content').scrollTop;
   post(action,attrs);
 });
 // Preserve direct itinerary reordering; all writes still go through MusicTripViewModel.

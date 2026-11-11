@@ -8,6 +8,8 @@ import androidx.compose.animation.core.tween
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.flow.first
 import android.app.Activity
+import android.graphics.Rect
+import android.os.Bundle
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -23,6 +25,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -45,6 +49,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import kotlin.math.roundToInt
+
+private const val PlaceArchiveEntry = "place-archive-entry"
 
 @Composable private fun NativeWallTab(section:Int,onSearch:()->Unit,content:@Composable ()->Unit) {
  Column(Modifier.fillMaxSize()) {
@@ -149,7 +156,6 @@ private fun isWebDetailRoute(route:String?)=when(route) {
    val map:MusicMapViewModel=viewModel()
    val trips:MusicTripViewModel=viewModel()
    val storedTrips by trips.state.collectAsStateWithLifecycle()
-   val recentWork by music.recentWork.collectAsStateWithLifecycle()
    val musicCatalog by music.catalog.collectAsStateWithLifecycle()
    val storedMusicFavorites by music.favorites.collectAsStateWithLifecycle()
    val musicUndo by music.undo.collectAsStateWithLifecycle()
@@ -171,15 +177,38 @@ private fun isWebDetailRoute(route:String?)=when(route) {
    }
    val libraryOwner=remember(owner){owner?.let{"user:$it"} ?: LibraryDatabase.guestOwner(context)}
    val tripState=storedTrips.takeIf{it.owner==libraryOwner}?:MusicTripState(libraryOwner,busy=true)
-   val mapWork=musicCatalog.works.find{it.id==recentWork}?:musicCatalog.works.find{it.title=="最伟大的作品"&&it.artist=="周杰伦"}?:musicCatalog.works.firstOrNull()
    val tripCities=remember(sourceCatalog,tripState.trips){(musicMapCities(sourceCatalog,null).map{MusicTripCity(it.name,it.country)}+tripState.trips.flatMap{it.cities}).distinctBy{it.key}}
    var addTripPlace by rememberSaveable(owner){mutableStateOf<String?>(null)}
    val musicFavorites=storedMusicFavorites.takeIf{it.owner==libraryOwner} ?: MusicFavorites()
    val archiveState=storedArchive.takeIf{it.owner==owner} ?: MusicArchiveState(owner=owner,loading=owner!=null)
-   val navigate:(String)->Unit={focus.clearFocus();keyboard?.hide();nav.navigate(it){launchSingleTop=true}}
+   val archiveHandoff=remember{ArchiveHandoff()}
+   var archiveBounds by remember{mutableStateOf<Rect?>(null)}
+   LaunchedEffect(entry?.id){archiveHandoff.routeChanged(entry?.id)}
+   fun handoffArchive(popping:Boolean=false,change:()->Unit) {
+    archiveHandoff.navigate((context as? Activity)?.window,archiveBounds,popping,{nav.currentBackStackEntry?.id},change)
+   }
+   fun navigateTo(path:String,placeEntry:Bundle?=null) {
+    val change:()->Unit={
+     focus.clearFocus();keyboard?.hide();nav.navigate(path){launchSingleTop=true}
+     placeEntry?.let{nav.currentBackStackEntry?.savedStateHandle?.set(PlaceArchiveEntry,it)}
+    }
+    if(isArchiveHandoffPath(path))handoffArchive(change=change)else change()
+   }
+   val navigate:(String)->Unit={navigateTo(it)}
    fun followMusicArchiveLink(source:NavBackStackEntry,target:String) {
     if(nav.currentBackStackEntry!=source)return
-    if(!nav.popBackStack(target,inclusive=false))navigate(target)
+    if(runCatching{nav.getBackStackEntry(target)}.getOrNull()!=null) {
+     handoffArchive(popping=true){nav.popBackStack(target,inclusive=false)}
+    }else navigate(target)
+   }
+   fun openArchivePlace(source:NavBackStackEntry,id:String,title:String,links:List<MusicPlaceLink>) {
+    if(nav.currentBackStackEntry!=source)return
+    val link=links.find{it.place.id==id}?:return
+    val origin=Bundle().apply {
+     putString("title",title)
+     putStringArrayList("scenes",ArrayList(link.scenes.map(Scene::id)))
+    }
+    navigateTo("place/${Uri.encode(id)}",origin)
    }
    fun leaveProfile(action:()->Unit) {
     if(route=="form/{kind}/{target}"&&recordSaving)return
@@ -187,7 +216,10 @@ private fun isWebDetailRoute(route:String?)=when(route) {
     if(route=="edit-profile"&&draft.saving)return
     if(route=="edit-profile"&&draft.dirty){discardAction=action}else action()
    }
-   val back:()->Unit={leaveProfile{nav.popBackStack();Unit}}
+   val back:()->Unit={leaveProfile {
+    if(isArchiveHandoffPath(nav.previousBackStackEntry?.destination?.route))handoffArchive(popping=true){nav.popBackStack()}
+    else nav.popBackStack()
+   }}
    val login:()->Unit={authPending=true;session.clearError();session.notice.value=null;navigate("auth")}
    val openTrips:()->Unit={if(owner==null)login()else navigate("trips")}
    val addToTrip:(Place)->Unit={place->if(owner==null)login()else {trips.dismissError();addTripPlace=place.id}}
@@ -271,28 +303,34 @@ private fun isWebDetailRoute(route:String?)=when(route) {
    ) {
     composable(path,arguments=arguments){destination->
      RoomRouteFrame(destination,performanceImmersive,!(path=="edit-profile"&&draft.saving)&&!recordSaving,back) {
-      content(destination)
+      val archiveBack=back.takeIf{entry?.id==destination.id&&isArchiveHandoffPath(path)&&
+       isArchiveHandoffPath(nav.previousBackStackEntry?.destination?.route)}
+      CompositionLocalProvider(LocalArchiveDrawn provides {archiveHandoff.drawn(destination.id)},
+       LocalArchiveBack provides archiveBack) { content(destination) }
      }
     }
    }
 
-   RoomWall(Modifier.fillMaxSize()) {
+   RoomWall(Modifier.fillMaxSize().onGloballyPositioned { coordinates ->
+    val bounds=coordinates.boundsInWindow()
+    archiveBounds=Rect(bounds.left.roundToInt(),bounds.top.roundToInt(),bounds.right.roundToInt(),bounds.bottom.roundToInt())
+   }) {
     NavHost(navController=nav,startDestination="room",modifier=Modifier.fillMaxSize(),
      enterTransition={
-      if(motion)routeMotion(initialState.destination.route,targetState.destination.route,popping=false).enter()
+      if(motion&&!archiveHandoff.holds(targetState.id))routeMotion(initialState.destination.route,targetState.destination.route,popping=false).enter()
       else EnterTransition.None
      },
-     exitTransition={if(motion)ExitTransition.KeepUntilTransitionsFinished else ExitTransition.None},
+     exitTransition={if(motion&&!archiveHandoff.holds(targetState.id))ExitTransition.KeepUntilTransitionsFinished else ExitTransition.None},
      popEnterTransition={EnterTransition.None},
      popExitTransition={
-      if(motion)routeMotion(initialState.destination.route,targetState.destination.route,popping=true).exit()
+      if(motion&&!archiveHandoff.holds(targetState.id))routeMotion(initialState.destination.route,targetState.destination.route,popping=true).exit()
       else ExitTransition.None
      }) {
      page("room"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
      page("catalogue"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
      page("album/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
       RoomAlbum(release,release.id in musicFavorites.releases,{music.toggleFavorite(release.id,true)},
-       {followMusicArchiveLink(e,"song/${Uri.encode(it.id)}")},{navigate("place/${Uri.encode(it)}")},
+       {followMusicArchiveLink(e,"song/${Uri.encode(it.id)}")},{openArchivePlace(e,it,release.title,release.places)},
        onBack=back,onSearch={navigate("release-search/${Uri.encode(release.id)}")})
      }}
      page("search"){RoomSearch(musicCatalog){navigate("song/${Uri.encode(it.id)}")}}
@@ -305,7 +343,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
       LaunchedEffect(work.id,libraryOwner){music.browseWork(work.id)}
       val play=playable.find{it.title==work.title&&it.artist==work.artist}
       RoomSong(work,musicCatalog.releases.find{it.id==work.releaseId}?.title.orEmpty(),work.id in musicFavorites.songs,{music.toggleFavorite(work.id)},
-       {navigate("place/${Uri.encode(it)}")},play?.let{song->{navigate("perform/${Uri.encode(song.id)}")}},
+       {openArchivePlace(e,it,work.title,work.places)},play?.let{song->{navigate("perform/${Uri.encode(song.id)}")}},
        onBack=back,onRelease={followMusicArchiveLink(e,"album/${Uri.encode(work.releaseId)}")})
      }}
      page("explore"){e->
@@ -373,7 +411,10 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      }
      page("account-profile"){profileScreen(owner.orEmpty())}
      page("place/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->
-      RoomPlaceDetail(place,mapWork,viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,archive::deleteVisitContent,{navigate("place-community/${Uri.encode(place.id)}")},{addToTrip(place)},onBack=back,onMap={wallBrowse.focusWorld(place.id);navigate("explore")})
+      val origin=e.savedStateHandle.get<Bundle>(PlaceArchiveEntry)
+      RoomPlaceDetail(place,origin?.getStringArrayList("scenes").orEmpty().toSet(),origin?.getString("title").orEmpty(),
+       viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,archive::deleteVisitContent,
+       {navigate("place-community/${Uri.encode(place.id)}")},{addToTrip(place)},onBack=back,onMap={wallBrowse.focusWorld(place.id);navigate("explore")})
      }?:Text("这个地点暂未收录，请返回重试。",Modifier.padding(24.dp))}
      page("place-community/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->RoomPlaceCommunity(place,viewModel(key="community-$owner-${place.id}"),session,login,openForm,openProfile){navigate("archive/footprints")}}}
      page("trips"){if(owner==null)LaunchedEffect(Unit){login()}else key(libraryOwner){RoomTripList(tripState,libraryOwner,tripCities,trips){navigate("trip/${Uri.encode(it)}")}}}
@@ -443,6 +484,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
    if(savedNotice!=null&&(route in listOf("me","place/{id}","place-community/{id}","profile/{id}","mine/{kind}")||archiveRoute))Surface(Modifier.align(Alignment.BottomCenter).padding(20.dp),color=RoomColors.Navy,shape=RoundedCornerShape(6.dp)){Text(savedNotice.orEmpty(),Modifier.padding(16.dp),color=RoomColors.Paper)}
    if(route in listOf("explore","place/{id}")&&archiveState.error!=null)Surface(Modifier.align(Alignment.BottomCenter).padding(16.dp),color=RoomColors.Paper,shape=RoundedCornerShape(6.dp),shadowElevation=4.dp){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Text(archiveState.error.orEmpty(),Modifier.weight(1f),color=RoomColors.Ink);TextButton(archive::reload){Text("重试")}}}
    }
+   ArchiveHandoffLayer(archiveHandoff,motion,Modifier.matchParentSize())
    }
    sourceCatalog.publicOnly().places.find{it.id==addTripPlace}?.let{place->RoomAddToTripDialog(place,tripState,libraryOwner,tripCities,trips){addTripPlace=null}}
    if(discardAction!=null)RoomDiscardProfileDialog({discardAction=null},{val action=discardAction;discardAction=null;editor.discard();action?.invoke()})

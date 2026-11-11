@@ -29,7 +29,7 @@ import cn.musicpilgrimage.app.ui.ContentCard
 import cn.musicpilgrimage.app.ui.ViewModelStatus
 
 @Composable internal fun RoomPlaceDetail(
-    place:Place,work:MusicWork?,vm:PlaceViewModel,session:SessionViewModel,
+    place:Place,entryScenes:Set<String>,entryTitle:String,vm:PlaceViewModel,session:SessionViewModel,
     favorite:Boolean,favoriteBusy:Boolean,onFavorite:()->Unit,onLogin:()->Unit,
     onForm:(String,String,ContentItem?)->Unit,onDelete:(ContentItem)->Unit,onCommunity:()->Unit,onAdd:()->Unit,
     onBack:()->Unit={},onMap:()->Unit={}
@@ -37,32 +37,46 @@ import cn.musicpilgrimage.app.ui.ViewModelStatus
     val owner by session.signedIn.collectAsStateWithLifecycle()
     val revision by session.services.changed.collectAsStateWithLifecycle()
     val own by vm.ownItems.collectAsStateWithLifecycle()
-    val loaded by vm.loaded.collectAsStateWithLifecycle()
-    val error by vm.error.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     LaunchedEffect(place.id,owner,revision){vm.load(place.id)}
     val context=LocalContext.current
-    val hero=remember(place,work){place.mapScene(work)}
     val media=remember(context){SwissDetailMedia(context)}
+    val photo=remember(place,media){media.archivePhoto(place)}
+    val recreation=remember(place,entryScenes){place.scenes.firstOrNull{it.id in entryScenes&&it.canRecreate}
+        ?:place.scenes.firstOrNull{it.canRecreate}}
     var sources by rememberSaveable(place.id){mutableStateOf(false)}
-    var imageReady by remember(hero?.id){mutableStateOf(false)}
-    val visits=own.filter{it.owner==owner&&it.kind=="visit"}.sortedByDescending{it.raw.optString("verified_at").ifBlank{it.raw.optString("created_at")}}
-    val data=swissDetailData("place",place.id).put("places",org.json.JSONArray().put(media.place(place,hero)))
+    var referenceReady by remember(recreation?.id){mutableStateOf(false)}
+    val archivePlace=remember(place,photo,entryScenes,entryTitle){media.placeArchive(place,photo,entryScenes,entryTitle)}
+    val data=swissDetailData("place",place.id).put("places",org.json.JSONArray().put(archivePlace))
         .put("favorites",org.json.JSONArray(if(favorite)listOf(place.id)else emptyList<String>())).put("fallbacks",media.fallbacks)
     SwissWebDetail(data){action,_->when(action) {
         "back"->onBack();"favorite"->if(!favoriteBusy)onFavorite();"add-trip"->onAdd();"map-place"->onMap()
         "record-new"->if(owner==null)onLogin()else onForm("visit",place.id,null)
-        "community"->onCommunity();"sources"->sources=true;"hero-ready"->imageReady=true
+        "community"->onCommunity();"sources"->sources=true
     }}
     if(sources)AppMotionDialog({sources=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)) {
         RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {Column {
             RoomHeader("资料来源",onBack={sources=false},onSpace={})
             LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(25.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-                item {Text(PlaceEditorialCopy.name(context,place),fontSize=25.sp,lineHeight=34.sp,color=RoomColors.Ink)}
-                items(place.scenes.filter{it.publiclyVisible}.distinctBy{it.work to it.sourceUrl},key={it.id}){scene->Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                item {
+                    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text(PlaceEditorialCopy.name(context,place),fontSize=25.sp,lineHeight=34.sp,color=RoomColors.Ink)
+                        val intro=PlaceEditorialCopy.intro(context,place)
+                        if(intro.isNotBlank())Text(intro,fontSize=14.sp,lineHeight=24.sp,color=RoomColors.Muted)
+                    }
+                }
+                if(photo!=null)item {
+                    Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                        Text("地点照片",fontSize=18.sp,color=RoomColors.Ink)
+                        Text("${photo.description} · ${photo.author}",fontSize=14.sp,color=RoomColors.Muted)
+                        RoomSourceLink("查看原始照片",photo.source)
+                        RoomSourceLink("${photo.license} · 已缩放与转码",photo.licenseUrl)
+                    }
+                }
+                items(place.scenes.filter(Scene::publiclyVisible).distinctBy{listOf(it.artistId,it.work,it.kind,it.associationSourceUrl.ifBlank{it.sourceUrl})},key={it.id}){scene->Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     HorizontalDivider(color=RoomColors.Line)
                     Text("${scene.work} · ${scene.artistName}",fontSize=18.sp,lineHeight=27.sp,color=RoomColors.Ink)
-                    Text(scene.kindLabel.substringBefore(" · "),fontSize=12.sp,color=RoomColors.Muted)
+                    Text(scene.archiveConnection().label,fontSize=12.sp,color=RoomColors.Muted)
                     scene.timestampSeconds?.let{Text("原作 ${it/60}:${(it%60).toString().padStart(2,'0')}",fontSize=12.sp,color=RoomColors.Muted)}
                     val credit=scene.imageCredit.orEmpty().replace(Regex("https?://\\S+"),"").trim(' ','·')
                     if(credit.isNotBlank())Text(credit,fontSize=12.sp,lineHeight=20.sp,color=RoomColors.Muted)
@@ -70,7 +84,14 @@ import cn.musicpilgrimage.app.ui.ViewModelStatus
                     if(scene.canonicalWorkUrl.startsWith("http")&&scene.canonicalWorkUrl!=scene.sourceUrl)RoomSourceLink("查看原作版本",scene.canonicalWorkUrl)
                     if(scene.associationSourceUrl.startsWith("https://"))RoomSourceLink("查看地点关联依据",scene.associationSourceUrl)
                 }}
-                if(hero?.canRecreate==true)item{SwissOutlinedButton({sources=false;if(owner==null)onLogin()else onForm("recreation",hero.id,own.find{it.kind=="recreation"&&it.sceneId==hero.id})},enabled=imageReady&&!busy,modifier=Modifier.fillMaxWidth()){Text(if(imageReady)"复刻这个镜头"else "正在加载原作…")}}
+                if(recreation!=null)item {
+                    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text("复刻原作参考",fontSize=16.sp,color=RoomColors.Ink)
+                        RoomReference(recreation,recreation.work,Modifier.fillMaxWidth().aspectRatio(recreation.aspectRatio),onReady={referenceReady=it})
+                        SwissOutlinedButton({sources=false;if(owner==null)onLogin()else onForm("recreation",recreation.id,own.find{it.kind=="recreation"&&it.sceneId==recreation.id})},
+                            enabled=referenceReady&&!busy,modifier=Modifier.fillMaxWidth()){Text("复刻这个镜头")}
+                    }
+                }
                 item{SwissTextButton({sources=false;if(owner==null)onLogin()else onForm("correction",place.id,null)}){Text("补充地点信息")}}
             }
         }}
