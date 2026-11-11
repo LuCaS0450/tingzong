@@ -1,4 +1,4 @@
-/* Shared interactive prototype / Android world. Pins and geography share MapLibre's GPU projection.
+/* Shared interactive prototype / Android world. Marker centers use MapLibre's map projection.
  * No per-frame native bridge calls, Compose marker trees, setData(), or persistent writes while dragging.
  */
 (() => {
@@ -11,7 +11,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const wrap = v => ((v + 180) % 360 + 360) % 360 - 180;
   const radians = x => x * Math.PI / 180;
-  let map, gestures, earthPreview, earthTiles, focusLayer, selectedPin, places = [], byId = new Map(), selected = '', summaryOpen = false;
+  let map, gestures, earthPreview, earthTiles, focusLayer, markers, places = [], byId = new Map(), selected = '', summaryOpen = false;
   let favorites = new Set(), visits = new Set(), favoriteBusy = false;
   let initialized = false, controlsReady = false, vectorsReady = false, vectorError = false, earthError=false, loadingSince = 0;
   let visualReady = false;
@@ -22,7 +22,6 @@
   let pendingBoot = null;
   let countries=[];
   const empty = { type:'FeatureCollection', features:[] };
-  const imageNames = new Set();
   const messages = [];
   let sceneScale=1;
   function sizeScene() {
@@ -80,38 +79,9 @@
     map.getSource('selection').setData(byId.has(selected) ? featureSet([byId.get(selected)]) : empty);
   }
 
-  function makeImage(kind, count) {
-    if(kind==='selected')return selectedPin.image();
-    const scale = 2, w = kind === 'pin' || kind === 'visited' ? 24 : 48;
-    const h = kind === 'pin' || kind === 'visited' ? 32 : 48;
-    const canvas = document.createElement('canvas'); canvas.width=w*scale; canvas.height=h*scale;
-    const c=canvas.getContext('2d',{willReadFrequently:true}); c.scale(scale,scale);
-    const gradient=c.createLinearGradient(5,3,22,30);
-    gradient.addColorStop(0,kind==='visited'?'#3b443f':'#d24a3a'); gradient.addColorStop(1,kind==='visited'?'#1c221f':'#a82e22');
-    if (kind === 'pin' || kind === 'visited') {
-      c.shadowColor='rgba(36,43,39,.30)';c.shadowBlur=1.5;c.shadowOffsetY=1;
-      const p=new Path2D('M12 30.6C12 30.6 2.6 19.8 2.6 12a9.4 9.4 0 0 1 18.8 0c0 7.8-9.4 18.6-9.4 18.6z');
-      c.fillStyle=gradient;c.strokeStyle='#f7f6f2';c.lineWidth=1;c.lineJoin='round';c.fill(p);c.stroke(p);
-    } else {
-      const r=count>=10?15:13;
-      c.shadowColor='rgba(36,43,39,.2)';c.shadowBlur=1.5;c.shadowOffsetY=1;
-      // Cluster sprites are scaled up relative to pins. Match their visible edge thickness.
-      c.beginPath();c.arc(24,24,r,0,Math.PI*2);c.fillStyle=gradient;c.fill();c.strokeStyle='#f7f6f2';c.lineWidth=.7;c.stroke();c.shadowColor='transparent';
-      c.font=`600 ${count>=100?11:12}px Swiss, sans-serif`;c.textAlign='center';c.textBaseline='middle';c.fillStyle='#f7f6f2';c.fillText(String(count),24,24.5);
-      const half=r+4;
-      return c.getImageData((24-half)*scale,(24-half)*scale,2*half*scale,2*half*scale);
-    }
-    return c.getImageData(0,0,canvas.width,canvas.height);
-  }
-  function addImage(id) {
-    if (map.hasImage(id)) return;
-    const kind=id.startsWith('cluster-')?'cluster':id;
-    const count=Number(id.split('-')[1]);
-    if (!['pin','visited','selected','cluster'].includes(kind) || (kind==='cluster' && !(count>=2 && count<=places.length))) return;
-    map.addImage(id,makeImage(kind,count),{pixelRatio:2});imageNames.add(id);
-  }
   function baseStyle() {
-    const surfaceAlignment={'icon-pitch-alignment':'map','icon-rotation-alignment':'map'};
+    // Keep the clustered sources active. Their marker outlines are drawn on the overlay.
+    const markerPaint={'circle-opacity':0};
     return {version:8,projection:{type:'globe'},
       // A resident z0 tile covers the whole sphere while the detail source changes LOD.
       sources:{'earth-base':{type:'raster',tiles:[new URL('earth/0/0/0.jpg?v=4',location.href).href],tileSize:512,minzoom:0,maxzoom:0},
@@ -124,10 +94,8 @@
         {id:'earth-base',type:'raster',source:'earth-base',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],5,1,8,0],'raster-fade-duration':0,'raster-resampling':'linear'}},
         {id:'earth',type:'raster',source:'earth',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
         {id:'earth-hd',type:'raster',source:'earth-hd',minzoom:1.25,maxzoom:8,paint:{'raster-opacity':['interpolate',['linear'],['zoom'],1.25,0,1.75,1,5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
-        // MapLibre places these layers in reverse order. Only the selected pin reserves space.
-        {id:'clusters',type:'symbol',source:'places',filter:['has','point_count'],layout:{...surfaceAlignment,'icon-image':['concat','cluster-',['to-string',['get','point_count']]],'icon-padding':[0],'icon-ignore-placement':true,'icon-size':['interpolate',['linear'],['zoom'],0,.84,5,1]}},
-        {id:'pins',type:'symbol',source:'places',filter:['!',['has','point_count']],layout:{...surfaceAlignment,'icon-image':['case',['get','visited'],'visited','pin'],'icon-size':['interpolate',['linear'],['zoom'],0,.60,3,.60,7,.75],'icon-anchor':'bottom','icon-offset':[0,1],'icon-padding':[0],'icon-ignore-placement':true}},
-        {id:'selected',type:'symbol',source:'selection',layout:{...surfaceAlignment,'icon-image':'selected','icon-size':1,'icon-anchor':'bottom','icon-offset':selectedPin.anchorOffset,'icon-padding':[0],'icon-allow-overlap':true}}
+        {id:'places-index',type:'circle',source:'places',paint:markerPaint},
+        {id:'selection-index',type:'circle',source:'selection',paint:markerPaint}
       ]};
   }
 
@@ -230,10 +198,8 @@
     if(visibleCity){const b=document.createElement('button');b.textContent=near.place.city;b.onclick=()=>zoomTo(11);$('city').append(b);}
   }
   function updateAccessibleMarkers() {
-    const visible=map.queryRenderedFeatures({layers:['pins','clusters','selected']});
     const accessible=$('map-accessibility');accessible.replaceChildren();
-    const seen=new Set();
-    for(const f of visible){const id=f.properties.id||`cluster-${f.properties.cluster_id}`;if(seen.has(id))continue;seen.add(id);
+    for(const f of markers.features()){
       const b=document.createElement('button');b.textContent=f.properties.point_count?`${f.properties.point_count} 个地点`:f.properties.name;
       b.onclick=()=>f.properties.point_count?expandCluster(f):selectPlace(f.properties.id,true);accessible.append(b);
     }
@@ -320,17 +286,17 @@
   }
   function mapClick(e) {
     const {x,y}=e.point, reach=24;
-    const features=map.queryRenderedFeatures([[x-reach,y-reach],[x+reach,y+reach]],{layers:['selected','pins','clusters']});
-    const f=features.find(f=>f.layer.id==='selected')||features.find(f=>f.layer.id==='pins')||features[0];
+    const features=markers.hit(x,y,reach);
+    const f=features[0];
     if(!f){if(summaryOpen)closeSummary();return;}
     if(map.getZoom()>=17.8){
       const ids=new Set(features.map(f=>f.properties.id).filter(Boolean));
-      if(f.layer.id==='selected'){
-        // Keep the nearby-place chooser usable when a coincident pin is hidden.
+      if(f.properties.id===selected){
+        // Keep the nearby-place chooser usable when a coincident dot is hidden.
+        const range=reach+markers.placeRadius(map.getZoom());
         for(const pin of map.querySourceFeatures('places',{filter:['!',['has','point_count']]})){
           const point=map.project(pin.geometry.coordinates);
-          // At street zoom, the ordinary pin is 18 by 24 pixels with a bottom anchor.
-          if(Math.abs(point.x-x)<=reach+9 && point.y+.75>=y-reach && point.y-23.25<=y+reach)ids.add(pin.properties.id);
+          if(Math.abs(point.x-x)<=range&&Math.abs(point.y-y)<=range)ids.add(pin.properties.id);
         }
       }
       const list=[...ids].map(id=>byId.get(id)).filter(Boolean);
@@ -407,7 +373,8 @@
     const cityCount=new Set(places.map(p=>`${p.country}/${p.city}`)).size;
     $('count').textContent=`${cityCount} 座城市 / ${places.length} 个地点`;
     layoutCompact=Number(saved.zoom)>=3;root.classList.toggle('compact',layoutCompact);
-    earthTiles=TingzongEarthTiles();focusLayer=TingzongFocusLayer(globeBounds);selectedPin=TingzongSelectedPin();
+    earthTiles=TingzongEarthTiles();focusLayer=TingzongFocusLayer(globeBounds);
+    markers=TingzongSurfaceMarkers($('surface-markers'),globeBounds);
     maplibregl.setWorkerCount(2);
     const bottomPadding=Math.max(0,$('stage').clientHeight-2*($('stage').clientWidth*352/360-64));
     map=new maplibregl.Map({container:'map',style:baseStyle(),center:[Number.isFinite(saved.longitude)?saved.longitude:35,Number.isFinite(saved.latitude)?clamp(saved.latitude,-80,80):24],
@@ -427,28 +394,32 @@
       // Use the primitive projection so rendering and gesture solving both use 6 - zoom.
       map.setProjection({type:['interpolate',['linear'],['zoom'],5,'vertical-perspective',6,'mercator']});
       map.jumpTo(initialCamera);
-      map.addLayer(focusLayer,'clusters');
-      ['pin','visited','selected'].forEach(addImage);
-      for(let count=2;count<=Math.min(20,places.length);count++)addImage(`cluster-${count}`);
+      map.addLayer(focusLayer,'places-index');
       renderSummary();wireControls();controlsReady=true;updateVisual();
       loadVectors();
       emit('ready');
     });
     fetch('countries.json').then(r=>r.json()).then(d=>{countries=d.countries;if(controlsReady&&!moving)updateContext();}).catch(()=>{});
-    map.on('styleimagemissing',e=>addImage(e.id));
     map.on('load',()=>{
       updateVisual();updateContext();loadVectors();
       if(data.focus&&byId.has(data.focus)){const p=byId.get(data.focus);selectPlace(p.id,false);flyTo([p.lon,p.lat],15,selectionOffset());}
     });
-    map.on('move',scheduleVisual);
+    map.on('move',()=>{markers.invalidate();scheduleVisual();});
+    map.on('resize',()=>markers.invalidate());
     map.on('movestart',()=>{moving=true;});
     map.on('moveend',()=>{if(gestures?.active)return;moving=false;updateVisual();updateContext();persist();});
-    map.on('idle',updateAccessibleMarkers);
+    map.on('idle',()=>{
+      markers.invalidate();markers.render(map);updateAccessibleMarkers();
+    });
     map.on('click',mapClick);
     map.on('zoom',()=>focusLayer.zoomed());
-    map.on('sourcedata',e=>{if(e.sourceId==='streets'||e.sourceId==='earth-hd')updateLoading();});
+    map.on('sourcedata',e=>{
+      if(e.sourceId==='places'||e.sourceId==='selection')markers.invalidate();
+      if(e.sourceId==='streets'||e.sourceId==='earth-hd')updateLoading();
+    });
     map.on('error',e=>{if(e.sourceId==='earth'||String(e.error?.message).includes('/earth/'))earthError=true;if(e.sourceId==='earth-hd'){hdError=true;updateLoading();}if(e.sourceId==='streets'){vectorError=true;updateLoading();}});
     map.on('render',()=>{
+      if(controlsReady)markers.render(map);
       if(!earthPreview.hidden||!visualReady){
         const earthReady=map.isSourceLoaded('earth-base')||(!earthError&&map.isSourceLoaded('earth'));
         if(!earthPreview.hidden&&(map.getZoom()>=5||earthReady))earthPreview.hide();
@@ -473,7 +444,7 @@
   window.pauseWorld=()=>{gestures?.cancel();if(map)map.stop();persist();};
   window.worldBack=()=>{gestures?.cancel();if($('chooser').open){$('chooser').close();return true;}if(summaryOpen){closeSummary();return true;}if(map&&map.getZoom()>1){goGlobe();return true;}return false;};
   // Read-only diagnostics plus opt-in sampling; nothing is uploaded.
-  window.worldDiagnostics=(point,coordinate)=>({engine:'MapLibre GL JS 5.24.0',ready:controlsReady,state:state(),moving,vectorsReady,vectorError,gesture:gestures?.diagnostics(),earth:earthTiles?.diagnostics(),focus:focusLayer?.diagnostics(),selectedMarker:selectedPin?.diagnostics(),baseLoaded:map?.getSource('earth-base')?map.isSourceLoaded('earth-base'):false,projection:map?{style:map.style.projection?.transitionState,transform:map.transform._globeness,placement:map.style.placement?.transform?._globeness}:null,sourceLoaded:map&&vectorsReady?map.isSourceLoaded('streets'):false,canvas:map?{width:map.getCanvas().width,height:map.getCanvas().height}:null,point:point&&map?map.unproject(point):null,anchoredPoint:coordinate&&map?map.project(coordinate):null,selectedPoint:map&&byId.has(selected)?map.project([byId.get(selected).lon,byId.get(selected).lat]):null,places:places.length,images:imageNames.size,frameGaps:frameGaps.slice(),projectionFrames:projectionFrames.slice(),inputMoves,messages:messages.slice(-6)});
+  window.worldDiagnostics=(point,coordinate)=>({engine:'MapLibre GL JS 5.24.0',ready:controlsReady,state:state(),moving,vectorsReady,vectorError,gesture:gestures?.diagnostics(),earth:earthTiles?.diagnostics(),focus:focusLayer?.diagnostics(),markers:markers?.diagnostics(),baseLoaded:map?.getSource('earth-base')?map.isSourceLoaded('earth-base'):false,projection:map?{style:map.style.projection?.transitionState,transform:map.transform._globeness,placement:map.style.placement?.transform?._globeness}:null,sourceLoaded:map&&vectorsReady?map.isSourceLoaded('streets'):false,canvas:map?{width:map.getCanvas().width,height:map.getCanvas().height}:null,point:point&&map?map.unproject(point):null,anchoredPoint:coordinate&&map?map.project(coordinate):null,selectedPoint:map&&byId.has(selected)?map.project([byId.get(selected).lon,byId.get(selected).lat]):null,places:places.length,frameGaps:frameGaps.slice(),projectionFrames:projectionFrames.slice(),inputMoves,messages:messages.slice(-6)});
   window.beginWorldMeasurement=()=>{frameGaps=[];projectionFrames=[];lastRender=0;inputMoves=0;measuring=true;};
   window.endWorldMeasurement=()=>{measuring=false;return window.worldDiagnostics();};
   if(!native){
