@@ -111,6 +111,7 @@
     map.addImage(id,makeImage(kind,count),{pixelRatio:2});imageNames.add(id);
   }
   function baseStyle() {
+    const surfaceAlignment={'icon-pitch-alignment':'map','icon-rotation-alignment':'map'};
     return {version:8,projection:{type:'globe'},
       // A resident z0 tile covers the whole sphere while the detail source changes LOD.
       sources:{'earth-base':{type:'raster',tiles:[new URL('earth/0/0/0.jpg?v=4',location.href).href],tileSize:512,minzoom:0,maxzoom:0},
@@ -124,9 +125,9 @@
         {id:'earth',type:'raster',source:'earth',paint:{'raster-opacity':['interpolate',['linear'],['zoom'],5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
         {id:'earth-hd',type:'raster',source:'earth-hd',minzoom:1.25,maxzoom:8,paint:{'raster-opacity':['interpolate',['linear'],['zoom'],1.25,0,1.75,1,5,1,8,0],'raster-fade-duration':200,'raster-resampling':'linear'}},
         // MapLibre places these layers in reverse order. Only the selected pin reserves space.
-        {id:'clusters',type:'symbol',source:'places',filter:['has','point_count'],layout:{'icon-image':['concat','cluster-',['to-string',['get','point_count']]],'icon-padding':[0],'icon-ignore-placement':true,'icon-size':['interpolate',['linear'],['zoom'],0,.84,5,1]}},
-        {id:'pins',type:'symbol',source:'places',filter:['!',['has','point_count']],layout:{'icon-image':['case',['get','visited'],'visited','pin'],'icon-size':['interpolate',['linear'],['zoom'],0,.60,3,.60,7,.75],'icon-anchor':'bottom','icon-offset':[0,1],'icon-padding':[0],'icon-ignore-placement':true}},
-        {id:'selected',type:'symbol',source:'selection',layout:{'icon-image':'selected','icon-size':1,'icon-anchor':'bottom','icon-offset':selectedPin.anchorOffset,'icon-padding':[0],'icon-allow-overlap':true}}
+        {id:'clusters',type:'symbol',source:'places',filter:['has','point_count'],layout:{...surfaceAlignment,'icon-image':['concat','cluster-',['to-string',['get','point_count']]],'icon-padding':[0],'icon-ignore-placement':true,'icon-size':['interpolate',['linear'],['zoom'],0,.84,5,1]}},
+        {id:'pins',type:'symbol',source:'places',filter:['!',['has','point_count']],layout:{...surfaceAlignment,'icon-image':['case',['get','visited'],'visited','pin'],'icon-size':['interpolate',['linear'],['zoom'],0,.60,3,.60,7,.75],'icon-anchor':'bottom','icon-offset':[0,1],'icon-padding':[0],'icon-ignore-placement':true}},
+        {id:'selected',type:'symbol',source:'selection',layout:{...surfaceAlignment,'icon-image':'selected','icon-size':1,'icon-anchor':'bottom','icon-offset':selectedPin.anchorOffset,'icon-padding':[0],'icon-allow-overlap':true}}
       ]};
   }
 
