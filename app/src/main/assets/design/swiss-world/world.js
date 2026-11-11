@@ -28,6 +28,8 @@
     const width=document.documentElement.getBoundingClientRect().width||innerWidth;
     if(width<=0||innerHeight<=0)return;
     const scale=width/360;sceneScale=scale;
+    // Keep UI type at the app's sizes while the map scene scales with the viewport.
+    root.style.setProperty('--sp',`${1/scale}px`);
     // WebView can initially resolve percentage body heights to zero while Compose attaches it.
     document.documentElement.style.height=`${innerHeight}px`;
     document.body.style.height=`${innerHeight}px`;
