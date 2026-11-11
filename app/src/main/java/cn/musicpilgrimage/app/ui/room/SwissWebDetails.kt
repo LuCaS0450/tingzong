@@ -14,6 +14,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -33,6 +34,7 @@ private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
     val latestAction by rememberUpdatedState(onAction)
     val json=data.toString()
     val latestJson by rememberUpdatedState(json)
+    var archiveScroll by rememberSaveable(data.optString("identity")){mutableStateOf(0.0)}
     val web=remember(context){WebView(context)}
     val rendered=remember(web){arrayOf<String?>(null)}
     var ready by remember(web){mutableStateOf(false)}
@@ -54,7 +56,15 @@ private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
             @JavascriptInterface fun postMessage(raw:String) {
                 if(raw.length>8192)return
                 val message=runCatching{JSONObject(raw)}.getOrNull()?:return
-                post{when(message.optString("action")){"__image-opened"->imageOpen=true;"__image-closed"->imageOpen=false;else->latestAction(message.optString("action"),message)}}
+                post{
+                    val offset=message.optDouble("scrollTop")
+                    if(offset.isFinite()&&offset>=0)archiveScroll=offset
+                    when(val action=message.optString("action")) {
+                        "__image-opened"->imageOpen=true
+                        "__image-closed"->imageOpen=false
+                        else->latestAction(action,message)
+                    }
+                }
             }
         },"TingzongDetail")
         webViewClient=object:WebViewClient() {
@@ -72,7 +82,7 @@ private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
             override fun onPageFinished(view:WebView,url:String) {
                 if(url!="file:///android_asset/design/swiss-details/index.html")return
                 android.util.Log.d("SwissDetail","Approved local page ready")
-                ready=true;rendered[0]=latestJson;view.renderDetail(latestJson)
+                ready=true;rendered[0]=latestJson;view.renderDetail(latestJson,archiveScroll)
             }
             override fun onReceivedError(view:WebView,request:WebResourceRequest,error:WebResourceError) {
                 if(request.isForMainFrame)android.util.Log.e("SwissDetail","Local page error "+error.errorCode+": "+error.description)
@@ -87,8 +97,8 @@ private const val DetailFontOrigin = "https://details.tingzong.local/fonts/"
     })
 }
 
-private fun WebView.renderDetail(json:String) {
-    evaluateJavascript("(function(){try{updateNativeDetail($json);return JSON.stringify({width:innerWidth,height:innerHeight,sections:document.getElementById('app-view').children.length,scale:getComputedStyle(document.getElementById('phone')).transform});}catch(e){console.error('Native detail render: '+e.name+': '+e.message);return 'render-error';}})()") {
+private fun WebView.renderDetail(json:String,initialScroll:Double=0.0) {
+    evaluateJavascript("(function(){try{updateNativeDetail($json,$initialScroll);return JSON.stringify({width:innerWidth,height:innerHeight,sections:document.getElementById('app-view').children.length,scale:getComputedStyle(document.getElementById('phone')).transform});}catch(e){console.error('Native detail render: '+e.name+': '+e.message);return 'render-error';}})()") {
         android.util.Log.d("SwissDetail","Render metrics: $it")
     }
 }

@@ -27,8 +27,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.*
+import androidx.navigation.navArgument
 import cn.musicpilgrimage.app.*
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.design.*
@@ -114,6 +117,10 @@ import org.json.JSONObject
    val musicFavorites=storedMusicFavorites.takeIf{it.owner==libraryOwner} ?: MusicFavorites()
    val archiveState=storedArchive.takeIf{it.owner==owner} ?: MusicArchiveState(owner=owner,loading=owner!=null)
    val navigate:(String)->Unit={moduleMotion=false;focus.clearFocus();keyboard?.hide();nav.navigate(it){launchSingleTop=true}}
+   fun followMusicArchiveLink(source:NavBackStackEntry,target:String) {
+    if(nav.currentBackStackEntry!=source)return
+    if(!nav.popBackStack(target,inclusive=false))navigate(target)
+   }
    fun leaveProfile(action:()->Unit) {
     if(route=="form/{kind}/{target}"&&recordSaving)return
     if(route=="form/{kind}/{target}"&&recordLeaveGuard!=null){recordLeaveGuard?.invoke(action);return}
@@ -205,8 +212,10 @@ import org.json.JSONObject
      popExitTransition={fadeOut(tween(if(motion)100 else 0))}) {
      composable("room"){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}
      composable("catalogue"){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}
-     composable("album/{id}"){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
-      RoomAlbum(release,release.id in musicFavorites.releases,{music.toggleFavorite(release.id,true)},{navigate("song/${Uri.encode(it.id)}")},{navigate("place/${Uri.encode(it)}")},onBack=back,onSearch={navigate("release-search/${Uri.encode(release.id)}")})
+     composable("album/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
+      RoomAlbum(release,release.id in musicFavorites.releases,{music.toggleFavorite(release.id,true)},
+       {followMusicArchiveLink(e,"song/${Uri.encode(it.id)}")},{navigate("place/${Uri.encode(it)}")},
+       onBack=back,onSearch={navigate("release-search/${Uri.encode(release.id)}")})
      }}
      composable("search"){RoomSearch(musicCatalog){navigate("song/${Uri.encode(it.id)}")}}
      composable("release-search/{id}"){e->RoomSearch(musicCatalog,musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.title.orEmpty()){navigate("song/${Uri.encode(it.id)}")}}
@@ -214,11 +223,12 @@ import org.json.JSONObject
       val kind=if(e.arguments?.getString("kind")=="releases")"releases" else "songs"
       LaunchedEffect(kind){nav.navigate("archive/$kind"){popUpTo("music-favorites/{kind}"){inclusive=true};launchSingleTop=true}}
      }
-     composable("song/{id}"){e->musicCatalog.works.find{it.id==e.arguments?.getString("id")}?.let {work->
+     composable("song/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.works.find{it.id==e.arguments?.getString("id")}?.let {work->
       LaunchedEffect(work.id,libraryOwner){music.browseWork(work.id)}
       val play=playable.find{it.title==work.title&&it.artist==work.artist}
       RoomSong(work,musicCatalog.releases.find{it.id==work.releaseId}?.title.orEmpty(),work.id in musicFavorites.songs,{music.toggleFavorite(work.id)},
-       {navigate("place/${Uri.encode(it)}")},play?.let{song->{navigate("perform/${Uri.encode(song.id)}")}},onBack=back,onRelease={navigate("album/${Uri.encode(work.releaseId)}")})
+       {navigate("place/${Uri.encode(it)}")},play?.let{song->{navigate("perform/${Uri.encode(song.id)}")}},
+       onBack=back,onRelease={followMusicArchiveLink(e,"album/${Uri.encode(work.releaseId)}")})
      }}
      composable("explore",enterTransition={EnterTransition.None},exitTransition={ExitTransition.None},popEnterTransition={EnterTransition.None},popExitTransition={ExitTransition.None}){SwissWorldWall(sourceCatalog,wallBrowse,archiveState.places.toSet(),archiveState.loading,{navigate("place/${Uri.encode(it)}")},togglePlace,openTrips,{navigate("archive/footprints")},addToTrip,{navigate("search")},back,archiveState.visits.map{it.location}.toSet())}
      composable("performance"){SwissPlayWall(performanceEntries,performanceArtwork,performanceLibraryUi.loaded,wallBrowse,performanceLibraryUi.downloads,{navigate("perform/${Uri.encode(it)}")},{performanceLibrary.prepareAll(retry=true)})}

@@ -1,5 +1,5 @@
 'use strict';
-let D={},state={payload:{},favorites:new Set(),trip:{}},nativeScroll=0;
+let D={},state={payload:{},favorites:new Set(),trip:{}};
 const release=id=>D.releases.find(r=>r.id===id)||D.releases[0];
 const place=id=>D.places.find(p=>p.id===id)||D.places[0];
 const view=document.getElementById('app-view');
@@ -10,18 +10,27 @@ function sizeDetail(){
   const scale=innerWidth/360,phone=document.getElementById('phone');
   phone.style.transform=`scale(${scale})`;phone.style.height=(innerHeight/scale)+'px';
 }
-function updateNativeDetail(data){
+function updateNativeDetail(data,initialScroll=0){
   const scroller=view.querySelector('.scroll-content'),same=D.identity===data.identity;
-  nativeScroll=same&&scroller?scroller.scrollTop:0;
+  const scrollTop=same&&scroller?scroller.scrollTop:initialScroll;
   D=data;state.payload=D.payload;state.trip=D.trip||{};state.favorites=new Set(D.favorites||[]);
   view.innerHTML=({album:albumPage,work:workPage,place:placePage,trip:tripPage}[D.page])();
-  view.querySelector('.scroll-content').scrollTop=nativeScroll;
+  sizeDetail();
+  const nextScroller=view.querySelector('.scroll-content');
+  // Keep late artwork and font layout from moving a restored position.
+  if(!same&&scrollTop>0)nextScroller.style.overflowAnchor='none';
+  nextScroller.scrollTop=scrollTop;
+  const appliedScroll=nextScroller.scrollTop,hero=view.querySelector('.hero-image');
+  if(!same&&scrollTop>0&&hero&&!hero.complete){
+    hero.addEventListener('load',()=>{
+      if(nextScroller.isConnected&&nextScroller.scrollTop===appliedScroll)nextScroller.scrollTop=scrollTop;
+    },{once:true});
+  }
   view.querySelectorAll('img').forEach(img=>{
     img.onerror=()=>{const fallback=D.fallbacks?.[img.getAttribute('src')];if(fallback&&img.src!==fallback)img.src=fallback;};
     if(img.classList.contains('hero-image')){img.onload=()=>post('hero-ready');if(img.complete&&img.naturalWidth)post('hero-ready');}
   });
   view.querySelectorAll('.trip-stop').forEach(el=>{const index=Number(el.querySelector('[data-action="move-stop"]').dataset.index);el.dataset.stop=D.trip.stops[index]?.id||'';el.querySelector('.stop-index').style.touchAction='none';});
-  sizeDetail();
 }
 document.addEventListener('click',event=>{
   const link=event.target.closest('a.source-link');
@@ -34,7 +43,9 @@ document.addEventListener('click',event=>{
     document.getElementById('overlay-root').innerHTML=`<div class="modal-shade image-shade" role="dialog" aria-modal="true" aria-label="完整图片"><img src="${esc(attrs.src)}" alt="${esc(img?.alt||'完整原作图片')}"><button class="icon-button" type="button" data-action="native-close-image" aria-label="关闭大图">${icon('close')}</button><div class="image-credit">${esc(shortCredit(attrs.credit))}<br><a class="source-link" data-action="sources" href="#" style="color:inherit">资料来源 ↗</a></div></div>`;
     post('__image-opened');return;
   }
-  post(node.dataset.action,attrs);
+  const action=node.dataset.action;
+  if(action==='work'||action==='release'||action==='search-release')attrs.scrollTop=view.querySelector('.scroll-content').scrollTop;
+  post(action,attrs);
 });
 // Preserve direct itinerary reordering; all writes still go through MusicTripViewModel.
 let drag=null;
