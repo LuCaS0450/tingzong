@@ -11,9 +11,9 @@ $taskAdb=Join-Path $Sdk 'platform-tools\adb.exe'
 $taskEmulator=Join-Path $Sdk 'emulator\emulator.exe'
 $taskConfig=Join-Path $env:USERPROFILE ".android\avd\$Avd.avd\config.ini"
 $taskLog=Join-Path $taskRoot 'artifacts\standalone-preview.log'
-$taskPackage='cn.musicpilgrimage.app.review'
 $taskActivity=$Activity
 $taskIsMusicSpace=$taskActivity -in @('cn.musicpilgrimage.app.MainActivity','cn.musicpilgrimage.app.MusicSpacePreviewActivity')
+$taskPackage=if($taskIsMusicSpace){'cn.musicpilgrimage.app'}else{'cn.musicpilgrimage.app.review'}
 $taskLock=New-Object System.Threading.Mutex($false,'Local\TingzongStandalonePreview')
 $taskOwnsLock=$false
 
@@ -196,16 +196,20 @@ try {
     Invoke-TaskAdb -Arguments @('-s',$taskSerial,'shell','wm','density','280') | Out-Null
     Write-TaskLog "Android ready on $taskSerial; 720x1616, density 280."
     $taskResolved=Invoke-TaskAdb -Arguments @('-s',$taskSerial,'shell','cmd','package','resolve-activity','--brief','-n',"$taskPackage/$taskActivity") -AllowFailure
-    if($taskResolved.Text -notmatch [regex]::Escape($taskActivity)) {
+    $taskResolvedLines=$taskResolved.Text -split '\r?\n'
+    $taskShortActivity=$taskActivity
+    if($taskActivity.StartsWith("$taskPackage.")){$taskShortActivity=$taskActivity.Substring($taskPackage.Length)}
+    if($taskResolved.Code -ne 0 -or
+        ("$taskPackage/$taskActivity" -notin $taskResolvedLines -and "$taskPackage/$taskShortActivity" -notin $taskResolvedLines)) {
         $taskApk=if($taskIsMusicSpace){
-            Join-Path $taskRoot 'artifacts\world-opus\Tingzong-world-opus-private.apk'
+            Join-Path $taskRoot 'artifacts\standalone\Tingzong-full-debug.apk'
         }else{Join-Path $taskRoot 'artifacts\performance\Tingzong-rhythm-comparison-private.apk'}
-        if(!(Test-Path -LiteralPath $taskApk)){throw 'The requested preview APK has not been built yet.'}
-        Write-TaskLog 'Installing the existing private preview APK.'
+        if(!(Test-Path -LiteralPath $taskApk)){throw "The APK for $taskPackage is missing: $taskApk"}
+        Write-TaskLog "Installing $taskPackage from $taskApk"
         Invoke-TaskAdb -Arguments @('-s',$taskSerial,'install','-r',$taskApk) | Out-Null
     }
     if($taskActivity -eq 'cn.musicpilgrimage.app.performance.RhythmComparisonActivity'){Ensure-TaskMusic $taskSerial}
-    $taskOpened=Invoke-TaskAdb -Arguments @('-s',$taskSerial,'shell','am','start','-W','--activity-single-top','-n',"$taskPackage/$taskActivity")
+    $taskOpened=Invoke-TaskAdb -Arguments @('-s',$taskSerial,'shell','am','start','-W','--activity-reorder-to-front','--activity-single-top','-n',"$taskPackage/$taskActivity")
     if($taskOpened.Text -match 'Error:|Error type'){throw $taskOpened.Text}
     Show-TaskWindow
     Write-TaskLog $(if($taskIsMusicSpace){'Ready: native music space opened in the independent emulator window.'}else{'Ready: rhythm comparison opened in the independent emulator window.'})
