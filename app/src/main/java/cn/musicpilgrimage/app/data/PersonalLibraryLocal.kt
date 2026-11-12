@@ -41,13 +41,22 @@ internal object MusicFavoriteCodec {
 }
 
 internal object MusicTripCodec {
-    fun encode(values:List<MusicTrip>)=JSONObject().put("trips",JSONArray().apply {
-        values.sortedWith(compareBy<MusicTrip>{it.start}.thenBy{it.id}).forEach {trip->put(JSONObject().put("id",trip.id).put("name",trip.name).put("start",trip.start.toString()).put("end",trip.end.toString())
+    fun encode(values: List<MusicTrip>, previous: JSONArray = JSONArray()): JSONObject {
+        // Reading a legacy name should not count as an edit on another device.
+        val stored = previous.objects().associateBy { it.getString("id") }
+        return JSONObject().put("trips", JSONArray().apply {
+        values.sortedWith(compareBy<MusicTrip>{it.start}.thenBy{it.id}).forEach {trip->
+            val unchanged = stored[trip.id]?.takeIf { MusicTripCodec.trip(it) == trip }
+            put(unchanged ?: JSONObject().put("id",trip.id).put("name",trip.name).put("start",trip.start.toString()).put("end",trip.end.toString())
             .put("cities",JSONArray().apply{trip.cities.forEach{put(JSONObject().put("name",it.name).put("country",it.country))}})
             .put("stops",JSONArray().apply{trip.stops.forEach{put(JSONObject().put("id",it.id).put("place",it.placeId?:JSONObject.NULL).put("name",it.name).put("city",it.city).put("country",it.country).put("day",it.day?:JSONObject.NULL).put("note",it.note))}}))}
-    })
+        })
+    }
     fun decode(doc:JSONObject):List<MusicTrip> = doc.getJSONArray("trips").objects().map(::trip).also{require(it.map{row->row.id}.distinct().size==it.size){"行程重复，本机数据已保留"}}.sortedBy{it.start}
     fun trip(raw:JSONObject)=MusicTrip(raw.getString("id"),raw.getString("name"),LocalDate.parse(raw.getString("start")),LocalDate.parse(raw.getString("end")),
-        raw.getJSONArray("cities").objects().map{MusicTripCity(it.getString("name"),it.getString("country"))},
-        raw.getJSONArray("stops").objects().map{MusicTripStop(it.getString("id"),it.stringOrNull("place"),it.getString("name"),it.getString("city"),it.getString("country"),if(it.isNull("day"))null else it.getInt("day"),it.optString("note"))})
+        raw.getJSONArray("cities").objects().map{MusicTripCity.fromStored(it.getString("name"),it.getString("country"))}.distinctBy{it.key},
+        raw.getJSONArray("stops").objects().map {
+            val city = MusicTripCity.fromStored(it.getString("city"), it.getString("country"))
+            MusicTripStop(it.getString("id"),it.stringOrNull("place"),it.getString("name"),city.name,city.country,if(it.isNull("day"))null else it.getInt("day"),it.optString("note"))
+        })
 }

@@ -191,10 +191,15 @@
   function updateContext() {
     const z=map.getZoom(), near=nearestPlace();
     $('region').replaceChildren();$('city').replaceChildren();
-    const center=map.getCenter();let country=countryAt(wrap(center.lng),center.lat);
+    const center=map.getCenter(), centerRegion=countryAt(wrap(center.lng),center.lat);
     const visibleCity=near&&z>=7&&map.getBounds().contains([near.place.lon,near.place.lat]);
-    if(visibleCity&&near.degrees<.2)country=near.place.country;
-    if(country&&z>=3){const b=document.createElement('button');b.textContent=country;b.onclick=()=>zoomTo(5);$('region').append(b);}
+    const nearbyRegion=visibleCity&&near.degrees<.2?near.place:null;
+    const country=nearbyRegion?.country||centerRegion;
+    if(country&&z>=3){
+      const b=document.createElement('button');b.textContent=country;
+      b.onclick=()=>nearbyRegion&&centerRegion!==country?flyTo([nearbyRegion.lon,nearbyRegion.lat],5):zoomTo(5);
+      $('region').append(b);
+    }
     if(visibleCity){const b=document.createElement('button');b.textContent=near.place.city;b.onclick=()=>zoomTo(11);$('city').append(b);}
   }
   function updateAccessibleMarkers() {
@@ -223,7 +228,7 @@
     }
     root.classList.toggle('beyond-globe',z>=4);
     root.classList.toggle('satellite-scale',z<8);
-    const name=z>=13?'街道':z>=7?'城市':z>=3?'国家':'地球';
+    const name=z>=13?'街道':z>=7?'城市':z>=3?'国家或地区':'地球';
     $('level').textContent=name;
     $('level').style.top=`${clamp((15-z)/14.5,0,1)*72+4}px`;
     const shadow=$('shadow');

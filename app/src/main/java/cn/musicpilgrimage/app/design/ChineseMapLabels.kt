@@ -1,6 +1,7 @@
 package cn.musicpilgrimage.app.design
 
 import android.content.Context
+import cn.musicpilgrimage.app.data.canonicalRegionName
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -29,7 +30,7 @@ internal class ChineseMapLabels private constructor(private val root: Node) {
             else { result.append(replacement); start = matchedEnd }
         }
         // Some provider names contain both scripts, e.g. 东京都/東京都.
-        return result.toString().split('/', '／', ';', '；').map{it.trim()}.filter{it.isNotEmpty()}.distinct().joinToString("/")
+        return result.toString().split('/', '／', ';', '；').map{canonicalRegionName(it.trim())}.filter{it.isNotEmpty()}.distinct().joinToString("/")
     }
 
     fun style(bytes: ByteArray): ByteArray {

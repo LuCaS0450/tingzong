@@ -29,6 +29,7 @@ import cn.musicpilgrimage.app.data.MusicTrip
 import cn.musicpilgrimage.app.data.MusicTripCity
 import cn.musicpilgrimage.app.data.MusicTripStop
 import cn.musicpilgrimage.app.data.Place
+import cn.musicpilgrimage.app.data.canonicalRegionName
 import cn.musicpilgrimage.app.ui.AppMotionDialog
 
 @Composable internal fun TripPanel(
@@ -106,7 +107,7 @@ internal fun List<String>.tripDestinations()=chunked(2).map{MusicTripCity(it[0],
         val countries=catalogCities.map{it.country}.distinct().map{MusicTripCity.country(it)}
         (countries+catalogCities).distinctBy{it.key}
     }
-    val term=query.trim()
+    val term=canonicalRegionName(query.trim())
     val matches=remember(options,term) {
         if(term.isEmpty()) emptyList()
         else options.filter{it.label.contains(term,true)||it.country.contains(term,true)}
@@ -118,7 +119,7 @@ internal fun List<String>.tripDestinations()=chunked(2).map{MusicTripCity(it[0],
             OutlinedTextField(name,{onName(it.take(60))},label={Text("行程名称")},singleLine=true,
                 enabled=!busy,modifier=Modifier.fillMaxWidth().testTag("trip-name-input"))
         }
-        item { TripSearch(query,{query=it},"搜索城市或国家","trip-destination-search",busy) }
+        item { TripSearch(query,{query=it},"搜索城市、国家或地区","trip-destination-search",busy) }
         if(term.isNotEmpty()) {
             if(matches.isEmpty()) item { Text("没有找到匹配的目的地，可以手动填写。",color=RoomColors.Muted,fontSize=13.sp) }
             items(matches,key={"result-${it.key}"}) { destination ->
@@ -151,7 +152,7 @@ internal fun List<String>.tripDestinations()=chunked(2).map{MusicTripCity(it[0],
                     singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
                 OutlinedTextField(countryName,{countryName=it.take(60)},label={Text("国家或地区名称")},
                     singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
-                val country=countryName.trim()
+                val country=canonicalRegionName(countryName.trim())
                 val destination=if(countryOnly) MusicTripCity.country(country) else MusicTripCity(cityName.trim(),country)
                 SwissOutlinedButton({
                     onSelection(selected+destination)

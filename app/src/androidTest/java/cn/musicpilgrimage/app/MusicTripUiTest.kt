@@ -130,6 +130,28 @@ class MusicTripUiTest {
         assertTrue(store.read(key).any{it.id==other.id})
     }
 
+    @Test fun taiwanAndHongKongCanBeSelectedIndependentlyAsRegions() {
+        val services = (context.applicationContext as PilgrimageApplication).services
+        val destinations = services.catalog.value.publicOnly().places
+            .filter { it.country == "中国台湾" || it.country == "中国香港" }
+            .map { MusicTripCity(it.city, it.country) }.distinct()
+        var selected by mutableStateOf(emptyList<MusicTripCity>())
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                PilgrimageTheme {
+                    TripDestinationFields("旅行", {}, destinations, selected, { selected = it }, false)
+                }
+            }
+        }
+        val search = compose.onNodeWithTag("trip-destination-search")
+        search.performTextInput("中华民国")
+        compose.onNodeWithText("中国台湾 · 国家或地区").performClick()
+        search.performTextReplacement("中国香港")
+        compose.onNodeWithText("中国香港 · 国家或地区").performClick()
+        compose.runOnIdle { assertEquals(listOf("中国台湾", "中国香港"), selected.map { it.label }) }
+        capture("region-selection")
+    }
+
     @Test fun searchDestinationsAddAcrossCitiesAndEditDirectlyFromDayCard() {
         val services=(context.applicationContext as PilgrimageApplication).services
         assumeTrue("Do not alter a signed-in account",services.userId.value==null)

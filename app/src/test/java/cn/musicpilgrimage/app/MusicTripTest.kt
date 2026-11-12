@@ -1,6 +1,7 @@
 package cn.musicpilgrimage.app
 
 import cn.musicpilgrimage.app.data.*
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import java.time.LocalDate
@@ -53,6 +54,20 @@ class MusicTripTest {
         assertFalse(city.isCountry)
         val trip=plan().copy(cities=listOf(country)).add(place("a").copy(city=city.name,country=city.country),1)
         assertEquals(listOf(country,city),trip.cities)
+    }
+    @Test fun legacyTaiwanDestinationsAndStopsReadTogetherWithoutMarkingTheTripEdited() {
+        val document = JSONObject("""
+            {"trips":[{"id":"trip","name":"旅行","start":"2026-11-01","end":"2026-11-01",
+            "cities":[{"name":"台湾（全境）","country":"台湾"},{"name":"台北","country":"中華民國"},
+                      {"name":"台北","country":"中国台湾"}],
+            "stops":[{"id":"stop","name":"散步","city":"台湾（全境）","country":"台湾","day":1}]}]}
+        """.trimIndent())
+        val trip = MusicTripCodec.decode(document).single()
+        val region = MusicTripCity.country("中国台湾")
+        assertEquals(listOf(region, MusicTripCity("台北", "中国台湾")), trip.cities)
+        assertEquals(region.name, trip.stops.single().city)
+        assertEquals(region.country, trip.stops.single().country)
+        assertTrue(libraryJsonEqual(document, MusicTripCodec.encode(listOf(trip), document.getJSONArray("trips"))))
     }
     @Test fun invalidDayAndDateCannotBeSaved() {
         assertThrows(IllegalArgumentException::class.java){plan().add(place("a"),0)}

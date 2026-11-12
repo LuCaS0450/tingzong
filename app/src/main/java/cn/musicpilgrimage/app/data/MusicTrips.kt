@@ -16,6 +16,11 @@ internal data class MusicTripCity(val name:String,val country:String) {
         // Keep country destinations in the existing name/country sync format.
         private fun countryName(country:String)="$country（全境）"
         fun country(country:String)=MusicTripCity(countryName(country),country)
+
+        fun fromStored(name: String, region: String): MusicTripCity {
+            val canonical = canonicalRegionName(region)
+            return if (name == countryName(region)) country(canonical) else MusicTripCity(name, canonical)
+        }
     }
 }
 internal data class MusicTripStop(val id:String,val placeId:String?,val name:String,val city:String,val country:String,val day:Int?,val note:String="")
@@ -79,8 +84,8 @@ internal class MusicTripStore(private val preferences:SharedPreferences,private 
         return (0 until array.length()).mapNotNull{array.optJSONObject(it)}.mapNotNull{raw->runCatching{MusicTripCodec.trip(raw)}.getOrNull()}.sortedBy{it.start}
     }
     @Synchronized fun write(owner:String,values:List<MusicTrip>) {
-        val array=MusicTripCodec.encode(values).getJSONArray("trips")
         val before=JSONObject().put("trips",JSONArray(preferences.getString("$owner:trips","[]")))
+        val array=MusicTripCodec.encode(values, before.getJSONArray("trips")).getJSONArray("trips")
         check(preferences.edit().putString("$owner:trips",array.toString()).libraryLocalEdit(preferences,owner,kind,before,JSONObject().put("trips",array)).commit()){"行程尚未保存，请重试"}
         onChanged(owner,true)
     }
@@ -96,8 +101,8 @@ internal class MusicTripStore(private val preferences:SharedPreferences,private 
         val local=snapshot(owner)
         if(remote.revision<local.revision)return LibraryMerge(local.data)
         val merged=reconcileLibrary(kind,local,remote,acknowledged)
-        val rows=MusicTripCodec.decode(merged.data)
-        check(preferences.edit().putString("$owner:trips",MusicTripCodec.encode(rows).getJSONArray("trips").toString()).libraryRemote(owner,remote,merged.dirty).commit()){"同步行程尚未保存，请重试"}
+        MusicTripCodec.decode(merged.data)
+        check(preferences.edit().putString("$owner:trips",merged.data.getJSONArray("trips").toString()).libraryRemote(owner,remote,merged.dirty).commit()){"同步行程尚未保存，请重试"}
         onChanged(owner,false)
         return merged
     }
