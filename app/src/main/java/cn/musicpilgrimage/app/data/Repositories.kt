@@ -50,6 +50,9 @@ class ContentRepository(private val api:AppServices) {
  suspend fun submissions()=(api.call("submissions") as JSONArray).objects()
  suspend fun upload(path:String,request:String,owner:String)=api.upload(path,request,owner)
  suspend fun discardUpload(id:String,owner:String)=api.call("cancel_upload",JSONObject().put("id",id),owner)
+ internal suspend fun setPlaceFavorite(id:String,enabled:Boolean,owner:String) {
+  api.call("favorite",JSONObject().put("location_id",id).put("enabled",enabled),owner)
+ }
  suspend fun save(action:String,payload:JSONObject,owner:String?=api.userId.value):Any {
   require(action in setOf("favorite","create_message","verify_visit","publish_recreation","update_content","delete_content","make_private","like","report","submit","profile_update"))
   return api.mutate(action,payload,owner)

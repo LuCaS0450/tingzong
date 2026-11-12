@@ -263,7 +263,8 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      val own=id==owner
      val p=profile?.takeIf{own&&it.optString("id")==id}
      val management:(@Composable ()->Unit)?=if(own) {{
-      val placeCount=if(archiveState.loading&&p==null)null else p?.optJSONArray("favorites")?.length()?:archiveState.places.size
+      val placeCount=archiveState.takeIf{it.owner==id&&!it.loading}?.places?.size
+       ?:p?.optJSONArray("favorites")?.length()
       val visitCount=if(archiveState.loading&&p==null)null else if(archiveState.visits.isNotEmpty())archiveState.visits.map{it.location}.distinct().size else p?.optInt("visit_count")?:0
       RoomProfileManagement(session.services.accountEmail(id),placeCount?.plus(musicFavorites.songs.size+musicFavorites.releases.size),
        visitCount,p?.optString("status")=="disabled",{navigate("edit-profile")},navigate,

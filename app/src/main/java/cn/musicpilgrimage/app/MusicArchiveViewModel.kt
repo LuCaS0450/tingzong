@@ -47,7 +47,7 @@ class MusicArchiveViewModel(app: Application) : AndroidViewModel(app) {
               lock.withLock {
                 if (services.userId.value != change.owner) return@withLock
                 try {
-                    services.repositories.content.save("favorite", JSONObject().put("location_id",change.id).put("enabled",change.enabled),change.owner)
+                    services.repositories.content.setPlaceFavorite(change.id,change.enabled,change.owner)
                     if (pending[change.id]?.version == change.version) pending.remove(change.id)
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) {

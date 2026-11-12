@@ -67,7 +67,7 @@ import org.json.JSONObject
             item("tabs"){RoomCommunityTabs(listOf("留言","到访与复刻"),tab,onTab,inset)}
             item("status"){Column(inset,verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("最新发布在前",color=RoomColors.Muted,fontSize=12.sp)
-                if(busy)LinearProgressIndicator(Modifier.fillMaxWidth(),color=RoomColors.Navy)
+                if(!loaded&&busy)Text("正在读取社区内容…",color=RoomColors.Muted,fontSize=12.sp)
                 if(error!=null){Text("暂时无法更新社区内容，请重试。",color=MaterialTheme.colorScheme.error,fontSize=13.sp);SwissTextButton(onMore){Text("重试")}}
                 if(notice!=null)Text(notice,color=RoomColors.Navy,fontSize=13.sp)
             }}
