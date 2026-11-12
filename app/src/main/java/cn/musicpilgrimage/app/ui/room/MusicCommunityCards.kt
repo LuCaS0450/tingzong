@@ -229,7 +229,7 @@ private data class MessageMenuOrigin(val pivot: TransformOrigin, val travel: Flo
             Popup(popupPositionProvider=position,onDismissRequest={expanded=false},properties=PopupProperties(focusable=true)) {
                 Box(Modifier.padding(8.dp)) {
                     Surface(
-                        modifier=Modifier.width(132.dp).testTag("room-message-menu-$id").graphicsLayer {
+                        modifier=Modifier.width(108.dp).testTag("room-message-menu-$id").graphicsLayer {
                             val placement=origin
                             val amount=if(motion)progress else if(expanded)1f else 0f
                             alpha=if(placement==null)0f else (amount/.8f).coerceIn(0f,1f)
@@ -243,11 +243,12 @@ private data class MessageMenuOrigin(val pivot: TransformOrigin, val travel: Flo
                         shape=RoundedCornerShape(6.dp),color=RoomColors.Paper,
                         border=BorderStroke(1.dp,RoomColors.Line),shadowElevation=4.dp,
                     ) {
-                        Column(Modifier.padding(vertical=3.dp)) {
+                        Column {
                             if(canEdit)DropdownMenuItem(
                                 text={Text("编辑")},
                                 onClick={expanded=false;onEdit()},
                                 enabled=expanded&&!busy,
+                                contentPadding=PaddingValues(horizontal=10.dp),
                                 colors=MenuDefaults.itemColors(textColor=RoomColors.Ink,leadingIconColor=RoomColors.Ink),
                                 leadingIcon={Icon(Icons.Outlined.Edit,null,Modifier.size(18.dp))},
                             )
@@ -255,6 +256,7 @@ private data class MessageMenuOrigin(val pivot: TransformOrigin, val travel: Flo
                                 text={Text("删除")},
                                 onClick={expanded=false;onDelete()},
                                 enabled=expanded&&!busy,
+                                contentPadding=PaddingValues(horizontal=10.dp),
                                 colors=MenuDefaults.itemColors(textColor=RoomColors.Red,leadingIconColor=RoomColors.Red),
                                 leadingIcon={Icon(Icons.Outlined.DeleteOutline,null,Modifier.size(18.dp))},
                             )
