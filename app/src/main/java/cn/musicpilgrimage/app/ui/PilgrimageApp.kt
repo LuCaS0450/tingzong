@@ -491,8 +491,8 @@ private fun isWebDetailRoute(route:String?)=when(route) {
    if(discardAction!=null)RoomDiscardProfileDialog({discardAction=null},{val action=discardAction;discardAction=null;editor.discard();action?.invoke()})
    if(performanceLibraryUi.mobileConfirmation)AlertDialog(onDismissRequest=performanceLibrary::waitForWifi,
     title={Text("用移动网络准备音乐？")},text={
-     val missing=performanceLibraryUi.entries.filterNot{it.audioReady}
-     val bytes=missing.sumOf{it.song.recording?.files?.values?.sumOf{file->file.bytes}?:0L}
+     val missing=performanceLibraryUi.entries.filterNot{it.downloadReady}
+     val bytes=missing.sumOf{it.song.recording?.downloadFile?.second?.bytes?:0L}
      Column {Text("共 ${missing.size} 首，约 ${bytes/1048576} MB。下载完成后可离线演奏。")
       Spacer(Modifier.height(12.dp));Text(missing.joinToString("、"){it.song.title},style=MaterialTheme.typography.bodySmall)}
     },confirmButton={TextButton(performanceLibrary::allowMobile){Text("下载全部")}},dismissButton={TextButton(performanceLibrary::waitForWifi){Text("等待 Wi-Fi")}})

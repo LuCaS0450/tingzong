@@ -28,23 +28,28 @@ internal class PerformanceLibraryViewModel(application:Application):AndroidViewM
     private var mobileAllowed=false
     private var entered=false
     private val checkedDownloads=mutableMapOf<java.util.UUID,java.io.File?>()
+    private fun matches(work: WorkInfo, song: SongPackage): Boolean {
+        val opus = PerformanceAudioDownloadWorker.opusTag(song)
+        return "audio-song:${song.id}" in work.tags && "audio-version:${song.version}" in work.tags &&
+            work.tags.firstOrNull { it.startsWith("audio-opus:") } == opus
+    }
     init {
         viewModelScope.launch{load()}
         viewModelScope.launch {
             WorkManager.getInstance(application).getWorkInfosByTagFlow(PerformanceAudioDownloadWorker.TAG).collect{infos->
                 val old=mutable.value
                 val entries=withContext(Dispatchers.IO){old.entries.map{entry->
-                    if(entry.audioReady)entry else {
-                        val completed=infos.filter{"audio-song:${entry.song.id}" in it.tags&&"audio-version:${entry.song.version}" in it.tags&&it.state==WorkInfo.State.SUCCEEDED}
+                    if(entry.downloadReady)entry else {
+                        val completed=infos.filter{matches(it,entry.song)&&it.state==WorkInfo.State.SUCCEEDED}
                         val directory=completed.firstNotNullOfOrNull{work->
-                            if(!checkedDownloads.containsKey(work.id))checkedDownloads[work.id]=store.verifiedDirectory(entry.song)
+                            if(!checkedDownloads.containsKey(work.id))checkedDownloads[work.id]=store.verifiedDownloadDirectory(entry.song)
                             checkedDownloads[work.id]
                         }
-                        if(directory!=null)entry.copy(audioDirectory=directory)else entry
+                        if(directory!=null)entry.copy(audioDirectory=directory,downloadReady=true)else entry
                     }
                 }}
-                val states=entries.filterNot{it.audioReady}.associate{entry->
-                    val matching=infos.filter{"audio-song:${entry.song.id}" in it.tags&&"audio-version:${entry.song.version}" in it.tags&&it.state!=WorkInfo.State.CANCELLED}
+                val states=entries.filterNot{it.downloadReady}.associate{entry->
+                    val matching=infos.filter{matches(it,entry.song)&&it.state!=WorkInfo.State.CANCELLED}
                     val work=matching.firstOrNull{!it.state.isFinished}?:matching.lastOrNull()
                     val status=when(work?.state) {
                         WorkInfo.State.RUNNING->AudioDownloadState("正在准备 ${(work.progress.getFloat("fraction",0f)*100).toInt()}%",work.progress.getFloat("fraction",0f))
@@ -61,14 +66,18 @@ internal class PerformanceLibraryViewModel(application:Application):AndroidViewM
     }
     private suspend fun load() {
         val songs=withContext(Dispatchers.IO){PerformanceCatalog.load(getApplication())}
-        val entries=withContext(Dispatchers.IO){songs.map{PerformanceEntry(it,audioDirectory=store.verifiedDirectory(it))}}
+        val entries=withContext(Dispatchers.IO){songs.map{song->
+            val downloaded=store.verifiedDownloadDirectory(song)
+            val legacy=if (downloaded==null && song.recording?.opus!=null) store.verifiedLegacyDirectory(song) else null
+            PerformanceEntry(song,audioDirectory=downloaded?:legacy,downloadReady=downloaded!=null || song.recording?.local!=true)
+        }}
         mutable.value=mutable.value.copy(loaded=true,entries=entries)
         if(entered)prepareAll()
     }
     fun prepareAll(retry:Boolean=false) {
         entered=true
         if(retry)mutable.value=mutable.value.copy(error=null)
-        val missing=mutable.value.entries.filterNot{it.audioReady}
+        val missing=mutable.value.entries.filterNot{it.downloadReady}
         if(missing.isEmpty())return
         val connectivity=getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         if(connectivity.activeNetwork!=null&&connectivity.isActiveNetworkMetered&&!mobileAllowed)mutable.value=mutable.value.copy(mobileConfirmation=true)

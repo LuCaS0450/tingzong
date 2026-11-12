@@ -30,6 +30,9 @@ internal object PerformanceCatalog {
     }
     fun load(context:Context):List<SongPackage> {
         val folders=context.assets.list("performance").orEmpty().filter{it!="piano"}
+        val opusManifest = if ("opus.json" in folders) {
+            context.assets.open("performance/opus.json").bufferedReader().use { JSONObject(it.readText()) }
+        } else JSONObject()
         val loaded=folders.mapNotNull {folder->
             if(!Regex("[a-z0-9-]+").matches(folder))return@mapNotNull null
             val files=context.assets.list("performance/$folder").orEmpty()
@@ -42,7 +45,16 @@ internal object PerformanceCatalog {
                 }
                 require(song.sections.all{Regex("[a-z0-9-]+").matches(it.scene)})
                 context.assets.open(backgroundAssetPath(context,song)).use{check(it.read()>=0)}
-                song
+                val recording = song.recording
+                val opus = opusManifest.optJSONObject(song.id)?.takeIf {
+                    recording?.local == true && it.optInt("version") == song.version &&
+                        it.optString("sourceSha256") == recording.files.values.singleOrNull()?.sha256
+                }
+                if (recording != null && opus != null) {
+                    val file = RecordingFile(opus.getLong("bytes"), opus.getString("sha256"))
+                    require(file.bytes in 1..RecordedMusic.MAX_PCM_BYTES && Regex("[a-f0-9]{64}").matches(file.sha256))
+                    song.copy(recording = recording.copy(opus = file))
+                } else song
             }.getOrNull()
         }
         return loaded.sortedWith(compareBy({val idx=ORDERED_SONG_IDS.indexOf(it.id);if(idx>=0)idx else Int.MAX_VALUE},{it.id}))

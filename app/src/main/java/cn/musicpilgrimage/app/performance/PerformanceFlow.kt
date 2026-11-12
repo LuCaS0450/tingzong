@@ -19,7 +19,8 @@ import cn.musicpilgrimage.app.ui.room.*
 import java.io.File
 
 /** Preview entries are supplied only by a debug activity, never admitted by the release catalogue. */
-internal data class PerformanceEntry(val song:SongPackage,val preview:Boolean=false,val audioDirectory:File?=null,val onImport:(()->Unit)?=null) {
+internal data class PerformanceEntry(val song:SongPackage,val preview:Boolean=false,val audioDirectory:File?=null,
+    val downloadReady:Boolean=audioDirectory!=null || song.recording?.local!=true,val onImport:(()->Unit)?=null) {
     val audioReady get()=if(preview||song.recording?.local==true)audioDirectory!=null else true
 }
 internal val LocalPerformancePreviews=staticCompositionLocalOf<List<PerformanceEntry>>{emptyList()}

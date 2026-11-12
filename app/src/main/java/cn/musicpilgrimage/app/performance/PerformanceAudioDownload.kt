@@ -24,23 +24,25 @@ class PerformanceAudioDownloadWorker(context:Context,parameters:WorkerParameters
         val version=inputData.getInt("version",-1)
         val song=PerformanceCatalog.load(applicationContext).find{it.id==id&&it.version==version}?:return@withContext Result.failure()
         val store=PerformanceAudioStore(applicationContext)
-        val expected=song.recording?.files?.entries?.singleOrNull()?:return@withContext Result.failure()
+        val (filename, expected) = song.recording?.downloadFile ?: return@withContext Result.failure()
+        val opusTag = opusTag(song)
+        if (inputData.getString("opus") != opusTag) return@withContext Result.failure()
         try {
-            if(store.verifiedDirectory(song)!=null)return@withContext Result.success()
+            if(store.verifiedDownloadDirectory(song)!=null)return@withContext Result.success()
             val base=BuildConfig.SUPABASE_URL.trimEnd('/')+"/storage/v1/object/public/performance-audio/excerpt"
             check(base.startsWith("https://")){"音乐下载服务尚未配置"}
             val part=store.partial(song)
             val partialBefore=part.length()
             val job=currentCoroutineContext()
             var lastProgress=0L
-            AudioHttpTransfer.download(client,"$base/${expected.value.sha256}.pcmz",part,expected.value) {copied->
+            AudioHttpTransfer.download(client,"$base/${expected.sha256}.${filename.substringAfterLast('.')}",part,expected) {copied->
                 job.ensureActive()
                 val now=System.currentTimeMillis()
-                if(now-lastProgress>350L){lastProgress=now;setProgressAsync(workDataOf("fraction" to (copied.toFloat()/expected.value.bytes)))}
+                if(now-lastProgress>350L){lastProgress=now;setProgressAsync(workDataOf("fraction" to (copied.toFloat()/expected.bytes)))}
             }
             job.ensureActive();store.installDownloaded(song,part)
-            android.util.Log.i("PerformanceAudioDownload","Ready ${song.id}; ${expected.value.bytes} verified bytes; partial-before=$partialBefore")
-            Result.success(workDataOf("preparedSong" to song.id,"verifiedBytes" to expected.value.bytes,"partialBefore" to partialBefore))
+            android.util.Log.i("PerformanceAudioDownload","Ready ${song.id}; ${expected.bytes} verified bytes; partial-before=$partialBefore")
+            Result.success(workDataOf("preparedSong" to song.id,"verifiedBytes" to expected.bytes,"partialBefore" to partialBefore))
         }catch(cancel:kotlinx.coroutines.CancellationException){throw cancel}
         catch(error:AudioSourceUnavailable){Result.failure(workDataOf("message" to error.message))}
         catch(error:Exception){
@@ -49,17 +51,20 @@ class PerformanceAudioDownloadWorker(context:Context,parameters:WorkerParameters
     }
     companion object {
         internal const val TAG="performance-audio-download"
+        internal fun opusTag(song: SongPackage) = song.recording?.opus?.let { "audio-opus:${it.sha256}" }
         private val client=OkHttpClient.Builder().connectTimeout(20,TimeUnit.SECONDS).readTimeout(45,TimeUnit.SECONDS).build()
         internal suspend fun enqueue(context:Context,song:SongPackage,mobileAllowed:Boolean)=withContext(Dispatchers.IO) {
             val manager=WorkManager.getInstance(context)
-            val name="audio:${song.id}:${song.version}"
+            val opus = opusTag(song)
+            val name="audio:${song.id}:${song.version}" + (opus?.let { ":$it" } ?: "")
             val current=manager.getWorkInfosForUniqueWork(name).get().firstOrNull{!it.state.isFinished}
             if(current!=null&&!mobileAllowed)return@withContext
             val builder=OneTimeWorkRequestBuilder<PerformanceAudioDownloadWorker>()
-                .setInputData(workDataOf("song" to song.id,"version" to song.version))
+                .setInputData(workDataOf("song" to song.id,"version" to song.version,"opus" to opus))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(if(mobileAllowed)NetworkType.CONNECTED else NetworkType.UNMETERED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,10,TimeUnit.SECONDS)
                 .addTag(TAG).addTag("audio-song:${song.id}").addTag("audio-version:${song.version}")
+            if (opus != null) builder.addTag(opus)
             if(current!=null) {
                 // Relaxing a Wi-Fi constraint doesn't cancel a transfer or race its partial file.
                 manager.updateWork(builder.setId(current.id).build()).get()

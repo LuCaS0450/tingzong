@@ -18,15 +18,34 @@ internal class PerformanceAudioStore(context:Context,private val root:File=File(
         val directory=folder(song)
         return directory.takeIf{recording.files.all{(name,spec)->File(it,name).let{f->f.isFile&&f.length()==spec.bytes}}}
     }
-    fun verifiedDirectory(song:SongPackage):File?=directory(song)?.takeIf{dir->song.recording!!.files.all{(name,spec)->AudioHttpTransfer.valid(File(dir,name),spec)}}
-    fun partial(song:SongPackage):File=File(folder(song).apply{mkdirs()},"original.pcmz.part")
-    fun installDownloaded(song:SongPackage,part:File)=synchronized(lock) {
-        val expected=requireNotNull(song.recording).files.entries.single()
-        require(AudioHttpTransfer.valid(part,expected.value)){"音乐文件校验未通过"}
-        val atomic=AtomicFile(File(folder(song),expected.key))
+    fun verifiedLegacyDirectory(song: SongPackage): File? = synchronized(lock) {
+        val recording = song.recording ?: return@synchronized null
+        directory(song)?.takeIf { dir ->
+            recording.files.all { (name, spec) -> AudioHttpTransfer.valid(File(dir, name), spec) }
+        }
+    }
+    fun verifiedDownloadDirectory(song: SongPackage): File? {
+        val (name, spec) = song.recording?.takeIf { it.local }?.downloadFile ?: return null
+        return folder(song).takeIf { AudioHttpTransfer.valid(File(it, name), spec) }
+    }
+    fun partial(song:SongPackage):File {
+        val (name, _) = checkNotNull(song.recording?.downloadFile)
+        return File(folder(song).apply { mkdirs() }, "$name.part")
+    }
+    fun installDownloaded(song:SongPackage,part:File):Unit=synchronized(lock) {
+        val recording = requireNotNull(song.recording)
+        val (name, spec) = checkNotNull(recording.downloadFile)
+        require(AudioHttpTransfer.valid(part,spec)){"音乐文件校验未通过"}
+        val atomic=AtomicFile(File(folder(song),name))
         val output=atomic.startWrite()
         try {part.inputStream().use{it.copyTo(output)};atomic.finishWrite(output);part.delete()}
         catch(error:Throwable){atomic.failWrite(output);throw error}
+        if (recording.opus != null) {
+            for (legacyName in recording.files.keys) {
+                File(folder(song), legacyName).delete()
+                File(folder(song), "$legacyName.part").delete()
+            }
+        }
     }
     fun import(song:SongPackage,input:InputStream,onProgress:(Float)->Unit={})=synchronized(lock) {
         val recording=requireNotNull(song.recording?.takeIf{it.local}){"这首曲目不需要导入音源"}

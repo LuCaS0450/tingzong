@@ -2,6 +2,7 @@ package cn.musicpilgrimage.app.performance
 
 import android.content.Context
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.DataInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -13,7 +14,9 @@ import org.json.JSONObject
 /** Complete music and interaction targets are independent. Each variant retains the same pitch. */
 internal data class RecordingFile(val bytes:Long,val sha256:String)
 internal data class RecordedMusic(val sampleRate:Int,val variants:Map<Double,String>,val local:Boolean=false,
-    val frames:Long?=null,val files:Map<String,RecordingFile> = emptyMap(),val encoding:String="f32le") {
+    val frames:Long?=null,val files:Map<String,RecordingFile> = emptyMap(),val encoding:String="f32le",
+    val opus:RecordingFile?=null) {
+    val downloadFile get()=opus?.let { OPUS_FILENAME to it } ?: files.entries.singleOrNull()?.toPair()
     init {
         require(sampleRate in 8000..192000 && variants.isNotEmpty())
         require(encoding in listOf("f32le","pcm16-delta"))
@@ -32,9 +35,24 @@ internal data class RecordedMusic(val sampleRate:Int,val variants:Map<Double,Str
         require(expectedFrames in 1..MAX_PCM_BYTES/8){"歌曲音频过大"}
         require(kotlin.math.abs(expectedFrames.toDouble()/sampleRate*speed*1e6-song.durationUs)<=20_000){"歌曲音频与谱面时长不一致"}
         val spec=files[name]
-        if(spec!=null)require(File(requireNotNull(localDirectory),name).length()==spec.bytes){"音源不完整，请重新导入"}
-        val input=if(localDirectory!=null)File(localDirectory,name).inputStream()
-            else context.assets.open("performance/${song.id}/audio/$name")
+        fun verifiedOpus() = opus?.takeIf { localDirectory != null && speed == 1.0 }?.let { expected ->
+            File(localDirectory, OPUS_FILENAME).takeIf { AudioHttpTransfer.valid(it, expected) }
+        }
+        var opusFile = verifiedOpus()
+        val input = if (localDirectory == null) context.assets.open("performance/${song.id}/audio/$name") else try {
+            // Opening the legacy file first also keeps it readable if a download replaces it concurrently.
+            if (opusFile != null) null else File(localDirectory, name).inputStream()
+        } catch (missing: FileNotFoundException) {
+            opusFile = verifiedOpus() ?: throw missing
+            null
+        }
+        if (input == null) {
+            val opusFrames = kotlin.math.round(song.durationUs / 1e6 * OpusPcmDecoder.SAMPLE_RATE).toLong()
+            require(opusFrames in 1..MAX_PCM_BYTES / 8) { "歌曲音频过大" }
+            val pcm = OpusPcmDecoder.decode(checkNotNull(opusFile), opusFrames.toInt())
+            check(engine.setBacking(engine.handle, OpusPcmDecoder.SAMPLE_RATE, speed, pcm)) { "歌曲音频无法读取" }
+            return
+        }
         val (pcm,actualSha256)=decodeSamples(input,expectedFrames)
         if(spec!=null)require(actualSha256==spec.sha256){"音源与曲目不匹配，请重新导入"}
         require(pcm.all{it.isFinite()}){"歌曲音频含有无效采样"}
@@ -78,6 +96,7 @@ internal data class RecordedMusic(val sampleRate:Int,val variants:Map<Double,Str
         return pcm to digest.digest().joinToString(""){"%02x".format(it)}
     }
     companion object {
+        const val OPUS_FILENAME = "original.ogg"
         const val MAX_PCM_BYTES=192L*1024*1024
         fun from(json:JSONObject):RecordedMusic {
             val storage=json.optString("storage","bundled")
