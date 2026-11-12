@@ -1,6 +1,8 @@
 package cn.musicpilgrimage.app.data
 
 import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -22,13 +24,29 @@ class CatalogRepository(private val api:AppServices) {
  suspend fun nearby(fix:LocationFix)=api.call("nearby",fix.json()) as JSONObject
 }
 class ContentRepository(private val api:AppServices) {
+ internal val likes=ContentLikes(api.scope,api.userId) { owner,id,enabled ->
+  api.call("like",JSONObject().put("id",id).put("enabled",enabled),owner)
+ }
  suspend fun list(location:String="",kind:String="",mine:Boolean=false,offset:Int=0):List<ContentItem> {
+  val owner=api.userId.value
+  val revision=likes.beginRead()
   val payload=JSONObject().put("mine",mine).put("offset",offset)
   if(location.isNotBlank())payload.put("location_id",location)
   if(kind.isNotBlank())payload.put("kind",kind)
-  return (api.call("content",payload) as JSONArray).objects().map(::ContentItem)
+  val rows=(api.call("content",payload,owner) as JSONArray).objects().map(::ContentItem)
+  withContext(Dispatchers.Main.immediate){likes.reconcile(owner,revision,rows)}
+  return rows
  }
- suspend fun profile(id:String)=api.call("profile",JSONObject().put("id",id)) as JSONObject
+ suspend fun profile(id:String):JSONObject {
+  val owner=api.userId.value
+  val revision=likes.beginRead()
+  val profile=api.call("profile",JSONObject().put("id",id),owner) as JSONObject
+  withContext(Dispatchers.Main.immediate) {
+   val rows=listOf("visits","recreations").flatMap{profile.optJSONArray(it)?.objects().orEmpty()}.map(::ContentItem)
+   likes.reconcile(owner,revision,rows)
+  }
+  return profile
+ }
  suspend fun submissions()=(api.call("submissions") as JSONArray).objects()
  suspend fun upload(path:String,request:String,owner:String)=api.upload(path,request,owner)
  suspend fun discardUpload(id:String,owner:String)=api.call("cancel_upload",JSONObject().put("id",id),owner)

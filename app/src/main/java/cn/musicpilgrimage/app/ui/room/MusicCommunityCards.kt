@@ -21,6 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,24 +31,33 @@ import cn.musicpilgrimage.app.FeatureViewModel
 import cn.musicpilgrimage.app.SessionViewModel
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 
 @Composable internal fun RoomContentCard(item:ContentItem,session:SessionViewModel,vm:FeatureViewModel,onEdit:(ContentItem)->Unit,onProfile:(String)->Unit,showAuthor:Boolean=true) {
     val owner by session.signedIn.collectAsState()
     val profile by session.profile.collectAsState()
     val busy by vm.busy.collectAsState()
+    val likes=vm.repositories.content.likes
+    val reactionFlow=remember(likes,item.id){likes.states.map{it[item.id]}.distinctUntilChanged()}
+    val reaction by reactionFlow.collectAsState(initial=likes.states.value[item.id])
     val catalog by session.services.catalog.collectAsState()
     val context=LocalContext.current
     val scene=catalog.places.flatMap{it.scenes}.firstOrNull{it.id==item.sceneId}
     val original=remember(scene?.id,scene?.imageUrl){scene?.let{BundledCovers.model(context,"reference-${it.id}",it.imageUrl)}}
     RoomContentEntry(item,owner,profile?.optString("id")==owner&&profile?.optString("status")=="active",busy,
         roomPrivatePhotoModel(item.mediaId,session.services),original,scene?.let{"${it.kindLabel} · 《${it.work}》"},showAuthor,
-        {onEdit(item)},onProfile,{action,payload->vm.mutation(action,payload){if(action=="report")vm.notice.value="举报已提交"}})
+        {onEdit(item)},onProfile,{action,payload->vm.mutation(action,payload){if(action=="report")vm.notice.value="举报已提交"}},
+        likeState=reaction?.takeIf{it.owner==owner},
+        onLike={owner?.let{likes.toggle(it,item.id,item.liked)}})
 }
 
 @Composable internal fun RoomContentEntry(
     item:ContentItem,owner:String?,active:Boolean,busy:Boolean,photo:Any?,original:Any?,originalLabel:String?,showAuthor:Boolean=true,
-    onEdit:()->Unit,onProfile:(String)->Unit,onAction:(String,JSONObject)->Unit
+    onEdit:()->Unit,onProfile:(String)->Unit,onAction:(String,JSONObject)->Unit,
+    likeState:ContentLikeState?=null,
+    onLike:()->Unit={onAction("like",JSONObject().put("id",item.id).put("enabled",!item.liked))}
 ) {
     val motion=LocalPhysicalMotion.current
     var manage by rememberSaveable(item.id,owner){mutableStateOf(false)}
@@ -55,14 +67,15 @@ import org.json.JSONObject
     val date=if(item.kind=="visit")item.raw.stringOrNull("verified_at")?.take(10)?.let{"到访于 $it"}?:"到访记录"else item.date
     val work=item.raw.stringOrNull("scene_work")?:item.song
     val lift=remember(item.id){Animatable(0f)}
-    var previousLiked by remember(item.id){mutableStateOf(item.liked)}
-    LaunchedEffect(item.id,item.liked,motion) {
-        val changed=previousLiked!=item.liked
-        previousLiked=item.liked
+    val liked=likeState?.liked?:item.liked
+    var previousLiked by remember(item.id,owner){mutableStateOf(liked)}
+    LaunchedEffect(item.id,liked,motion) {
+        val changed=previousLiked!=liked
+        previousLiked=liked
         lift.snapTo(0f)
         if(changed&&motion) {
-            lift.animateTo(if(item.liked)1f else -.45f,tween(if(item.liked)85 else 65))
-            lift.animateTo(0f,tween(if(item.liked)145 else 105))
+            lift.animateTo(if(liked)1f else -.45f,tween(if(liked)85 else 65))
+            lift.animateTo(0f,tween(if(liked)145 else 105))
         }
     }
     RoomPaper(Modifier.fillMaxWidth().testTag("room-content-${item.id}"),woodEdge=true) {
@@ -97,15 +110,15 @@ import org.json.JSONObject
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 if(item.visibility=="private")Text("仅自己可见",Modifier.weight(1f),color=RoomColors.Muted,fontSize=12.sp)
                 else {
-                    IconButton({onAction("like",JSONObject().put("id",item.id).put("enabled",!item.liked))},enabled=active&&!busy&&!item.hidden) {
+                    IconButton(onLike,enabled=active&&!busy&&!item.hidden) {
                         Icon(
-                            if(item.liked)Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
-                            if(item.liked)"取消点赞"else "点赞",
+                            if(liked)Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
+                            if(liked)"取消点赞"else "点赞",
                             Modifier.graphicsLayer{translationY=-3.dp.toPx()*lift.value;rotationZ=-9f*lift.value},
                             tint=RoomColors.Navy,
                         )
                     }
-                    Text("${item.likes}",Modifier.weight(1f),fontSize=12.sp,color=RoomColors.Muted)
+                    Text("${likeState?.count(item.liked,item.likes)?:item.likes}",Modifier.weight(1f),fontSize=12.sp,color=RoomColors.Muted)
                 }
                 if(own && item.kind == "message") {
                     IconButton(onClick={manage=!manage},enabled=!busy,modifier=Modifier.testTag("room-manage-${item.id}")) {
@@ -114,6 +127,13 @@ import org.json.JSONObject
                 }
                 else if(own)SwissTextButton({manage=!manage},enabled=!busy,modifier=Modifier.testTag("room-manage-${item.id}")){Icon(Icons.Outlined.Settings,null,Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("管理记录",fontSize=12.sp)}
                 else if(active&&!item.hidden&&item.visibility=="public")SwissTextButton({reporting=true},enabled=!busy){Icon(Icons.Outlined.Flag,null,Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("举报",fontSize=12.sp)}
+            }
+            likeState?.failedTarget?.let { failedLike ->
+                Text(
+                    if(failedLike)"点赞未保存，请重试" else "取消点赞未保存，请重试",
+                    Modifier.semantics { liveRegion=LiveRegionMode.Polite },
+                    color=MaterialTheme.colorScheme.error,fontSize=12.sp,
+                )
             }
             AnimatedVisibility(own&&manage,enter=fadeIn(tween(if(motion)160 else 0))+expandVertically(tween(if(motion)160 else 0)),exit=fadeOut(tween(if(motion)160 else 0))+shrinkVertically(tween(if(motion)160 else 0))) {
                 Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(2.dp)) {
