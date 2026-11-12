@@ -252,6 +252,7 @@
   }
   function renderSummary() {
     const p=byId.get(selected);summaryOpen=Boolean(summaryOpen&&p);
+    $('favorite').querySelector('svg').getAnimations().forEach(animation=>animation.cancel());
     root.classList.toggle('selected',summaryOpen);$('summary').hidden=!summaryOpen;
     if(!summaryOpen)return;
     $('place-name').textContent=p.name;$('place-city').textContent=`${p.city} · ${p.country}`;
@@ -353,12 +354,22 @@
   }
   function normalize(p){return {...p,lat:Number(p.lat??p.latitude),lon:Number(p.lon??p.longitude)};}
   function applyNative(data) {
+    const previousSelection=selected,wasFavorite=favorites.has(selected);
     root.classList.toggle('reduce-motion',data.motion===false);
     favorites=new Set(data.favorites||[]);visits=new Set(data.visits||[]);favoriteBusy=Boolean(data.favoriteBusy);
     if(!initialized){pendingBoot=data;startWhenSized();return;}
     if(data.places){places=data.places.map(normalize);byId=new Map(places.map(p=>[p.id,p]));refreshSources();}
     refreshFavorite();
     if(data.focus&&byId.has(data.focus)){const p=byId.get(data.focus);selected=p.id;summaryOpen=true;refreshSources();renderSummary();flyTo([p.lon,p.lat],15,selectionOffset());}
+    const saved=favorites.has(selected);
+    if(summaryOpen&&selected===previousSelection&&saved!==wasFavorite&&data.motion!==false&&!reduced){
+      const heart=$('favorite').querySelector('svg');
+      heart.getAnimations().forEach(animation=>animation.cancel());
+      heart.animate(
+        {transform:(saved?[1,1.23,.96,1]:[1,.86,1]).map(scale=>`scale(${scale})`)},
+        {duration:saved?260:160,easing:'cubic-bezier(.22,.61,.36,1)'},
+      );
+    }
   }
   function startWhenSized() {
     // WebView can deliver its page before the native tab has a measured map viewport.

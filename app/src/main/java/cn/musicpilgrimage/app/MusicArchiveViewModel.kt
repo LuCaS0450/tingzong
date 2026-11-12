@@ -95,19 +95,20 @@ class MusicArchiveViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun reload() { val owner=services.userId.value ?: return;viewModelScope.launch{mutable.value=mutable.value.copy(loading=true,error=null);refresh(owner)} }
-    fun removePlace(id:String) {
+    fun removePlace(id:String) = removePlace(id, offerUndo = true)
+    private fun removePlace(id:String, offerUndo:Boolean) {
         val owner=services.userId.value ?: return
         val current=mutable.value.takeIf{it.owner==owner} ?: return
         val index=current.places.indexOf(id);if(index<0)return
         val version=++sequence
-        undoMutable.value=PlaceFavoriteUndo(version,owner,id,index)
+        undoMutable.value=if(offerUndo)PlaceFavoriteUndo(version,owner,id,index)else null
         mutable.value=current.copy(places=current.places-id,error=null)
         enqueue(Change(owner,id,false,version,index))
     }
     fun togglePlace(id:String) {
         val owner=services.userId.value ?: return
         val current=mutable.value.takeIf{it.owner==owner&&!it.loading} ?: return
-        if(id in current.places){removePlace(id);return}
+        if(id in current.places){removePlace(id, offerUndo = false);return}
         undoMutable.value=null
         mutable.value=current.copy(places=listOf(id)+current.places,error=null)
         enqueue(Change(owner,id,true,++sequence))

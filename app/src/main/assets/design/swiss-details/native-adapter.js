@@ -72,10 +72,22 @@ function paintPlaceMap(figure){
 function updateNativeDetail(data,initialScroll=0){
   const scroller=view.querySelector('.scroll-content'),same=D.identity===data.identity;
   const scrollTop=same&&scroller?scroller.scrollTop:initialScroll;
+  const previousFavorite=same?view.querySelector('button[data-action="favorite"]'):null;
   D=data;state.payload=D.payload;state.trip=D.trip||{};state.favorites=new Set(D.favorites||[]);
   document.documentElement.classList.toggle('place-archive-body',D.page==='place');
   placeBodyObserver.disconnect();
   view.innerHTML=({album:albumPage,work:workPage,place:placePage,trip:tripPage}[D.page])();
+  if(previousFavorite&&detailMotion&&!reduceMotion.matches){
+    const favorite=view.querySelector('button[data-action="favorite"]');
+    const pressed=favorite?.getAttribute('aria-pressed');
+    if(favorite&&favorite.dataset.id===previousFavorite.dataset.id&&pressed!==previousFavorite.getAttribute('aria-pressed')){
+      const saved=pressed==='true';
+      favorite.querySelector('svg').animate(
+        {transform:(saved?[1,1.23,.96,1]:[1,.86,1]).map(scale=>`scale(${scale})`)},
+        {duration:saved?260:160,easing:motionEasing},
+      );
+    }
+  }
   if(D.page==='place')placeBodyObserver.observe(view.querySelector('.scroll-content'));
   sizeDetail();
   paintPlaceMap(view.querySelector('.place-map'));

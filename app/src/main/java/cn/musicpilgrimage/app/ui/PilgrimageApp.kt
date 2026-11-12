@@ -283,6 +283,12 @@ private fun isWebDetailRoute(route:String?)=when(route) {
     previousOwner=owner
    }
    val archiveRoute=isArchiveRoute(route)
+   LaunchedEffect(archiveRoute) {
+    if(!archiveRoute) {
+     music.undo.value?.let{music.dismissUndo(it.token)}
+     archive.undo.value?.let{archive.dismissUndo(it.token)}
+    }
+   }
    val webDetailRoute=isWebDetailRoute(route)
    val gameFullscreen=route=="perform/{song}"&&performanceImmersive
    DisposableEffect(gameFullscreen,context) {
@@ -476,8 +482,8 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      SwissWallTabs(wallSection?:lastWallSection,chooseModule,enabled=wallSection!=null)
     }
     Box(Modifier.matchParentSize().then(if(gameFullscreen||webDetailRoute)Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing))) {
-   if(archiveRoute||route in listOf("explore","place/{id}")) {
-    if(archiveRoute)musicUndo?.let{undo->RoomUndoNotice(undo.label,undo.token,{music.undoRemoval(undo.token)},{music.dismissUndo(undo.token)},Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())}
+   if(archiveRoute) {
+    musicUndo?.let{undo->RoomUndoNotice(undo.label,undo.token,{music.undoRemoval(undo.token)},{music.dismissUndo(undo.token)},Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())}
     placeUndo?.takeIf{it.owner==owner}?.let{undo->RoomUndoNotice("已取消地点收藏",undo.token,{archive.undoRemoval(undo.token)},{archive.dismissUndo(undo.token)},Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())}
    }
    if(savedNotice!=null&&(route in listOf("me","place/{id}","profile/{id}","mine/{kind}")||archiveRoute))Surface(Modifier.align(Alignment.BottomCenter).padding(20.dp),color=RoomColors.Navy,shape=RoundedCornerShape(6.dp)){Text(savedNotice.orEmpty(),Modifier.padding(16.dp),color=RoomColors.Paper)}

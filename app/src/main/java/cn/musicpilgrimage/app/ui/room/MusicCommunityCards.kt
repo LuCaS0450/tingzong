@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -53,9 +54,17 @@ import org.json.JSONObject
     val own=item.owner.isNotBlank()&&item.owner==owner
     val date=if(item.kind=="visit")item.raw.stringOrNull("verified_at")?.take(10)?.let{"到访于 $it"}?:"到访记录"else item.date
     val work=item.raw.stringOrNull("scene_work")?:item.song
-    val scale=remember(item.id){Animatable(1f)}
+    val lift=remember(item.id){Animatable(0f)}
     var previousLiked by remember(item.id){mutableStateOf(item.liked)}
-    LaunchedEffect(item.liked) {if(previousLiked!=item.liked&&motion){scale.animateTo(1.06f,tween(90));scale.animateTo(1f,tween(90))};previousLiked=item.liked}
+    LaunchedEffect(item.id,item.liked,motion) {
+        val changed=previousLiked!=item.liked
+        previousLiked=item.liked
+        lift.snapTo(0f)
+        if(changed&&motion) {
+            lift.animateTo(if(item.liked)1f else -.45f,tween(if(item.liked)85 else 65))
+            lift.animateTo(0f,tween(if(item.liked)145 else 105))
+        }
+    }
     RoomPaper(Modifier.fillMaxWidth().testTag("room-content-${item.id}"),woodEdge=true) {
         Column(Modifier.padding(15.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -88,8 +97,13 @@ import org.json.JSONObject
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 if(item.visibility=="private")Text("仅自己可见",Modifier.weight(1f),color=RoomColors.Muted,fontSize=12.sp)
                 else {
-                    IconButton({onAction("like",JSONObject().put("id",item.id).put("enabled",!item.liked))},Modifier.graphicsLayer{scaleX=scale.value;scaleY=scale.value},enabled=active&&!busy&&!item.hidden) {
-                        Icon(if(item.liked)Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,if(item.liked)"取消点赞"else "点赞",tint=RoomColors.Navy)
+                    IconButton({onAction("like",JSONObject().put("id",item.id).put("enabled",!item.liked))},enabled=active&&!busy&&!item.hidden) {
+                        Icon(
+                            if(item.liked)Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
+                            if(item.liked)"取消点赞"else "点赞",
+                            Modifier.graphicsLayer{translationY=-3.dp.toPx()*lift.value;rotationZ=-9f*lift.value},
+                            tint=RoomColors.Navy,
+                        )
                     }
                     Text("${item.likes}",Modifier.weight(1f),fontSize=12.sp,color=RoomColors.Muted)
                 }
