@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
@@ -101,11 +102,13 @@ import org.json.JSONObject
                 keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email,imeAction=ImeAction.Next),keyboardActions=KeyboardActions(onNext={if(!state.help)codeFocus.requestFocus()}),
                 colors=accountFieldColors())
             if(!state.help) {
+                // Match the top space OutlinedTextField reserves for its floating label.
+                val labelInset=with(LocalDensity.current){MaterialTheme.typography.bodySmall.lineHeight.toDp()/2}
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalAlignment=Alignment.Top) {
                     OutlinedTextField(state.code,onCode,Modifier.weight(1f).focusRequester(codeFocus).testTag("account-code"),label={Text("验证码")},singleLine=true,enabled=!busy,isError=state.codeError!=null,
                         supportingText={Text(state.codeError.orEmpty(),fontSize=12.sp)},shape=androidx.compose.ui.graphics.RectangleShape,
                         keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword,imeAction=ImeAction.Done),keyboardActions=KeyboardActions(onDone={onVerify()}),colors=accountFieldColors())
-                    SwissOutlinedButton(onSend,Modifier.width(125.dp).padding(top=8.dp).height(56.dp).testTag("account-send-code"),enabled=!busy&&state.remainingSeconds==0,shape=androidx.compose.ui.graphics.RectangleShape,contentPadding=PaddingValues(5.dp)) {
+                    SwissOutlinedButton(onSend,Modifier.width(125.dp).padding(top=labelInset).height(OutlinedTextFieldDefaults.MinHeight).testTag("account-send-code"),enabled=!busy&&state.remainingSeconds==0,shape=androidx.compose.ui.graphics.RectangleShape,contentPadding=PaddingValues(5.dp)) {
                         if(state.busy==OtpOperation.SEND)AccountWaiting("发送中",motion)
                         else Text(if(state.remainingSeconds>0)"${state.remainingSeconds}秒后重发" else "获取验证码",fontSize=13.sp,maxLines=1)
                     }
