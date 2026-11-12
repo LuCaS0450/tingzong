@@ -2,7 +2,7 @@ package cn.musicpilgrimage.app.ui.room
 
 import org.json.JSONObject
 
-/** One camera and selection across globe, arbitrary streets, details and process recreation. */
+/** Camera and selection shared by the globe, streets and details within one app session. */
 internal data class WorldCameraSnapshot(
     val longitude: Double, val latitude: Double, val zoom: Double,
     val selected: String = "", val summaryOpen: Boolean = false,

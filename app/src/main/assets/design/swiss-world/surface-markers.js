@@ -49,6 +49,10 @@ window.TingzongSurfaceMarkers = function(canvas, globeBounds) {
     return 5.0 + 2.8 * smooth(2, 14, zoom);
   }
 
+  function selectionRingRadius(stand) {
+    return 8.2 + 2.2 * stand;
+  }
+
   function drawGroundEllipse(x, y, rx, ry, angle) {
     ctx.beginPath();
     ctx.ellipse(x, y, Math.max(0.6, rx), Math.max(0.6, ry), angle, 0, Math.PI * 2);
@@ -149,7 +153,7 @@ window.TingzongSurfaceMarkers = function(canvas, globeBounds) {
     // 选中地点的地面双环靶心（贴合地表椭圆，标示精确落点）
     if (isSelected) {
       const pulse = smooth(0, 420, now - selectedTime);
-      const ringR = mix(4.5, 8.2 + 2.2 * stand, pulse);
+      const ringR = mix(4.5, selectionRingRadius(stand), pulse);
       drawGroundEllipse(x, y, ringR * ratio, ringR, angle);
       ctx.lineWidth = 2.2;
       ctx.strokeStyle = `rgba(247, 246, 242, ${0.92 * opacity})`;
@@ -221,6 +225,31 @@ window.TingzongSurfaceMarkers = function(canvas, globeBounds) {
 
   function markerExtent(marker) {
     return marker.radius + Math.hypot(marker.hx - marker.x, marker.hy - marker.y);
+  }
+
+  function clusterOverlapsSelection(cluster, selection) {
+    const radius = cluster.radius + 1.5;
+    if (Math.hypot(cluster.hx - selection.hx, cluster.hy - selection.hy) <= radius + selection.radius + 1.5) {
+      return true;
+    }
+
+    const dx = cluster.hx - selection.x;
+    const dy = cluster.hy - selection.y;
+    const stemX = selection.hx - selection.x;
+    const stemY = selection.hy - selection.y;
+    const stemLengthSquared = stemX * stemX + stemY * stemY;
+    if (stemLengthSquared > 1.2 ** 2) {
+      const t = clamp((dx * stemX + dy * stemY) / stemLengthSquared, 0, 1);
+      if (Math.hypot(dx - t * stemX, dy - t * stemY) <= radius + 1) return true;
+    }
+
+    // Reserve the fully expanded ring so the cluster does not flash during selection.
+    const ring = selectionRingRadius(selection.stand);
+    const cos = Math.cos(selection.angle);
+    const sin = Math.sin(selection.angle);
+    const radial = (dx * cos + dy * sin) / (ring * selection.ratio + radius + 1.1);
+    const tangent = (dy * cos - dx * sin) / (ring + radius + 1.1);
+    return radial * radial + tangent * tangent <= 1;
   }
 
   function hitScore(marker, x, y) {
@@ -353,7 +382,9 @@ window.TingzongSurfaceMarkers = function(canvas, globeBounds) {
     }
 
     // 按远近排序：球面上靠近边缘的先画、靠近球心的后画；街道上北侧先画、南侧后画；选中地点永远在最上层
-    visible = candidates.sort((a, b) => {
+    visible = candidates.filter(marker =>
+      !selection || marker.kind !== 'clusters' || !clusterOverlapsSelection(marker, selection)
+    ).sort((a, b) => {
       if (a.kind === 'selected' || b.kind === 'selected') {
         return (b.kind === 'selected') - (a.kind === 'selected');
       }
