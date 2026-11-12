@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandVertically
@@ -23,12 +22,15 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -176,13 +178,9 @@ private data class MessageMenuOrigin(val pivot: TransformOrigin, val travel: Flo
     var expanded by remember(id){mutableStateOf(false)}
     var origin by remember(id){mutableStateOf<MessageMenuOrigin?>(null)}
     val motion=LocalPhysicalMotion.current
-    val transition=updateTransition(expanded&&origin!=null,label="Message management")
+    val transition=updateTransition(expanded,label="Message management")
     val progress by transition.animateFloat(transitionSpec={
-        when {
-            !motion -> snap()
-            targetState -> spring(dampingRatio=.66f,stiffness=560f,visibilityThreshold=.002f)
-            else -> tween(125,easing=appMotionEasing)
-        }
+        if(motion)tween(if(targetState)95 else 70,easing=appMotionEasing) else snap()
     },label="Menu expansion"){if(it)1f else 0f}
 
     Box {
@@ -193,7 +191,7 @@ private data class MessageMenuOrigin(val pivot: TransformOrigin, val travel: Flo
             },
         ) {
             Icon(Icons.Outlined.Settings,"管理留言",Modifier.size(20.dp).graphicsLayer {
-                rotationZ=if(motion)14f*progress else 0f
+                rotationZ=if(motion)10f*progress else 0f
             },tint=RoomColors.Ink)
         }
         if(expanded||transition.currentState||transition.isRunning) {
@@ -226,16 +224,20 @@ private data class MessageMenuOrigin(val pivot: TransformOrigin, val travel: Flo
                     }
                 }
             }
-            Popup(popupPositionProvider=position,onDismissRequest={expanded=false},properties=PopupProperties(focusable=true)) {
+            Popup(popupPositionProvider=position,onDismissRequest={expanded=false},properties=PopupProperties(focusable=expanded)) {
                 Box(Modifier.padding(8.dp)) {
                     Surface(
-                        modifier=Modifier.width(108.dp).testTag("room-message-menu-$id").graphicsLayer {
+                        modifier=Modifier.testTag("room-message-menu-$id").graphicsLayer {
                             val placement=origin
                             val amount=if(motion)progress else if(expanded)1f else 0f
-                            alpha=if(placement==null)0f else (amount/.8f).coerceIn(0f,1f)
+                            alpha=when {
+                                placement==null -> 0f
+                                expanded -> amount.coerceAtLeast(.7f)
+                                else -> amount
+                            }
                             if(placement!=null) {
                                 transformOrigin=placement.pivot
-                                scaleX=.8f+.2f*amount
+                                scaleX=.94f+.06f*amount
                                 scaleY=scaleX
                                 translationY=placement.travel*(1f-amount)
                             }
@@ -243,27 +245,35 @@ private data class MessageMenuOrigin(val pivot: TransformOrigin, val travel: Flo
                         shape=RoundedCornerShape(6.dp),color=RoomColors.Paper,
                         border=BorderStroke(1.dp,RoomColors.Line),shadowElevation=4.dp,
                     ) {
-                        Column {
-                            if(canEdit)DropdownMenuItem(
-                                text={Text("编辑")},
-                                onClick={expanded=false;onEdit()},
-                                enabled=expanded&&!busy,
-                                contentPadding=PaddingValues(horizontal=10.dp),
-                                colors=MenuDefaults.itemColors(textColor=RoomColors.Ink,leadingIconColor=RoomColors.Ink),
-                                leadingIcon={Icon(Icons.Outlined.Edit,null,Modifier.size(18.dp))},
-                            )
-                            DropdownMenuItem(
-                                text={Text("删除")},
-                                onClick={expanded=false;onDelete()},
-                                enabled=expanded&&!busy,
-                                contentPadding=PaddingValues(horizontal=10.dp),
-                                colors=MenuDefaults.itemColors(textColor=RoomColors.Red,leadingIconColor=RoomColors.Red),
-                                leadingIcon={Icon(Icons.Outlined.DeleteOutline,null,Modifier.size(18.dp))},
-                            )
+                        Column(Modifier.width(IntrinsicSize.Max)) {
+                            if(canEdit)MessageMenuAction("编辑",Icons.Outlined.Edit,RoomColors.Ink,expanded&&!busy) {
+                                expanded=false
+                                onEdit()
+                            }
+                            MessageMenuAction("删除",Icons.Outlined.DeleteOutline,RoomColors.Red,expanded&&!busy) {
+                                expanded=false
+                                onDelete()
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable private fun MessageMenuAction(
+    label:String,icon:ImageVector,color:Color,enabled:Boolean,onClick:()->Unit
+) {
+    val tint=if(enabled)color else color.copy(alpha=.38f)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min=48.dp)
+            .clickable(enabled=enabled,role=Role.Button,onClick=onClick)
+            .padding(horizontal=10.dp),
+        verticalAlignment=Alignment.CenterVertically,
+        horizontalArrangement=Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(icon,null,Modifier.size(18.dp),tint=tint)
+        Text(label,color=tint,fontSize=14.sp)
     }
 }
