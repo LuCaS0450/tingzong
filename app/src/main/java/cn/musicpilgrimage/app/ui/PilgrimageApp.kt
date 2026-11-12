@@ -76,7 +76,6 @@ private fun isWebDetailRoute(route:String?)=when(route) {
  val edgeToEdge=isWebDetailRoute(route)||route=="perform/{song}"&&performanceImmersive
  val title=when(route) {
   "search","release-search/{id}"->"搜索"
-  "place-community/{id}"->"地点社区"
   "trips"->"我的行程"
   "archive/{kind}","music-favorites/{kind}"->"资料册"
   "account-profile","edit-profile","profile/{id}"->"个人资料"
@@ -412,12 +411,11 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      page("place/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->
       val origin=e.savedStateHandle.get<Bundle>(PlaceArchiveEntry)
       RoomPlaceDetail(place,origin?.getStringArrayList("scenes").orEmpty().toSet(),
-       viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,archive::deleteVisitContent,
-       {navigate("place-community/${Uri.encode(place.id)}")},{addToTrip(place)},musicCatalog,
+       viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,openProfile,
+       {addToTrip(place)},musicCatalog,
        onMusicArchive={target->followMusicArchiveLink(e,"${if(target.isRelease)"album" else "song"}/${Uri.encode(target.id)}")},
        onBack=back,onMap={wallBrowse.focusWorld(place.id);navigate("explore")})
      }?:Text("这个地点暂未收录，请返回重试。",Modifier.padding(24.dp))}
-     page("place-community/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->RoomPlaceCommunity(place,viewModel(key="community-$owner-${place.id}"),session,login,openForm,openProfile){navigate("archive/footprints")}}}
      page("trips"){if(owner==null)LaunchedEffect(Unit){login()}else key(libraryOwner){RoomTripList(tripState,libraryOwner,tripCities,trips){navigate("trip/${Uri.encode(it)}")}}}
      page("trip/{id}"){e->if(owner==null)LaunchedEffect(Unit){login()}else key(libraryOwner){tripState.trips.find{it.id==e.arguments?.getString("id")}?.let{RoomTripDetailWeb(it,tripState,libraryOwner,trips,{id->navigate("place/${Uri.encode(id)}")},onBack=back,onDiscover={chooseModule("explore")},catalog=sourceCatalog.publicOnly())}?:Text(if(tripState.busy)"正在载入行程…"else "这个行程暂不可用，请返回重试。",Modifier.padding(24.dp))}}
      page("auth"){if(recovery)AuthScreen(session,{authPending=false;pendingForm=null;back()})else RoomEmailLoginRoute(account,{account.otp.reset();authPending=false;pendingForm=null;back()})}
@@ -482,7 +480,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
     if(archiveRoute)musicUndo?.let{undo->RoomUndoNotice(undo.label,undo.token,{music.undoRemoval(undo.token)},{music.dismissUndo(undo.token)},Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())}
     placeUndo?.takeIf{it.owner==owner}?.let{undo->RoomUndoNotice("已取消地点收藏",undo.token,{archive.undoRemoval(undo.token)},{archive.dismissUndo(undo.token)},Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())}
    }
-   if(savedNotice!=null&&(route in listOf("me","place/{id}","place-community/{id}","profile/{id}","mine/{kind}")||archiveRoute))Surface(Modifier.align(Alignment.BottomCenter).padding(20.dp),color=RoomColors.Navy,shape=RoundedCornerShape(6.dp)){Text(savedNotice.orEmpty(),Modifier.padding(16.dp),color=RoomColors.Paper)}
+   if(savedNotice!=null&&(route in listOf("me","place/{id}","profile/{id}","mine/{kind}")||archiveRoute))Surface(Modifier.align(Alignment.BottomCenter).padding(20.dp),color=RoomColors.Navy,shape=RoundedCornerShape(6.dp)){Text(savedNotice.orEmpty(),Modifier.padding(16.dp),color=RoomColors.Paper)}
    if(route in listOf("explore","place/{id}")&&archiveState.error!=null)Surface(Modifier.align(Alignment.BottomCenter).padding(16.dp),color=RoomColors.Paper,shape=RoundedCornerShape(6.dp),shadowElevation=4.dp){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Text(archiveState.error.orEmpty(),Modifier.weight(1f),color=RoomColors.Ink);TextButton(archive::reload){Text("重试")}}}
    }
    ArchiveHandoffLayer(archiveHandoff,motion,Modifier.matchParentSize())

@@ -78,7 +78,9 @@ import coil.request.ImageRequest
     if(viewing)RoomCommunityPhotoViewer(model,description){viewing=false}
 }
 
-@Composable private fun RoomCommunityPhotoViewer(model:Any?,description:String,onClosed:()->Unit) {
+@Composable internal fun RoomCommunityPhotoViewer(
+    model:Any?,description:String,credit:String?=null,onSources:(()->Unit)?=null,onClosed:()->Unit
+) {
     val motion=LocalPhysicalMotion.current
     var closing by remember{mutableStateOf(false)}
     val close by rememberUpdatedState(onClosed)
@@ -102,6 +104,8 @@ import coil.request.ImageRequest
                         IconButton({closing=true}){Icon(Icons.Outlined.Close,"关闭大图",tint=RoomColors.Ink)}
                     }
                     AsyncImage(model,description,Modifier.fillMaxWidth().heightIn(min=120.dp,max=480.dp),contentScale=ContentScale.Fit)
+                    if(credit!=null)Text(credit,fontSize=12.sp,color=RoomColors.Muted)
+                    if(onSources!=null)SwissTextButton(onSources){Text("资料来源")}
                 }
             }
         }

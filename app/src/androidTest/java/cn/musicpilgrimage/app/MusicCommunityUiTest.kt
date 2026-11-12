@@ -76,20 +76,35 @@ class MusicCommunityUiTest {
     }
     @Test fun communityTabsOwnManagementAndDeleteConfirmationKeepCertification() {
         var actions=mutableListOf<String>()
-        val message=item("message","message","someone-else").also {
+        val message=item("message","message").also {
             it.raw.put("scene_work",JSONObject.NULL).put("artist","")
         }
         val own=item("visit","visit")
+        val privateVisit=item("private-visit","visit").also{it.raw.put("visibility","private")}
+        var existingVisit by mutableStateOf<ContentItem?>(null)
+        val openedVisits=mutableListOf<ContentItem?>()
         show("地点社区") {
             var tab by remember{mutableIntStateOf(0)}
-            RoomCommunityFeedContent(Place("samaritaine","莎玛丽丹百货","巴黎","法国",48.85,2.35),"fixture-owner",listOf(message,own),true,false,null,null,tab,{tab=it},{},{},{},{},{}) {row->
+            RoomCommunityFeedContent("fixture-owner",listOf(message,own),true,false,null,null,tab,{tab=it},
+                {},existingVisit,{openedVisits.add(it)},{},{},{Text("地点与音乐")}) {row->
                 RoomContentEntry(row,"fixture-owner",true,false,null,null,null,onEdit={actions.add("edit")},onProfile={},onAction={action,_->actions.add(action)})
             }
         }
         compose.onNodeWithText("写留言").assertIsDisplayed();compose.onNodeWithText("记录到访").assertIsDisplayed()
+        compose.onNodeWithText("记录到访").performClick()
+        compose.runOnIdle{existingVisit=privateVisit}
+        compose.onNodeWithText("编辑到访").performClick()
+        assertEquals(listOf(null,privateVisit),openedVisits)
+        compose.onNodeWithText("记录到访").assertDoesNotExist()
+        compose.onNodeWithText("我的记录").assertDoesNotExist()
         compose.onNodeWithTag("room-content-message").assertExists();compose.onNodeWithTag("room-content-visit").assertDoesNotExist()
         compose.onNodeWithText(message.body).assertIsDisplayed()
         compose.onNodeWithText("null").assertDoesNotExist()
+        compose.onNode(hasText("留言") and hasAnyAncestor(hasTestTag("room-content-message"))).assertDoesNotExist()
+        compose.onNodeWithText("管理记录").assertDoesNotExist()
+        compose.onNodeWithContentDescription("管理留言").performClick()
+        compose.onNodeWithText("编辑",useUnmergedTree=true).assertExists()
+        compose.onNodeWithContentDescription("管理留言").performClick()
         capture("community")
         compose.onNodeWithText("到访与复刻").performClick()
         compose.onNodeWithText("最伟大的作品 · 周杰伦").assertExists()

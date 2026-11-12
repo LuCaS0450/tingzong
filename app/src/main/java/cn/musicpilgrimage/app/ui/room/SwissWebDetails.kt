@@ -11,6 +11,7 @@ import android.webkit.ConsoleMessage
 import android.webkit.WebResourceError
 import android.webkit.WebResourceResponse
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -51,7 +52,9 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
     val latestAction by rememberUpdatedState(onAction)
     val json=data.toString()
     val latestJson by rememberUpdatedState(json)
+    val placeBody=data.optString("page")=="place"
     var archiveScroll by rememberSaveable(data.optString("identity")){mutableStateOf(0.0)}
+    var placeBodyHeight by rememberSaveable(data.optString("identity")){mutableIntStateOf(0)}
     val web=remember(context){WebView(context)}
     val rendered=remember(web){arrayOf<String?>(null)}
     val alive=remember(web){booleanArrayOf(true)}
@@ -67,7 +70,7 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
     LaunchedEffect(firstPaint,failed) {
         if(firstPaint||failed){withFrameNanos{};latestDrawn()}
     }
-    BackHandler(imageOpen||archiveBack!=null){
+    BackHandler(!placeBody&&(imageOpen||archiveBack!=null)){
         if(imageOpen)web.evaluateJavascript("closeNativeImage()",null) else archiveBack?.invoke()
     }
     DisposableEffect(web) {onDispose{alive[0]=false;web.removeJavascriptInterface("TingzongDetail");web.stopLoading();web.destroy()}}
@@ -96,7 +99,7 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
         rendered[0]=latestJson
         render(latestJson,archiveScroll)
     }
-    Box(Modifier.fillMaxSize()) {
+    Box(if(placeBody)Modifier.fillMaxWidth().height((placeBodyHeight.takeIf{it>0}?:200).dp) else Modifier.fillMaxSize()) {
     AndroidView(factory={web.apply {
         setBackgroundColor(android.graphics.Color.rgb(247,246,242))
         settings.javaScriptEnabled=true;settings.domStorageEnabled=false;settings.textZoom=100
@@ -119,6 +122,7 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
                         "__document-ready"->documentReady()
                         "__image-opened"->imageOpen=true
                         "__image-closed"->imageOpen=false
+                        "__place-body-height"->if(placeBody)message.optInt("height").takeIf{it>0}?.let{placeBodyHeight=it}
                         else->latestAction(action,message)
                     }
                 }
@@ -152,9 +156,16 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
     }},modifier=Modifier.fillMaxSize().testTag("swiss-web-detail"),update={
         if(ready&&rendered[0]!=json){rendered[0]=json;render(json)}
     })
-    if(!firstPaint)ArchiveLoadingPage(data,failed,{latestAction("back",JSONObject())}) {
+    val retry={
         failed=false;ready=false;loadAttempt++;rendered[0]=null
         web.stopLoading();web.loadUrl(DetailPage)
+    }
+    if(!firstPaint) {
+        if(placeBody)Column(Modifier.fillMaxSize().background(RoomColors.Paper).padding(25.dp)) {
+            Text(if(failed)"地点资料暂时无法载入。" else "正在载入地点资料…",color=RoomColors.Muted,fontSize=14.sp)
+            if(failed)SwissTextButton(retry){Text("重试")}
+        }
+        else ArchiveLoadingPage(data,failed,{latestAction("back",JSONObject())},retry)
     }
     }
 }

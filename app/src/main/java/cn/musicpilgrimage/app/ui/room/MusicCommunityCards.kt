@@ -66,7 +66,9 @@ import org.json.JSONObject
                         Text(date,Modifier.padding(top=4.dp),color=RoomColors.Muted,fontSize=12.sp)
                     }
                 } else Text(date,Modifier.weight(1f),fontSize=12.sp,color=RoomColors.Muted)
-                Text(when(item.kind){"message"->"留言";"visit"->"到访";"recreation"->"复刻";else->"记录"},fontSize=12.sp,color=RoomColors.Muted)
+                if (item.kind != "message") {
+                    Text(when(item.kind){"visit"->"到访";"recreation"->"复刻";else->"记录"},fontSize=12.sp,color=RoomColors.Muted)
+                }
             }
             if(item.hidden)Text("此条内容已被管理员隐藏，仅自己可管理。",color=MaterialTheme.colorScheme.error,fontSize=12.sp)
             if(item.kind!="message") {
@@ -91,7 +93,12 @@ import org.json.JSONObject
                     }
                     Text("${item.likes}",Modifier.weight(1f),fontSize=12.sp,color=RoomColors.Muted)
                 }
-                if(own)SwissTextButton({manage=!manage},enabled=!busy,modifier=Modifier.testTag("room-manage-${item.id}")){Icon(Icons.Outlined.Settings,null,Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("管理记录",fontSize=12.sp)}
+                if(own && item.kind == "message") {
+                    IconButton(onClick={manage=!manage},enabled=!busy,modifier=Modifier.testTag("room-manage-${item.id}")) {
+                        Icon(Icons.Outlined.Settings,"管理留言",Modifier.size(20.dp),tint=RoomColors.Ink)
+                    }
+                }
+                else if(own)SwissTextButton({manage=!manage},enabled=!busy,modifier=Modifier.testTag("room-manage-${item.id}")){Icon(Icons.Outlined.Settings,null,Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("管理记录",fontSize=12.sp)}
                 else if(active&&!item.hidden&&item.visibility=="public")SwissTextButton({reporting=true},enabled=!busy){Icon(Icons.Outlined.Flag,null,Modifier.size(16.dp));Spacer(Modifier.width(5.dp));Text("举报",fontSize=12.sp)}
             }
             AnimatedVisibility(own&&manage,enter=fadeIn(tween(if(motion)160 else 0))+expandVertically(tween(if(motion)160 else 0)),exit=fadeOut(tween(if(motion)160 else 0))+shrinkVertically(tween(if(motion)160 else 0))) {

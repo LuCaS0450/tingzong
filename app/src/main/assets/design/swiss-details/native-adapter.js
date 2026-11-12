@@ -25,10 +25,23 @@ function closeNativeImage(){
   if(detailMotion&&!reduceMotion.matches)animateImage(shade,false).finished.then(()=>shade.remove(),()=>{});
   else shade.remove();
 }
+const placeBodyObserver=new ResizeObserver(()=>reportPlaceBodyHeight());
+let placeBodyHeight=0;
+function reportPlaceBodyHeight(){
+  const content=view.querySelector('.scroll-content');
+  if(D.page!=='place'||!content)return;
+  const height=Math.ceil(content.getBoundingClientRect().height);
+  if(height>0&&height!==placeBodyHeight){
+    placeBodyHeight=height;
+    post('__place-body-height',{height});
+  }
+}
 function sizeDetail(){
   if(innerWidth<=0||innerHeight<=0)return;
   const scale=innerWidth/360,phone=document.getElementById('phone');
-  phone.style.transform=`scale(${scale})`;phone.style.height=(innerHeight/scale)+'px';
+  phone.style.transform=`scale(${scale})`;
+  phone.style.height=D.page==='place'?'':(innerHeight/scale)+'px';
+  reportPlaceBodyHeight();
 }
 let archiveCountries;
 function paintPlaceMap(figure){
@@ -60,7 +73,10 @@ function updateNativeDetail(data,initialScroll=0){
   const scroller=view.querySelector('.scroll-content'),same=D.identity===data.identity;
   const scrollTop=same&&scroller?scroller.scrollTop:initialScroll;
   D=data;state.payload=D.payload;state.trip=D.trip||{};state.favorites=new Set(D.favorites||[]);
+  document.documentElement.classList.toggle('place-archive-body',D.page==='place');
+  placeBodyObserver.disconnect();
   view.innerHTML=({album:albumPage,work:workPage,place:placePage,trip:tripPage}[D.page])();
+  if(D.page==='place')placeBodyObserver.observe(view.querySelector('.scroll-content'));
   sizeDetail();
   paintPlaceMap(view.querySelector('.place-map'));
   const nextScroller=view.querySelector('.scroll-content');
@@ -113,6 +129,10 @@ document.addEventListener('click',event=>{
   if(node.dataset.action==='native-close-image'){closeNativeImage();return;}
   if(node.dataset.action==='image'){
     const img=node.querySelector('img');
+    if(D.page==='place'){
+      post('archive-image',{src:img?.currentSrc||attrs.src,description:img?.alt||'完整图片',credit:shortCredit(attrs.credit)});
+      return;
+    }
     document.getElementById('overlay-root').innerHTML=`<div class="modal-shade image-shade" role="dialog" aria-modal="true" aria-label="完整图片"><img src="${esc(img?.currentSrc||attrs.src)}" alt="${esc(img?.alt||'完整图片')}"><button class="icon-button" type="button" data-action="native-close-image" aria-label="关闭大图">${icon('close')}</button><div class="image-credit">${esc(shortCredit(attrs.credit))}<br><a class="source-link" data-action="sources" href="#" style="color:inherit">资料来源 ↗</a></div></div>`;
     if(detailMotion&&!reduceMotion.matches)animateImage(document.querySelector('#overlay-root .image-shade'),true);
     post('__image-opened');return;

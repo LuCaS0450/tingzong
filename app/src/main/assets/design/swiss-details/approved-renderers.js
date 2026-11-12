@@ -92,7 +92,7 @@
   }
   function placePage(){
     const p=place(state.payload.id);
-    return subHeader('地点档案')+`<div class="scroll-content">
+    return `<div class="scroll-content">
       ${placeVisual(p)}
       <div class="pad">
         <p class="sub-eyebrow">${[p.country,p.city].filter(Boolean).map(esc).join(' / ')}</p>
@@ -101,8 +101,6 @@
         <div class="action-strip">${favoriteButton(p.id)}<button type="button" data-action="add-trip" data-id="${esc(p.id)}">${icon('plus')}加入行程</button><button type="button" data-action="map-place" data-id="${esc(p.id)}">${icon('pin')}地图</button></div>
         <div class="section-title">地点与音乐 <small>THE CONNECTION</small></div>
         ${placeConnections(p)}
-        <div class="section-title">到访记录 <small>YOUR STORY</small></div>
-        <div class="button-row"><button class="block-button" type="button" data-action="record-new" data-id="${esc(p.id)}">写下到访记录</button><button class="block-button" type="button" data-action="community" data-id="${esc(p.id)}">地点社区</button></div>
         <p class="credit-line"><a class="source-link" href="#" data-action="sources">资料来源 ↗</a></p>
       </div></div>`;
   }

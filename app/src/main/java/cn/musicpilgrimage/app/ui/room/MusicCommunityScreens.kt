@@ -12,8 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,7 +21,11 @@ import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.ViewModelStatus
 import org.json.JSONObject
 
-@Composable internal fun RoomPlaceCommunity(place:Place,vm:PlaceViewModel,session:SessionViewModel,onLogin:()->Unit,onForm:(String,String,ContentItem?)->Unit,onProfile:(String)->Unit,onMine:()->Unit={}) {
+@Composable internal fun RoomPlaceCommunity(
+    place:Place,vm:PlaceViewModel,session:SessionViewModel,onLogin:()->Unit,
+    onForm:(String,String,ContentItem?)->Unit,onProfile:(String)->Unit,
+    archive:@Composable ()->Unit
+) {
     val owner by session.signedIn.collectAsState()
     val revision by session.services.changed.collectAsState()
     val rows by vm.items.collectAsState()
@@ -34,45 +36,44 @@ import org.json.JSONObject
     val notice by vm.notice.collectAsState()
     var tab by rememberSaveable(place.id){mutableIntStateOf(0)}
     LaunchedEffect(place.id,owner,revision){vm.load(place.id)}
-    RoomCommunityFeedContent(place,owner,rows,loaded,busy,error,notice,tab,{tab=it},
-        {onForm("message",place.id,own.find{it.kind=="message"})},{onForm("visit",place.id,null)},onMine,onLogin,{vm.load(place.id,loaded&&error==null)}) {row->
+    val visit=own.firstOrNull{it.kind=="visit"&&it.owner==owner}
+    RoomCommunityFeedContent(owner,rows,loaded,busy,error,notice,tab,{tab=it},
+        {onForm("message",place.id,own.firstOrNull{it.kind=="message"&&it.owner==owner})},
+        visit,{onForm("visit",place.id,it)},onLogin,{vm.load(place.id,loaded&&error==null)},archive) {row->
         RoomContentCard(row,session,vm,{onForm(it.kind,if(it.kind=="recreation")it.sceneId else place.id,it)},onProfile)
     }
 }
 
 @Composable internal fun RoomCommunityFeedContent(
-    place:Place,owner:String?,rows:List<ContentItem>,loaded:Boolean,busy:Boolean,error:String?,notice:String?,tab:Int,onTab:(Int)->Unit,
-    onMessage:()->Unit,onVisit:()->Unit,onMine:()->Unit,onLogin:()->Unit,onMore:()->Unit,card:@Composable (ContentItem)->Unit
+    owner:String?,rows:List<ContentItem>,loaded:Boolean,busy:Boolean,error:String?,notice:String?,tab:Int,onTab:(Int)->Unit,
+    onMessage:()->Unit,visit:ContentItem?,onVisit:(ContentItem?)->Unit,onLogin:()->Unit,onMore:()->Unit,
+    archive:@Composable ()->Unit,card:@Composable (ContentItem)->Unit
 ) {
     val list=rememberLazyListState()
     val motion=LocalPhysicalMotion.current
     val filtered=rows.filter{RecordDraftRules.publiclyVisible(it)&&(if(tab==0)it.kind=="message"else it.kind in listOf("visit","recreation"))}.sortedByDescending{it.raw.optString("created_at")}
-    val heading=remember(place){place.heading()}
-    LazyColumn(Modifier.fillMaxSize().testTag("room-community"),state=list,contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item("place"){RoomPaper(Modifier.fillMaxWidth(),woodEdge=true){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
-            Text("${place.city} · ${place.country}",fontSize=12.sp,color=RoomColors.Muted)
-            Text(heading.title,Modifier.clearAndSetSemantics{contentDescription=place.name},fontSize=22.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
-            if(heading.qualifier.isNotBlank())Text(heading.qualifier,fontSize=14.sp,lineHeight=21.sp,color=RoomColors.Muted)
-        }}}
-        if(owner==null)item("login"){SwissTextButton(onLogin){Text("登录后查看社区")}}
+    val inset=Modifier.padding(horizontal=25.dp)
+    LazyColumn(Modifier.fillMaxSize().testTag("room-community"),state=list,contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        item("archive"){archive()}
+        item("community-heading"){
+            Text("地点社区",inset,fontSize=22.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
+        }
+        if(owner==null)item("login"){SwissTextButton(onLogin,inset){Text("登录后查看社区")}}
         else {
-            item("publish"){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                RoomPaper(Modifier.weight(1f)){SwissOutlinedButton(onMessage,Modifier.fillMaxWidth().heightIn(min=48.dp),shape=androidx.compose.ui.graphics.RectangleShape,colors=ButtonDefaults.outlinedButtonColors(contentColor=RoomColors.Navy)){Text("写留言")}}
-                RoomPaper(Modifier.weight(1f)){SwissOutlinedButton(onVisit,Modifier.fillMaxWidth().heightIn(min=48.dp),shape=androidx.compose.ui.graphics.RectangleShape,colors=ButtonDefaults.outlinedButtonColors(contentColor=RoomColors.Navy)){Text("记录到访")}}
+            item("publish"){Row(Modifier.fillMaxWidth().then(inset),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                RoomPaper(Modifier.weight(1f)){SwissOutlinedButton(onMessage,Modifier.fillMaxWidth().heightIn(min=48.dp),enabled=loaded&&!busy,shape=androidx.compose.ui.graphics.RectangleShape,colors=ButtonDefaults.outlinedButtonColors(contentColor=RoomColors.Navy)){Text("写留言")}}
+                RoomPaper(Modifier.weight(1f)){SwissOutlinedButton({onVisit(visit)},Modifier.fillMaxWidth().heightIn(min=48.dp),enabled=loaded&&!busy,shape=androidx.compose.ui.graphics.RectangleShape,colors=ButtonDefaults.outlinedButtonColors(contentColor=RoomColors.Navy)){Text(if(visit==null)"记录到访" else "编辑到访")}}
             }}
-            item("tabs"){Row(verticalAlignment=Alignment.CenterVertically) {
-                RoomCommunityTabs(listOf("留言","到访与复刻"),tab,onTab,Modifier.weight(1f))
-                SwissTextButton(onMine){Text("我的记录",fontSize=12.sp)}
-            }}
-            item("status"){Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            item("tabs"){RoomCommunityTabs(listOf("留言","到访与复刻"),tab,onTab,inset)}
+            item("status"){Column(inset,verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text("最新发布在前",color=RoomColors.Muted,fontSize=12.sp)
                 if(busy)LinearProgressIndicator(Modifier.fillMaxWidth(),color=RoomColors.Navy)
-                if(error!=null){Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp);SwissTextButton(onMore){Text("重试")}}
+                if(error!=null){Text("暂时无法更新社区内容，请重试。",color=MaterialTheme.colorScheme.error,fontSize=13.sp);SwissTextButton(onMore){Text("重试")}}
                 if(notice!=null)Text(notice,color=RoomColors.Navy,fontSize=13.sp)
             }}
-            if(loaded&&filtered.isEmpty())item("empty"){Text("这里还没有公开内容。",fontSize=14.sp,color=RoomColors.Muted)}
-            items(filtered,key={it.id}){row->Box(Modifier.animateItem(fadeInSpec=tween(if(motion)140 else 0),fadeOutSpec=tween(if(motion)140 else 0),placementSpec=null)){card(row)}}
-            if(rows.size>=30)item("more"){SwissTextButton(onMore){Text("加载更多")}}
+            if(loaded&&filtered.isEmpty())item("empty"){Text("这里还没有公开内容。",inset,fontSize=14.sp,color=RoomColors.Muted)}
+            items(filtered,key={it.id}){row->Box(Modifier.animateItem(fadeInSpec=tween(if(motion)140 else 0),fadeOutSpec=tween(if(motion)140 else 0),placementSpec=null).then(inset)){card(row)}}
+            if(rows.size>=30)item("more"){SwissTextButton(onMore,inset){Text("加载更多")}}
         }
     }
 }

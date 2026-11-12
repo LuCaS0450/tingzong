@@ -327,7 +327,8 @@ class NativeEmulatorAcceptanceTest {
         waitTag("archive-place-${f.getString("location")}")
         val name=services.catalog.value.places.first{it.id==f.getString("location")}.name
         compose.onNodeWithText(name,substring=false).performScrollTo().performClick();waitTag("room-place-detail")
-        compose.onNodeWithText("地点社区",substring=false).performScrollTo().performClick();waitTag("room-community")
+        waitTag("room-community")
+        compose.onNodeWithTag("room-community").performScrollToNode(hasText("写留言"))
     }
 
     @Test fun realCommunityMessageEditPeerInteractionsProfileAndDelete()=runBlocking {

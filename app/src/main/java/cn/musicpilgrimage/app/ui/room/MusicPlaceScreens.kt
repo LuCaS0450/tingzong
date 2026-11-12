@@ -4,7 +4,8 @@ import cn.musicpilgrimage.app.ui.AppMotionDialog
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -25,38 +26,60 @@ import androidx.compose.ui.unit.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.musicpilgrimage.app.*
 import cn.musicpilgrimage.app.data.*
-import cn.musicpilgrimage.app.ui.ContentCard
-import cn.musicpilgrimage.app.ui.ViewModelStatus
+import cn.musicpilgrimage.app.ui.LocalArchiveBack
+import org.json.JSONObject
 
 @Composable internal fun RoomPlaceDetail(
     place:Place,entryScenes:Set<String>,vm:PlaceViewModel,session:SessionViewModel,
     favorite:Boolean,favoriteBusy:Boolean,onFavorite:()->Unit,onLogin:()->Unit,
-    onForm:(String,String,ContentItem?)->Unit,onDelete:(ContentItem)->Unit,onCommunity:()->Unit,onAdd:()->Unit,
+    onForm:(String,String,ContentItem?)->Unit,onProfile:(String)->Unit,onAdd:()->Unit,
     catalog:MusicCatalogue,onMusicArchive:(MusicArchiveTarget)->Unit,
-    onBack:()->Unit={},onMap:()->Unit={}
+    onBack:()->Unit,onMap:()->Unit={}
 ) {
     val owner by session.signedIn.collectAsStateWithLifecycle()
-    val revision by session.services.changed.collectAsStateWithLifecycle()
     val own by vm.ownItems.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
-    LaunchedEffect(place.id,owner,revision){vm.load(place.id)}
+    val archiveBack=LocalArchiveBack.current
+    BackHandler(archiveBack!=null){archiveBack?.invoke()}
     val context=LocalContext.current
     val media=remember(context){SwissDetailMedia(context)}
     val photo=remember(place,media){media.archivePhoto(place)}
     val recreation=remember(place,entryScenes){place.scenes.firstOrNull{it.id in entryScenes&&it.canRecreate}
         ?:place.scenes.firstOrNull{it.canRecreate}}
     var sources by rememberSaveable(place.id){mutableStateOf(false)}
+    var archiveImage by remember(place.id){mutableStateOf<JSONObject?>(null)}
     var referenceReady by remember(recreation?.id){mutableStateOf(false)}
     val targets=remember(catalog,place.id){catalog.placeArchiveTargets(place.id)}
     val archivePlace=remember(place,photo,entryScenes,targets){media.placeArchive(place,photo,entryScenes,targets)}
     val data=swissDetailData("place",place.id).put("places",org.json.JSONArray().put(archivePlace))
         .put("favorites",org.json.JSONArray(if(favorite)listOf(place.id)else emptyList<String>())).put("fallbacks",media.fallbacks)
-    SwissWebDetail(data){action,args->when(action) {
-        "connection"->targets[args.optString("id")]?.let(onMusicArchive)
-        "back"->onBack();"favorite"->if(!favoriteBusy)onFavorite();"add-trip"->onAdd();"map-place"->onMap()
-        "record-new"->if(owner==null)onLogin()else onForm("visit",place.id,null)
-        "community"->onCommunity();"sources"->sources=true
-    }}
+    BoxWithConstraints(Modifier.fillMaxSize().background(RoomColors.Paper)
+        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal+WindowInsetsSides.Bottom))
+        .testTag("room-place-detail")) {
+        // Match the inset and header height of the 360-unit archive layout.
+        val archiveUnit=maxWidth/360f
+        Column(Modifier.fillMaxSize()) {
+            Spacer(Modifier.height(archiveUnit*32))
+            RoomHeader("地点档案",onBack=onBack,onSpace={},modifier=Modifier.height(archiveUnit*56))
+            HorizontalDivider(color=RoomColors.Line)
+            Box(Modifier.weight(1f)) {
+                RoomPlaceCommunity(place,vm,session,onLogin,onForm,onProfile) {
+                    SwissWebDetail(data){action,args->when(action) {
+                        "connection"->targets[args.optString("id")]?.let(onMusicArchive)
+                        "favorite"->if(!favoriteBusy)onFavorite()
+                        "add-trip"->onAdd()
+                        "map-place"->onMap()
+                        "sources"->sources=true
+                        "archive-image"->if(args.stringOrNull("src")!=null)archiveImage=args
+                    }}
+                }
+            }
+        }
+    }
+    archiveImage?.let { image ->
+        RoomCommunityPhotoViewer(image.optString("src"),image.optString("description"),
+            credit=image.stringOrNull("credit"),onSources={archiveImage=null;sources=true}){archiveImage=null}
+    }
     if(sources)AppMotionDialog({sources=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)) {
         RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {Column {
             RoomHeader("资料来源",onBack={sources=false},onSpace={})
