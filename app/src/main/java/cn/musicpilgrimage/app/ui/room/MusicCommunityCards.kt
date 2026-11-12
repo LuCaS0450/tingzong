@@ -52,7 +52,7 @@ import org.json.JSONObject
     var reporting by rememberSaveable(item.id,owner){mutableStateOf(false)}
     val own=item.owner.isNotBlank()&&item.owner==owner
     val date=if(item.kind=="visit")item.raw.stringOrNull("verified_at")?.take(10)?.let{"到访于 $it"}?:"到访记录"else item.date
-    val work=item.raw.optString("scene_work").ifBlank{item.song}
+    val work=item.raw.stringOrNull("scene_work")?:item.song
     val scale=remember(item.id){Animatable(1f)}
     var previousLiked by remember(item.id){mutableStateOf(item.liked)}
     LaunchedEffect(item.liked) {if(previousLiked!=item.liked&&motion){scale.animateTo(1.06f,tween(90));scale.animateTo(1f,tween(90))};previousLiked=item.liked}

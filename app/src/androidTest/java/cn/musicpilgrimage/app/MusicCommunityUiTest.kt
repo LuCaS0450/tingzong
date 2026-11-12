@@ -76,7 +76,9 @@ class MusicCommunityUiTest {
     }
     @Test fun communityTabsOwnManagementAndDeleteConfirmationKeepCertification() {
         var actions=mutableListOf<String>()
-        val message=item("message","message","someone-else")
+        val message=item("message","message","someone-else").also {
+            it.raw.put("scene_work",JSONObject.NULL).put("artist","")
+        }
         val own=item("visit","visit")
         show("地点社区") {
             var tab by remember{mutableIntStateOf(0)}
@@ -86,8 +88,11 @@ class MusicCommunityUiTest {
         }
         compose.onNodeWithText("写留言").assertIsDisplayed();compose.onNodeWithText("记录到访").assertIsDisplayed()
         compose.onNodeWithTag("room-content-message").assertExists();compose.onNodeWithTag("room-content-visit").assertDoesNotExist()
+        compose.onNodeWithText(message.body).assertIsDisplayed()
+        compose.onNodeWithText("null").assertDoesNotExist()
         capture("community")
         compose.onNodeWithText("到访与复刻").performClick()
+        compose.onNodeWithText("最伟大的作品 · 周杰伦").assertExists()
         compose.onNodeWithTag("room-manage-visit").performScrollTo().performClick()
         compose.onNodeWithText("编辑",useUnmergedTree=true).performScrollTo().performClick()
         assertEquals(listOf("edit"),actions)
