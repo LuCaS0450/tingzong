@@ -12,12 +12,6 @@
             android:theme="@style/Theme.MusicPilgrimage">
         </activity>
         <activity android:name="cn.musicpilgrimage.app.performance.RhythmComparisonActivity"
-            android:exported="true" android:label="听踪 · 节奏体验"
-            android:theme="@style/Theme.MusicPilgrimage">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="false" android:theme="@style/Theme.MusicPilgrimage" />
     </application>
 </manifest>

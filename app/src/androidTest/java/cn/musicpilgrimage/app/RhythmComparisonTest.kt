@@ -34,7 +34,7 @@ class RhythmComparisonTest {
         cleanRuns()
         val bundle=File(context.getExternalFilesDir(null),"comparison-local.zip")
         if(bundle.isFile)bundle.inputStream().use{ComparisonBundle.import(context,it)}
-        else requireNotNull(ComparisonBundle.current(context)){"请先通过独立试玩入口准备本地短样，不要把原唱放入测试 APK"}
+        else requireNotNull(ComparisonBundle.current(context)){"请先将本地短样 comparison-local.zip 放到被测应用的外部文件目录"}
     }
     @After fun clean(){cleanRuns()}
     private fun await(condition:()->Boolean) {

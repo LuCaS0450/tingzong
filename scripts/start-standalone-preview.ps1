@@ -2,7 +2,7 @@ param(
     [ValidatePattern('^[A-Za-z0-9_-]+$')][string]$Avd='Pixel_10a',
     [string]$Sdk="$env:LOCALAPPDATA\Android\Sdk",
     [switch]$ColdBoot,
-    [ValidateSet('cn.musicpilgrimage.app.performance.RhythmComparisonActivity','cn.musicpilgrimage.app.MainActivity','cn.musicpilgrimage.app.MusicSpacePreviewActivity')]
+    [ValidateSet('cn.musicpilgrimage.app.MainActivity','cn.musicpilgrimage.app.MusicSpacePreviewActivity')]
     [string]$Activity='cn.musicpilgrimage.app.MainActivity'
 )
 $ErrorActionPreference='Stop'
@@ -12,8 +12,7 @@ $taskEmulator=Join-Path $Sdk 'emulator\emulator.exe'
 $taskConfig=Join-Path $env:USERPROFILE ".android\avd\$Avd.avd\config.ini"
 $taskLog=Join-Path $taskRoot 'artifacts\standalone-preview.log'
 $taskActivity=$Activity
-$taskIsMusicSpace=$taskActivity -in @('cn.musicpilgrimage.app.MainActivity','cn.musicpilgrimage.app.MusicSpacePreviewActivity')
-$taskPackage=if($taskIsMusicSpace){'cn.musicpilgrimage.app'}else{'cn.musicpilgrimage.app.review'}
+$taskPackage='cn.musicpilgrimage.app'
 $taskLock=New-Object System.Threading.Mutex($false,'Local\TingzongStandalonePreview')
 $taskOwnsLock=$false
 
@@ -96,35 +95,6 @@ public static class TingzongPreviewWindow {
         }
     }
 }
-function Ensure-TaskMusic([string]$Serial) {
-    $taskPreferences=Invoke-TaskAdb -Arguments @('-s',$Serial,'shell','run-as',$taskPackage,'test','-f','shared_prefs/rhythm-comparison-local.xml') -AllowFailure
-    $taskExisting=Invoke-TaskAdb -Arguments @('-s',$Serial,'shell','run-as',$taskPackage,'test','-f','files/rhythm-comparison/original.pcmz') -AllowFailure
-    if($taskPreferences.Code -eq 0 -or $taskExisting.Code -eq 0){Write-TaskLog 'Existing local audio retained.';return}
-    $taskAudio=Join-Path $taskRoot '.tooling\release-reference\comparison'
-    $taskNames=@('original.pcmz','comparison.json')
-    if(@($taskNames | Where-Object {!(Test-Path -LiteralPath (Join-Path $taskAudio $_))}).Count -gt 0) {
-        $taskAudio=Join-Path $taskRoot '.tooling\standalone-preview-audio'
-        New-Item -ItemType Directory -Path $taskAudio -Force | Out-Null
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $taskZip=[System.IO.Compression.ZipFile]::OpenRead((Join-Path $taskRoot 'artifacts\performance\Tingzong-rhythm-audio-local.zip'))
-        try {foreach($taskName in $taskNames) {
-            $taskEntry=$taskZip.GetEntry($taskName)
-            if($null -eq $taskEntry -or $taskEntry.Length -gt 16000000){throw 'Invalid local audio bundle.'}
-            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($taskEntry,(Join-Path $taskAudio $taskName),$true)
-        }} finally {$taskZip.Dispose()}
-    }
-    $taskTemporary='/data/local/tmp/tingzong-preview-'+[guid]::NewGuid().ToString()
-    Invoke-TaskAdb -Arguments @('-s',$Serial,'shell','mkdir','-p',$taskTemporary) | Out-Null
-    Invoke-TaskAdb -Arguments @('-s',$Serial,'shell','run-as',$taskPackage,'mkdir','-p','files/rhythm-comparison') | Out-Null
-    foreach($taskName in $taskNames) {
-        Invoke-TaskAdb -Arguments @('-s',$Serial,'push',(Join-Path $taskAudio $taskName),"$taskTemporary/$taskName") | Out-Null
-        Invoke-TaskAdb -Arguments @('-s',$Serial,'shell','run-as',$taskPackage,'cp',"$taskTemporary/$taskName","files/rhythm-comparison/$taskName") | Out-Null
-        Invoke-TaskAdb -Arguments @('-s',$Serial,'shell','rm',"$taskTemporary/$taskName") | Out-Null
-    }
-    Invoke-TaskAdb -Arguments @('-s',$Serial,'shell','rmdir',$taskTemporary) | Out-Null
-    Write-TaskLog 'Local comparison audio prepared; no account or travel data changed.'
-}
-
 try {
     try {$taskOwnsLock=$taskLock.WaitOne(0)} catch [System.Threading.AbandonedMutexException] {$taskOwnsLock=$true}
     if(!$taskOwnsLock){exit 0}
@@ -201,18 +171,15 @@ try {
     if($taskActivity.StartsWith("$taskPackage.")){$taskShortActivity=$taskActivity.Substring($taskPackage.Length)}
     if($taskResolved.Code -ne 0 -or
         ("$taskPackage/$taskActivity" -notin $taskResolvedLines -and "$taskPackage/$taskShortActivity" -notin $taskResolvedLines)) {
-        $taskApk=if($taskIsMusicSpace){
-            Join-Path $taskRoot 'artifacts\standalone\Tingzong-full-debug.apk'
-        }else{Join-Path $taskRoot 'artifacts\performance\Tingzong-rhythm-comparison-private.apk'}
+        $taskApk=Join-Path $taskRoot 'artifacts\standalone\Tingzong-full-debug.apk'
         if(!(Test-Path -LiteralPath $taskApk)){throw "The APK for $taskPackage is missing: $taskApk"}
         Write-TaskLog "Installing $taskPackage from $taskApk"
         Invoke-TaskAdb -Arguments @('-s',$taskSerial,'install','-r',$taskApk) | Out-Null
     }
-    if($taskActivity -eq 'cn.musicpilgrimage.app.performance.RhythmComparisonActivity'){Ensure-TaskMusic $taskSerial}
     $taskOpened=Invoke-TaskAdb -Arguments @('-s',$taskSerial,'shell','am','start','-W','--activity-reorder-to-front','--activity-single-top','-n',"$taskPackage/$taskActivity")
     if($taskOpened.Text -match 'Error:|Error type'){throw $taskOpened.Text}
     Show-TaskWindow
-    Write-TaskLog $(if($taskIsMusicSpace){'Ready: native music space opened in the independent emulator window.'}else{'Ready: rhythm comparison opened in the independent emulator window.'})
+    Write-TaskLog 'Ready: full app opened in the independent emulator window.'
 } catch {
     Write-TaskLog $_.Exception.Message
     Add-Type -AssemblyName System.Windows.Forms
