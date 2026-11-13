@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -260,11 +262,15 @@ private data class MessageMenuPlacement(val button: Rect, val menu: Rect)
                                 val top=placement?.menu?.top?.roundToInt() ?: MessageMenuVerticalPadding.roundToPx()
                                 IntOffset(0,top-MessageMenuVerticalPadding.roundToPx())
                             }.width(IntrinsicSize.Max).testTag("room-message-menu-$id")) {
-                            if(canEdit)MessageMenuAction("编辑",Icons.Outlined.Edit,RoomColors.Ink,expanded&&!busy) {
+                            val anchor={placement?.button?.center}
+                            val reveal={if(motion)progress.coerceIn(0f,1f) else 1f}
+                            val ink=if(busy)RoomColors.Ink.copy(alpha=.38f) else RoomColors.Ink
+                            val red=if(busy)RoomColors.Red.copy(alpha=.38f) else RoomColors.Red
+                            if(canEdit)MessageMenuAction("编辑",Icons.Outlined.Edit,ink,expanded&&!busy,anchor,reveal) {
                                 expanded=false
                                 onEdit()
                             }
-                            MessageMenuAction("删除",Icons.Outlined.DeleteOutline,RoomColors.Red,expanded&&!busy) {
+                            MessageMenuAction("删除",Icons.Outlined.DeleteOutline,red,expanded&&!busy,anchor,reveal) {
                                 expanded=false
                                 onDelete()
                             }
@@ -316,17 +322,39 @@ private fun Modifier.messageMenuPlate(
 }
 
 @Composable private fun MessageMenuAction(
-    label:String,icon:ImageVector,color:Color,enabled:Boolean,onClick:()->Unit
+    label:String,icon:ImageVector,color:Color,enabled:Boolean,
+    anchor:()->Offset?,progress:()->Float,onClick:()->Unit,
 ) {
-    val tint=if(enabled)color else color.copy(alpha=.38f)
-    Row(
+    var contentCenter by remember { mutableStateOf<Offset?>(null) }
+    Box(
         Modifier.fillMaxWidth().heightIn(min=48.dp)
             .clickable(enabled=enabled,role=Role.Button,onClick=onClick)
             .padding(horizontal=10.dp),
-        verticalAlignment=Alignment.CenterVertically,
-        horizontalArrangement=Arrangement.spacedBy(8.dp),
+        contentAlignment=Alignment.CenterStart,
     ) {
-        Icon(icon,null,Modifier.size(18.dp),tint=tint)
-        Text(label,color=tint,fontSize=14.sp)
+        Row(
+            Modifier.onGloballyPositioned { coordinates ->
+                val topLeft=coordinates.positionInRoot()
+                contentCenter=topLeft+Offset(coordinates.size.width/2f,coordinates.size.height/2f)
+            }.graphicsLayer {
+                val amount=progress()
+                val center=contentCenter
+                val source=anchor()
+                if(center!=null&&source!=null) {
+                    val travel=(source-center)*(1f-amount)
+                    translationX=travel.x
+                    translationY=travel.y
+                }
+                val scale=.70f+.30f*amount
+                scaleX=scale
+                scaleY=scale
+                alpha=((amount-.20f)/.65f).coerceIn(0f,1f)
+            },
+            verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(icon,null,Modifier.size(18.dp),tint=color)
+            Text(label,color=color,fontSize=14.sp)
+        }
     }
 }
