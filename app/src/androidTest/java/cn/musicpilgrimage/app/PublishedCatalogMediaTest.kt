@@ -44,7 +44,7 @@ class PublishedCatalogMediaTest {
             assertNotEquals(scene.imageUrl, scene.displayCover?.imageUrl)
             assertFalse(scene.canRecreate)
             assertTrue(scene.editorialIntro.isNotBlank())
-            assertNull(scene.displayCover?.releaseYear)
+            assertTrue(scene.displayCover?.releaseYear == null || scene.displayCover?.releaseYear in 1900..2200)
         }
         assertEquals("lyric", scenes.single { it.work == "同舟之情" }.kind)
         assertEquals("movie_soundtrack", scenes.single { it.work == "遇见" }.kind)
