@@ -21,7 +21,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import cn.musicpilgrimage.app.MusicTripState
 import cn.musicpilgrimage.app.MusicTripViewModel
@@ -54,8 +53,7 @@ import cn.musicpilgrimage.app.ui.AppMotionDialog
             }
         }
     }
-    if(animated)AppMotionDialog(dismiss,properties,content=panel)
-    else Dialog(dismiss,properties,content=panel)
+    AppMotionDialog(dismiss,properties,animated=animated,content=panel)
 }
 
 @Composable internal fun TripError(error:String?) {

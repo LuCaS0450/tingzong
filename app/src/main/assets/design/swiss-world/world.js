@@ -7,7 +7,9 @@
   const root = $('world');
   const hint = $('hint');
   const native = typeof TingzongWorld !== 'undefined';
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const systemMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let nativeMotion = true;
+  const reduced = () => !nativeMotion || systemMotion.matches;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const wrap = v => ((v + 180) % 360 + 360) % 360 - 180;
   const radians = x => x * Math.PI / 180;
@@ -155,13 +157,15 @@
     gestures?.cancel();
     map.stop();
     focusLayer.focus(map.transform.centerPoint);
-    gestures.zoomAt(map.transform.centerPoint,clamp(z,globeZoom(map.getCenter().lat),18),reduced?200:duration);
+    gestures.zoomAt(map.transform.centerPoint,clamp(z,globeZoom(map.getCenter().lat),18),duration);
   }
   function flyTo(center,z,offset) {
     gestures?.cancel();
     map.stop();
     focusLayer.focus({x:map.transform.centerPoint.x+(offset?.[0]||0),y:map.transform.centerPoint.y+(offset?.[1]||0)});
-    map.flyTo({center,zoom:z,offset:offset||[0,0],duration:reduced?200:950,curve:1.42,speed:1.2,essential:true,easing:t=>1-Math.pow(1-t,3)});
+    const camera={center,zoom:z,offset:offset||[0,0],essential:true};
+    if(reduced())map.easeTo({...camera,duration:0,animate:false});
+    else map.flyTo({...camera,duration:950,curve:1.42,speed:1.2,easing:t=>1-Math.pow(1-t,3)});
   }
   function selectionOffset() {return [0,($('stage').clientHeight-$('summary').offsetHeight)/2-map.transform.centerPoint.y];}
   function globeZoom(latitude=24) {
@@ -276,7 +280,7 @@
       const centerY=map.transform.centerPoint.y;
       focusLayer.focus({x:map.transform.centerPoint.x,y:targetY});
       // Selection fits above the summary without resizing the map or changing its scale.
-      map.easeTo({center:[p.lon,p.lat],offset:[0,targetY-centerY],duration:reduced?200:360,easing:t=>1-Math.pow(1-t,3)});
+      map.easeTo({center:[p.lon,p.lat],offset:[0,targetY-centerY],duration:reduced()?0:360,essential:true,easing:t=>1-Math.pow(1-t,3)});
     }
     persist();
   }
@@ -358,16 +362,28 @@
     new ResizeObserver(()=>{map.resize();scheduleVisual();}).observe($('stage'));
   }
   function normalize(p){return {...p,lat:Number(p.lat??p.latitude),lon:Number(p.lon??p.longitude)};}
+  function syncMotion() {
+    root.classList.toggle('reduce-motion',reduced());
+    markers?.invalidate();
+    map?.triggerRepaint();
+    if(reduced()) {
+      gestures?.stopMotion();
+      if(map?.isEasing())map.stop();
+      $('favorite').querySelector('svg')?.getAnimations().forEach(animation=>animation.cancel());
+    }
+  }
+  systemMotion.addEventListener('change',syncMotion);
   function applyNative(data) {
     const previousSelection=selected,wasFavorite=favorites.has(selected);
-    root.classList.toggle('reduce-motion',data.motion===false);
+    const nextMotion=data.motion!==false;
+    if(nativeMotion!==nextMotion){nativeMotion=nextMotion;syncMotion();}
     favorites=new Set(data.favorites||[]);visits=new Set(data.visits||[]);favoriteBusy=Boolean(data.favoriteBusy);
     if(!initialized){pendingBoot=data;startWhenSized();return;}
     if(data.places){places=data.places.map(normalize);byId=new Map(places.map(p=>[p.id,p]));refreshSources();}
     refreshFavorite();
     if(data.focus&&byId.has(data.focus)){const p=byId.get(data.focus);selected=p.id;summaryOpen=true;refreshSources();renderSummary();flyTo([p.lon,p.lat],15,selectionOffset());}
     const saved=favorites.has(selected);
-    if(summaryOpen&&selected===previousSelection&&saved!==wasFavorite&&data.motion!==false&&!reduced){
+    if(summaryOpen&&selected===previousSelection&&saved!==wasFavorite&&!reduced()){
       const heart=$('favorite').querySelector('svg');
       heart.getAnimations().forEach(animation=>animation.cancel());
       heart.animate(
@@ -390,7 +406,7 @@
     $('count').textContent=`${cityCount} 座城市 / ${places.length} 个地点`;
     layoutCompact=Number(saved.zoom)>=3;root.classList.toggle('compact',layoutCompact);
     earthTiles=TingzongEarthTiles();focusLayer=TingzongFocusLayer(globeBounds);
-    markers=TingzongSurfaceMarkers($('surface-markers'),globeBounds);
+    markers=TingzongSurfaceMarkers($('surface-markers'),globeBounds,reduced);
     maplibregl.setWorkerCount(2);
     const bottomPadding=Math.max(0,$('stage').clientHeight-2*($('stage').clientWidth*352/360-64));
     map=new maplibregl.Map({container:'map',style:baseStyle(),center:[Number.isFinite(saved.longitude)?saved.longitude:35,Number.isFinite(saved.latitude)?clamp(saved.latitude,-80,80):24],

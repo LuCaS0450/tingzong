@@ -3,9 +3,14 @@ package cn.musicpilgrimage.app.ui
 import androidx.compose.animation.*
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.runtime.staticCompositionLocalOf
 
 internal val appMotionEasing = CubicBezierEasing(.22f, .61f, .36f, 1f)
-internal const val WallTabFadeMillis = 160
+internal const val ContentFadeMillis = 130
+internal const val WallTabFadeMillis = 110
+internal const val LiveFadeMillis = 100
+internal val LocalRouteActive = staticCompositionLocalOf { true }
+internal val LocalRouteIsCurrent = staticCompositionLocalOf<() -> Boolean> { { true } }
 
 internal fun wallSection(route: String?) = when (route) {
     "room", "catalogue" -> 0
@@ -16,34 +21,16 @@ internal fun wallSection(route: String?) = when (route) {
 }
 
 internal enum class AppRouteMotion(private val duration: Int) {
-    Tab(WallTabFadeMillis), Search(155), Live(110), Detail(230), Form(240);
+    Tab(WallTabFadeMillis), Detail(ContentFadeMillis), Live(LiveFadeMillis);
 
-    fun enter(): EnterTransition {
-        val fade = fadeIn(tween(duration, easing = appMotionEasing))
-        return when (this) {
-            Detail -> fade + slideInHorizontally(tween(duration, easing = appMotionEasing)) { it / 12 }
-            Form -> fade + slideInVertically(tween(duration, easing = appMotionEasing)) { it / 9 }
-            else -> fade
-        }
-    }
-
-    fun exit(): ExitTransition {
-        val fade = fadeOut(tween(duration, easing = appMotionEasing))
-        return when (this) {
-            Detail -> fade + slideOutHorizontally(tween(duration, easing = appMotionEasing)) { it / 12 }
-            Form -> fade + slideOutVertically(tween(duration, easing = appMotionEasing)) { it / 9 }
-            else -> fade
-        }
-    }
+    fun enter(initialAlpha: Float = 0f): EnterTransition =
+        fadeIn(tween(duration, easing = appMotionEasing), initialAlpha)
 }
 
-internal fun routeMotion(from: String?, to: String?, popping: Boolean): AppRouteMotion {
-    val presented = if (popping) from else to
+internal fun routeMotion(from: String?, to: String?): AppRouteMotion {
     return when {
         wallSection(from) != null && wallSection(to) != null -> AppRouteMotion.Tab
         from.isLiveRoute() || to.isLiveRoute() -> AppRouteMotion.Live
-        presented in listOf("search", "release-search/{id}", "auth") -> AppRouteMotion.Search
-        presented == "form/{kind}/{target}" || presented == "edit-profile" -> AppRouteMotion.Form
         else -> AppRouteMotion.Detail
     }
 }

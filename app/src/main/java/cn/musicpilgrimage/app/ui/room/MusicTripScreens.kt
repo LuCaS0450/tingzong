@@ -127,7 +127,8 @@ private enum class TripRowPosition { Closed, Delete }
 }
 
 @Composable internal fun RoomAddToTripDialog(
-    place:Place,state:MusicTripState,owner:String,cities:List<MusicTripCity>,vm:MusicTripViewModel,onClose:()->Unit
+    place:Place,state:MusicTripState,owner:String,cities:List<MusicTripCity>,vm:MusicTripViewModel,
+    onAdded:(()->Unit)?=null,onClose:()->Unit
 ) {
     var creating by rememberSaveable(place.id){mutableStateOf(false)}
     var selected by rememberSaveable(place.id){mutableStateOf<String?>(null)}
@@ -164,7 +165,7 @@ private enum class TripRowPosition { Closed, Delete }
             Text(trip.name,fontSize=17.sp,color=RoomColors.Ink)
             val existing=trip.stops.filter{it.placeId==place.id}.mapNotNull{it.day}.toSet()
             TripDateOptions(trip,existing,state.busy,Modifier.weight(1f,fill=false)){day->
-                vm.add(owner,trip.id,place,trip.start.plusDays(day-1L),requireActive=true,done=onClose)
+                vm.add(owner,trip.id,place,trip.start.plusDays(day-1L),requireActive=true,done=onAdded?:onClose)
             }
             SwissTextButton({selected=null;vm.dismissError()},enabled=!state.busy){Text("返回选择行程")}
         }

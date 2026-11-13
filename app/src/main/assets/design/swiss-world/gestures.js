@@ -6,9 +6,10 @@
 window.TingzongWorldGestures = function(map, options) {
   'use strict';
   const el=map.getContainer(), clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-  const tau=options.reducedMotion?.2:.32;
+  const tau=.32;
+  const reducedMotion=()=>typeof options.reducedMotion==='function'?options.reducedMotion():Boolean(options.reducedMotion);
   let gesture=null, raf=0, lastTap=null, wheelTimer=0, geometry=null,lastRelease=null;
-  const api={get active(){return Boolean(gesture);},cancel,zoomAt,diagnostics:()=>lastRelease};
+  const api={get active(){return Boolean(gesture);},cancel,zoomAt,stopMotion,diagnostics:()=>lastRelease};
   map.dragPan.disable();map.touchZoomRotate.disable();map.doubleClickZoom.disable();map.scrollZoom.disable();map.boxZoom.disable();
 
   function local(clientX,clientY) {
@@ -65,6 +66,9 @@ window.TingzongWorldGestures = function(map, options) {
     if(raf){cancelAnimationFrame(raf);apply();}
     finish();
   }
+  function stopMotion() {
+    if(gesture?.kind==='animation'||gesture?.kind==='inertia')finish();
+  }
   function release(e) {
     if(!gesture)return;
     if(raf){cancelAnimationFrame(raf);apply();}
@@ -82,7 +86,7 @@ window.TingzongWorldGestures = function(map, options) {
     // User override: both globe and street pan stop on the final input frame.
     // Only a genuine two-finger zoom may continue after release.
     const pinching=g.kind==='pinch'||g.kind==='remainder';
-    if(!pinching){finish();return;}
+    if(!pinching||reducedMotion()){finish();return;}
     const samples=g.samples,b=samples.at(-1),windowStart=now-80;
     if(!b||b.t<=windowStart||samples.length<2){finish();return;}
     const a=samples.findLast(s=>s.t<=windowStart)||samples[0];
@@ -109,6 +113,7 @@ window.TingzongWorldGestures = function(map, options) {
   }
   function zoomAt(point,zoom,duration=280) {
     const g=begin('animation',point),start=g.startZoom,target=clamp(zoom,options.minimumZoom(map.getCenter().lat),18),time=performance.now();
+    if(reducedMotion()){solve(g.base,g.anchor,point,target);finish();return;}
     const tick=now=>{if(!gesture)return;const t=clamp((now-time)/duration,0,1),ease=1-Math.pow(1-t,3);solve(g.base,g.anchor,point,start+(target-start)*ease);if(t<1)raf=requestAnimationFrame(tick);else finish();};
     raf=requestAnimationFrame(tick);
   }

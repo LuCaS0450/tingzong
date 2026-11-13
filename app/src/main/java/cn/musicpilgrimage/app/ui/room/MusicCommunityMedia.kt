@@ -84,9 +84,9 @@ import coil.request.ImageRequest
     val motion=LocalPhysicalMotion.current
     var closing by remember{mutableStateOf(false)}
     val close by rememberUpdatedState(onClosed)
-    val alpha=remember{Animatable(0f)}
-    LaunchedEffect(closing){
-        alpha.animateTo(if(closing)0f else 1f,tween(if(motion)if(closing)150 else 200 else 0,easing=appMotionEasing))
+    val alpha=remember{Animatable(if(motion).55f else 1f)}
+    LaunchedEffect(closing,motion){
+        alpha.animateTo(if(closing)0f else 1f,tween(if(motion)if(closing)120 else 170 else 0,easing=appMotionEasing))
         if(closing)close()
     }
     Dialog(onDismissRequest={closing=true},properties=DialogProperties(usePlatformDefaultWidth=false)) {

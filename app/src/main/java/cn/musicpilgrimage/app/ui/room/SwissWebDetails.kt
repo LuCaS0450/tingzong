@@ -11,6 +11,8 @@ import android.webkit.ConsoleMessage
 import android.webkit.WebResourceError
 import android.webkit.WebResourceResponse
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.viewinterop.AndroidView
@@ -27,11 +30,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.doOnLayout
 import cn.musicpilgrimage.app.BuildConfig
+import cn.musicpilgrimage.app.PilgrimageApplication
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.ui.AppMotionDialog
-import cn.musicpilgrimage.app.ui.LocalArchiveBack
-import cn.musicpilgrimage.app.ui.LocalArchiveDrawn
+import cn.musicpilgrimage.app.ui.ContentFadeMillis
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
+import cn.musicpilgrimage.app.ui.LocalRouteActive
+import cn.musicpilgrimage.app.ui.LocalRouteIsCurrent
+import cn.musicpilgrimage.app.ui.appMotionEasing
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
@@ -45,9 +51,25 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
 @SuppressLint("SetJavaScriptEnabled")
 @Composable internal fun SwissWebDetail(data:JSONObject,onAction:(String,JSONObject)->Unit) {
     val context=LocalContext.current
+    var canCreateWebView by remember{mutableStateOf(false)}
+    LaunchedEffect(context) {
+        (context.applicationContext as PilgrimageApplication).awaitWebViewStartup()
+        canCreateWebView=true
+    }
+    if(!canCreateWebView) {
+        if(data.optString("page")=="place")PlaceBodyLoading(data,failed=false,onRetry={})
+        else ArchiveLoadingPage(data,false,{onAction("back",JSONObject())},{})
+        return
+    }
+    SwissWebDetailContent(data,onAction)
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable private fun SwissWebDetailContent(data:JSONObject,onAction:(String,JSONObject)->Unit) {
+    val context=LocalContext.current
     val motion=LocalPhysicalMotion.current
-    val archiveBack=LocalArchiveBack.current
-    val latestDrawn by rememberUpdatedState(LocalArchiveDrawn.current)
+    val active=LocalRouteActive.current
+    val isCurrent by rememberUpdatedState(LocalRouteIsCurrent.current)
     val latestMotion by rememberUpdatedState(motion)
     val latestAction by rememberUpdatedState(onAction)
     val json=data.toString()
@@ -63,24 +85,31 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
     var failed by remember(web){mutableStateOf(false)}
     var loadAttempt by remember(web){mutableIntStateOf(0)}
     var imageOpen by remember(web){mutableStateOf(false)}
+    val contentAlpha by animateFloatAsState(
+        if(firstPaint)1f else .55f,
+        tween(if(motion&&firstPaint)ContentFadeMillis else 0,easing=appMotionEasing),
+        label="archive-content",
+    )
+    SideEffect {
+        web.importantForAccessibility=if(firstPaint&&active)android.view.View.IMPORTANT_FOR_ACCESSIBILITY_YES
+            else android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+    }
     LaunchedEffect(web,ready,motion){if(ready)web.evaluateJavascript("setDetailMotion($motion)",null)}
     LaunchedEffect(web,loadAttempt,firstPaint) {
         if(!firstPaint){delay(3600);failed=true}
     }
-    LaunchedEffect(firstPaint,failed) {
-        if(firstPaint||failed){withFrameNanos{};latestDrawn()}
-    }
-    BackHandler(!placeBody&&(imageOpen||archiveBack!=null)){
-        if(imageOpen)web.evaluateJavascript("closeNativeImage()",null) else archiveBack?.invoke()
+    BackHandler(active&&!placeBody&&imageOpen) {
+        web.evaluateJavascript("closeNativeImage()",null)
     }
     DisposableEffect(web) {onDispose{alive[0]=false;web.removeJavascriptInterface("TingzongDetail");web.stopLoading();web.destroy()}}
     fun render(value:String,scroll:Double=0.0) {
+        val attempt=loadAttempt
         web.renderDetail(value,scroll) { renderedBody ->
-            if(!alive[0]||firstPaint)return@renderDetail
+            if(!alive[0]||firstPaint||loadAttempt!=attempt)return@renderDetail
             if(!renderedBody){failed=true;return@renderDetail}
             web.doOnLayout { view ->
-                if(alive[0]&&view.isAttachedToWindow&&view.width>0&&view.height>0) {
-                    web.postVisualStateCallback(loadAttempt.toLong(),object:WebView.VisualStateCallback() {
+                if(alive[0]&&loadAttempt==attempt&&view.isAttachedToWindow&&view.width>0&&view.height>0) {
+                    web.postVisualStateCallback(attempt.toLong(),object:WebView.VisualStateCallback() {
                         override fun onComplete(requestId:Long) {
                             if(alive[0]&&requestId==loadAttempt.toLong()){
                                 firstPaint=true;failed=false
@@ -116,6 +145,7 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
                 if(raw.length>8192)return
                 val message=runCatching{JSONObject(raw)}.getOrNull()?:return
                 post{
+                    if(!alive[0])return@post
                     val offset=message.optDouble("scrollTop")
                     if(offset.isFinite()&&offset>=0)archiveScroll=offset
                     when(val action=message.optString("action")) {
@@ -123,7 +153,7 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
                         "__image-opened"->imageOpen=true
                         "__image-closed"->imageOpen=false
                         "__place-body-height"->if(placeBody)message.optInt("height").takeIf{it>0}?.let{placeBodyHeight=it}
-                        else->latestAction(action,message)
+                        else->if(firstPaint&&isCurrent())latestAction(action,message)
                     }
                 }
             }
@@ -153,7 +183,8 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
         }
         addOnLayoutChangeListener { view,_,_,_,_,_,_,_,_->if(view.width>0&&view.height>0&&ready)evaluateJavascript("sizeDetail()",null)}
         loadUrl(DetailPage)
-    }},modifier=Modifier.fillMaxSize().testTag("swiss-web-detail"),update={
+    }},modifier=Modifier.fillMaxSize().graphicsLayer{alpha=if(firstPaint)contentAlpha else 0f}
+        .testTag("swiss-web-detail"),update={
         if(ready&&rendered[0]!=json){rendered[0]=json;render(json)}
     })
     val retry={
@@ -161,12 +192,19 @@ private const val DetailPage = "file:///android_asset/design/swiss-details/index
         web.stopLoading();web.loadUrl(DetailPage)
     }
     if(!firstPaint) {
-        if(placeBody)Column(Modifier.fillMaxSize().background(RoomColors.Paper).padding(25.dp)) {
-            Text(if(failed)"地点资料暂时无法载入。" else "正在载入地点资料…",color=RoomColors.Muted,fontSize=14.sp)
-            if(failed)SwissTextButton(retry){Text("重试")}
-        }
+        if(placeBody)PlaceBodyLoading(data,failed,retry)
         else ArchiveLoadingPage(data,failed,{latestAction("back",JSONObject())},retry)
     }
+    }
+}
+
+@Composable private fun PlaceBodyLoading(data:JSONObject,failed:Boolean,onRetry:()->Unit) {
+    Column(Modifier.fillMaxWidth().heightIn(min=200.dp).background(RoomColors.Paper).padding(25.dp)) {
+        data.optJSONArray("places")?.optJSONObject(0)?.optString("name")?.takeIf{it.isNotBlank()}?.let {
+            Text(it,fontSize=27.sp,color=RoomColors.Ink,modifier=Modifier.padding(bottom=14.dp))
+        }
+        Text(if(failed)"地点资料暂时无法载入。" else "正在载入地点资料…",color=RoomColors.Muted,fontSize=14.sp)
+        if(failed)SwissTextButton(onRetry){Text("重试")}
     }
 }
 

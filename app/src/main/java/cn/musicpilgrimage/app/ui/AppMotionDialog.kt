@@ -1,7 +1,7 @@
 package cn.musicpilgrimage.app.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -17,12 +17,13 @@ import cn.musicpilgrimage.app.R
     onDismissRequest: () -> Unit,
     properties: DialogProperties = DialogProperties(),
     image: Boolean = false,
+    animated: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val motion = LocalPhysicalMotion.current
+    val motion = animated && LocalPhysicalMotion.current
     val progress = remember { Animatable(if (motion) 0f else 1f) }
     LaunchedEffect(motion) {
-        if (motion) progress.animateTo(1f, tween(200, easing = appMotionEasing))
+        if (motion) progress.animateTo(1f, spring(dampingRatio = 1f, stiffness = 1200f, visibilityThreshold = .003f))
         else progress.snapTo(1f)
     }
     Dialog(onDismissRequest, properties) {
@@ -36,11 +37,11 @@ import cn.musicpilgrimage.app.R
             (view.parent as? DialogWindowProvider)?.window?.setWindowAnimations(animation)
         }
         Box(Modifier.graphicsLayer {
-            alpha = progress.value
+            alpha = .55f + .45f * progress.value
             if (image) {
                 scaleX = .985f + .015f * progress.value
                 scaleY = scaleX
-            } else translationY = 24.dp.toPx() * (1f - progress.value)
+            } else translationY = 18.dp.toPx() * (1f - progress.value)
         }) { content() }
     }
 }

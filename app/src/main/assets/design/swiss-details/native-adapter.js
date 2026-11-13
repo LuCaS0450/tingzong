@@ -7,12 +7,22 @@ const post=(action,extra={})=>TingzongDetail.postMessage(JSON.stringify({action,
 let detailMotion=true;
 const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const motionEasing='cubic-bezier(.22,.61,.36,1)';
-function setDetailMotion(enabled){detailMotion=enabled;document.documentElement.classList.toggle('reduce-motion',!enabled);}
+function syncDetailMotion(){
+  const reduced=!detailMotion||reduceMotion.matches;
+  document.documentElement.classList.toggle('reduce-motion',reduced);
+  if(!reduced)return;
+  const shade=document.querySelector('#overlay-root .image-shade');
+  if(shade?.inert)shade.remove();
+  shade?.getAnimations({subtree:true}).forEach(animation=>animation.cancel());
+  view.querySelector('button[data-action="favorite"] svg')?.getAnimations().forEach(animation=>animation.cancel());
+}
+function setDetailMotion(enabled){detailMotion=enabled;syncDetailMotion();}
+reduceMotion.addEventListener('change',syncDetailMotion);
 function animateImage(shade,opening){
   const image=shade.querySelector('img');
-  const opacity=opening?[0,1]:[Number(getComputedStyle(shade).opacity),0];
+  const opacity=opening?[.55,1]:[Number(getComputedStyle(shade).opacity),0];
   const transform=opening?['scale(.985)','scale(1)']:[getComputedStyle(image).transform,'scale(.985)'];
-  const timing={duration:opening?200:150,easing:motionEasing,fill:'both'};
+  const timing={duration:opening?170:120,easing:motionEasing,fill:'both'};
   shade.getAnimations({subtree:true}).forEach(animation=>animation.cancel());
   image.animate({transform},timing);
   return shade.animate({opacity},timing);

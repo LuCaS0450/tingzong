@@ -4,7 +4,6 @@ import cn.musicpilgrimage.app.ui.AppMotionDialog
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,7 +25,6 @@ import androidx.compose.ui.unit.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.musicpilgrimage.app.*
 import cn.musicpilgrimage.app.data.*
-import cn.musicpilgrimage.app.ui.LocalArchiveBack
 import org.json.JSONObject
 
 @Composable internal fun RoomPlaceDetail(
@@ -39,8 +37,6 @@ import org.json.JSONObject
     val owner by session.signedIn.collectAsStateWithLifecycle()
     val own by vm.ownItems.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
-    val archiveBack=LocalArchiveBack.current
-    BackHandler(archiveBack!=null){archiveBack?.invoke()}
     val context=LocalContext.current
     val media=remember(context){SwissDetailMedia(context)}
     val photo=remember(place,media){media.archivePhoto(place)}

@@ -39,14 +39,16 @@ body.prototype{background:#e4e3dc;display:grid;place-items:center}body.prototype
 .compact .heading{animation:world-header-in .24s ease-out}.compact #crumb{animation:world-header-in .24s ease-out}@keyframes world-header-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 /* Map overlays follow the same bottom-in, bottom-out motion as native forms. */
 #chooser,#prototype-detail,#summary{
-  opacity:0;transform:translateY(24px);pointer-events:none;
-  transition:opacity 180ms cubic-bezier(.22,.61,.36,1),transform 180ms cubic-bezier(.22,.61,.36,1),display 180ms allow-discrete,overlay 180ms allow-discrete
+  opacity:0;transform:translateY(18px);pointer-events:none;
+  transition:opacity 125ms cubic-bezier(.22,.61,.36,1),transform 125ms cubic-bezier(.22,.61,.36,1),display 125ms allow-discrete,overlay 125ms allow-discrete
 }
-#chooser[open],#prototype-detail[open],#summary:not([hidden]){opacity:1;transform:none;pointer-events:auto}
-dialog::backdrop{opacity:0;pointer-events:none;transition:opacity 180ms ease-out,display 180ms allow-discrete,overlay 180ms allow-discrete}
-dialog[open]::backdrop{opacity:1;pointer-events:auto}
+#chooser[open],#prototype-detail[open],#summary:not([hidden]){opacity:1;transform:none;pointer-events:auto;transition-duration:180ms}
+dialog::backdrop{opacity:0;pointer-events:none;transition:opacity 125ms ease-out,display 125ms allow-discrete,overlay 125ms allow-discrete}
+dialog[open]::backdrop{opacity:1;pointer-events:auto;transition-duration:180ms}
 @starting-style{
-  #chooser[open],#prototype-detail[open],#summary:not([hidden]){opacity:0;transform:translateY(24px)}
+  #chooser[open],#prototype-detail[open],#summary:not([hidden]){opacity:.55;transform:translateY(18px)}
   dialog[open]::backdrop{opacity:0}
 }
+button:not(:disabled){transition:opacity 105ms cubic-bezier(.22,.61,.36,1)}
+button:not(:disabled):active{opacity:.82;transition-duration:0ms}
 .reduce-motion *,.reduce-motion *::backdrop{animation:none!important;transition:none!important}

@@ -17,6 +17,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,17 +25,21 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import cn.musicpilgrimage.app.BuildConfig
+import cn.musicpilgrimage.app.PilgrimageApplication
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.design.MapNetworking
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.WallTabFadeMillis
+import cn.musicpilgrimage.app.ui.LocalRouteIsCurrent
+import cn.musicpilgrimage.app.ui.appMotionEasing
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.Cache
 import okhttp3.OkHttpClient
@@ -56,11 +61,12 @@ import kotlin.math.*
     val context = LocalContext.current
     val motion = LocalPhysicalMotion.current
     var scene by remember(browse) { mutableStateOf(browse.worldScene) }
+    BackHandler(enabled = active && scene == null, onBack = onBack)
     LaunchedEffect(browse, active) {
         if (active && scene == null) {
-            // Finish the first tab handoff before creating the heavyweight WebView.
+            // Give the native preview a frame before creating the WebView.
             withFrameNanos { }
-            if (motion) delay(WallTabFadeMillis.toLong())
+            (context.applicationContext as PilgrimageApplication).awaitWebViewStartup()
             scene = browse.worldScene ?: WorldScene(context, browse).also { browse.worldScene = it }
         }
     }
@@ -70,7 +76,7 @@ import kotlin.math.*
                 onFootprints, onAdd, onSearch, onBack, visits, active)
         }
         AnimatedVisibility(visible = scene?.hasVisual != true, enter = EnterTransition.None,
-            exit = if (motion) fadeOut(tween(130)) else ExitTransition.None) {
+            exit = if (motion) fadeOut(tween(WallTabFadeMillis,easing=appMotionEasing)) else ExitTransition.None) {
             WorldLoadingPreview(browse, onSearch)
         }
     }
@@ -92,6 +98,12 @@ import kotlin.math.*
                 modifier = Modifier.align(Alignment.TopCenter).offset(y = center - diameter / 2).size(diameter))
         }
         SwissWallHeader(1, onSearch)
+        Text(
+            "正在打开世界…",
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+            color = RoomColors.Muted,
+            fontSize = 13.sp,
+        )
     }
 }
 
@@ -156,7 +168,9 @@ internal data class WorldPlaceData(val byId: Map<String, Place>, val json: JSONA
             .apply { pendingFocus?.let { put("focus", it.first); put("focusToken", it.second) } }.toString()
         }
     }
+    val isCurrent by rememberUpdatedState(LocalRouteIsCurrent.current)
     val latestAction by rememberUpdatedState<(String, String) -> Unit> { action, id ->
+        if (!isCurrent()) return@rememberUpdatedState
         when (action) {
             "detail" -> if (id in byId) onPlace(id)
             "favorite" -> if (!favoriteBusy && id in byId) onFavorite(id)
@@ -169,7 +183,7 @@ internal data class WorldPlaceData(val byId: Map<String, Place>, val json: JSONA
     BackHandler(enabled = active) {
         val source = scene.onAction
         scene.web.evaluateJavascript("window.worldBack ? worldBack() : false") { handled ->
-            if (source != null && scene.onAction === source && handled != "true") onBack()
+            if (isCurrent() && source != null && scene.onAction === source && handled != "true") onBack()
         }
     }
     if (active) DisposableEffect(scene, owner) {

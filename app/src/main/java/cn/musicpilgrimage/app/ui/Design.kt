@@ -54,7 +54,11 @@ internal val Line=Color(0xFFD8D8D0)
    headlineLarge=t.headlineLarge.copy(fontSize=27.sp,lineHeight=35.sp,fontWeight=FontWeight.SemiBold,letterSpacing=(-.4).sp),
    titleLarge=t.titleLarge.copy(fontSize=21.sp,lineHeight=28.sp,fontWeight=FontWeight.Medium,letterSpacing=(-.2).sp),
    bodyLarge=t.bodyLarge.copy(fontSize=16.sp,lineHeight=24.sp),bodyMedium=t.bodyMedium.copy(fontSize=16.sp,lineHeight=24.sp),
-   bodySmall=t.bodySmall.copy(fontSize=13.sp,lineHeight=20.sp)) },content=content)
+   bodySmall=t.bodySmall.copy(fontSize=13.sp,lineHeight=20.sp)) }) {
+  val motion=LocalPhysicalMotion.current
+  val indication=remember(motion){AppPressIndication(motion)}
+  CompositionLocalProvider(LocalIndication provides indication,content=content)
+ }
  }
 }
 @Composable internal fun PageTitle(title:String,subtitle:String?=null,action:(@Composable ()->Unit)?=null) {

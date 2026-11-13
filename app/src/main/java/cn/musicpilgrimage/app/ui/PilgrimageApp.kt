@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.flow.first
 import android.app.Activity
-import android.graphics.Rect
 import android.os.Bundle
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -24,12 +23,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
@@ -49,9 +49,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import kotlin.math.roundToInt
 
 private const val PlaceArchiveEntry = "place-archive-entry"
+private class SavedNotice(val message: String, val destination: String?)
 
 @Composable private fun NativeWallTab(section:Int,onSearch:()->Unit,content:@Composable ()->Unit) {
  Column(Modifier.fillMaxSize()) {
@@ -72,6 +72,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
  content:@Composable ()->Unit,
 ) {
  val route=destination.destination.route
+ val active=LocalRouteActive.current
  val tab=wallSection(route)!=null
  val edgeToEdge=isWebDetailRoute(route)||route=="perform/{song}"&&performanceImmersive
  val title=when(route) {
@@ -91,7 +92,8 @@ private fun isWebDetailRoute(route:String?)=when(route) {
   else->null
  }
  RoomWall(Modifier.fillMaxSize(),baseColor=if(isArchiveRoute(route))RoomColors.ArchiveWall else RoomColors.Wall) {
-  Box(Modifier.fillMaxSize().then(if(edgeToEdge)Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing))) {
+  val outgoing=if(active)Modifier else Modifier.semantics{hideFromAccessibility()}
+  Box(Modifier.fillMaxSize().then(outgoing).then(if(edgeToEdge)Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing))) {
    if(tab)RoomShelfWall(Modifier.matchParentSize())
    Column(Modifier.fillMaxSize()) {
     if(title!=null)RoomHeader(title,onBack=onBack,onSpace={},enabled=headerEnabled)
@@ -102,7 +104,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
  }
 }
 
-@Composable fun PilgrimageApp(session:SessionViewModel,requireAccount:Boolean=true) {
+@Composable fun PilgrimageApp(session:SessionViewModel,requireAccount:Boolean=true) = PilgrimageTheme {
  val owner by session.signedIn.collectAsStateWithLifecycle()
  val ready by session.services.authReady.collectAsStateWithLifecycle()
  val account:MusicAccountViewModel=viewModel()
@@ -110,13 +112,16 @@ private fun isWebDetailRoute(route:String?)=when(route) {
  var showedSignIn by remember{mutableStateOf(false)}
  if(!ready || requireAccount&&owner==null) {
   if(ready)SideEffect{showedSignIn=true}
-  PilgrimageTheme {RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-   if(!ready)CircularProgressIndicator(Modifier.align(Alignment.Center),color=RoomColors.Navy)
+  RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+   if(!ready) {
+    if(motion)CircularProgressIndicator(Modifier.align(Alignment.Center),color=RoomColors.Navy)
+    else Text("正在打开听踪…",Modifier.align(Alignment.Center),color=RoomColors.Muted)
+   }
    else RoomEmailLoginRoute(account)
-  }}
+  }
  } else if(showedSignIn) {
   val visible=remember{MutableTransitionState(false).apply{targetState=true}}
-  AnimatedVisibility(visibleState=visible,enter=if(motion)AppRouteMotion.Search.enter()else EnterTransition.None) {
+  AnimatedVisibility(visibleState=visible,enter=if(motion)AppRouteMotion.Detail.enter()else EnterTransition.None) {
    MusicSpaceContent(session,account,requireAccount)
   }
  } else MusicSpaceContent(session,account,requireAccount)
@@ -124,7 +129,6 @@ private fun isWebDetailRoute(route:String?)=when(route) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun MusicSpaceContent(session:SessionViewModel,account:MusicAccountViewModel,requireAccount:Boolean) {
-  PilgrimageTheme {
   val owner by session.signedIn.collectAsState();val recovery by session.recovery.collectAsState();val profile by session.profile.collectAsState()
   val openAuth by session.openAuth.collectAsState()
   key(Unit) {
@@ -144,12 +148,19 @@ private fun isWebDetailRoute(route:String?)=when(route) {
    val sessionBusy by session.busy.collectAsStateWithLifecycle()
    val sessionError by session.error.collectAsStateWithLifecycle()
    var discardAction by remember{mutableStateOf<(() -> Unit)?>(null)}
-   var savedNotice by remember{mutableStateOf<String?>(null)}
+   var savedNotice by remember{mutableStateOf<SavedNotice?>(null)}
+   fun showSaved(message:String) {
+    savedNotice=SavedNotice(message,nav.currentBackStackEntry?.id)
+   }
    var recordLeaveGuard by remember{mutableStateOf<(((()->Unit)->Unit))?>(null)}
    var recordSaving by remember{mutableStateOf(false)}
    var recordGuardOwner by remember{mutableStateOf<FormViewModel?>(null)}
    LaunchedEffect(route){if(route!="form/{kind}/{target}"){recordGuardOwner=null;recordLeaveGuard=null;recordSaving=false}}
-   LaunchedEffect(savedNotice){if(savedNotice!=null){delay(2600);savedNotice=null}}
+   LaunchedEffect(savedNotice,entry?.id) {
+    val notice=savedNotice ?: return@LaunchedEffect
+    if(notice.destination==entry?.id)delay(2600)
+    if(savedNotice===notice)savedNotice=null
+   }
    val music:MusicSpaceViewModel=viewModel()
    val archive:MusicArchiveViewModel=viewModel()
    val map:MusicMapViewModel=viewModel()
@@ -178,26 +189,21 @@ private fun isWebDetailRoute(route:String?)=when(route) {
    val tripState=storedTrips.takeIf{it.owner==libraryOwner}?:MusicTripState(libraryOwner,busy=true)
    val tripCities=remember(sourceCatalog,tripState.trips){(musicMapCities(sourceCatalog,null).map{MusicTripCity(it.name,it.country)}+tripState.trips.flatMap{it.cities}).distinctBy{it.key}}
    var addTripPlace by rememberSaveable(owner){mutableStateOf<String?>(null)}
+   var addTripEntry by rememberSaveable(owner){mutableStateOf<String?>(null)}
+   fun closeAddTrip() {addTripPlace=null;addTripEntry=null}
+   LaunchedEffect(entry?.id) {if(addTripEntry!=null&&addTripEntry!=entry?.id)closeAddTrip()}
    val musicFavorites=storedMusicFavorites.takeIf{it.owner==libraryOwner} ?: MusicFavorites()
    val archiveState=storedArchive.takeIf{it.owner==owner} ?: MusicArchiveState(owner=owner,loading=owner!=null)
-   val archiveHandoff=remember{ArchiveHandoff()}
-   var archiveBounds by remember{mutableStateOf<Rect?>(null)}
-   LaunchedEffect(entry?.id){archiveHandoff.routeChanged(entry?.id)}
-   fun handoffArchive(popping:Boolean=false,change:()->Unit) {
-    archiveHandoff.navigate((context as? Activity)?.window,archiveBounds,popping,{nav.currentBackStackEntry?.id},change)
-   }
    fun navigateTo(path:String,placeEntry:Bundle?=null) {
-    val change:()->Unit={
-     focus.clearFocus();keyboard?.hide();nav.navigate(path){launchSingleTop=true}
-     placeEntry?.let{nav.currentBackStackEntry?.savedStateHandle?.set(PlaceArchiveEntry,it)}
-    }
-    if(isArchiveHandoffPath(path))handoffArchive(change=change)else change()
+    if(runCatching{nav.getBackStackEntry(path).id}.getOrNull()==nav.currentBackStackEntry?.id)return
+    focus.clearFocus();keyboard?.hide();nav.navigate(path){launchSingleTop=true}
+    placeEntry?.let{nav.currentBackStackEntry?.savedStateHandle?.set(PlaceArchiveEntry,it)}
    }
    val navigate:(String)->Unit={navigateTo(it)}
    fun followMusicArchiveLink(source:NavBackStackEntry,target:String,origin:Bundle?=null) {
     if(nav.currentBackStackEntry!=source)return
     if(runCatching{nav.getBackStackEntry(target)}.getOrNull()!=null) {
-     handoffArchive(popping=true){nav.popBackStack(target,inclusive=false)}
+     nav.popBackStack(target,inclusive=false)
     }else navigateTo(target,origin)
    }
    fun openArchivePlace(source:NavBackStackEntry,id:String,links:List<MusicPlaceLink>) {
@@ -214,13 +220,17 @@ private fun isWebDetailRoute(route:String?)=when(route) {
     if(route=="edit-profile"&&draft.saving)return
     if(route=="edit-profile"&&draft.dirty){discardAction=action}else action()
    }
-   val back:()->Unit={leaveProfile {
-    if(isArchiveHandoffPath(nav.previousBackStackEntry?.destination?.route))handoffArchive(popping=true){nav.popBackStack()}
-    else nav.popBackStack()
-   }}
+   val back:()->Unit={
+    if(addTripPlace!=null&&addTripEntry==nav.currentBackStackEntry?.id) {
+     if(!tripState.busy)closeAddTrip()
+    }
+    else leaveProfile {nav.popBackStack()}
+   }
    val login:()->Unit={authPending=true;session.clearError();session.notice.value=null;navigate("auth")}
    val openTrips:()->Unit={if(owner==null)login()else navigate("trips")}
-   val addToTrip:(Place)->Unit={place->if(owner==null)login()else {trips.dismissError();addTripPlace=place.id}}
+   val addToTrip:(Place)->Unit={place->if(owner==null)login()else {
+    trips.dismissError();addTripEntry=nav.currentBackStackEntry?.id;addTripPlace=place.id
+   }}
    val togglePlace:(String)->Unit={id->if(owner==null)login()else archive.togglePlace(id)}
    fun finishAuth() {
     authPending=false
@@ -307,30 +317,27 @@ private fun isWebDetailRoute(route:String?)=when(route) {
     content:@Composable AnimatedContentScope.(NavBackStackEntry)->Unit,
    ) {
     composable(path,arguments=arguments){destination->
-     RoomRouteFrame(destination,performanceImmersive,!(path=="edit-profile"&&draft.saving)&&!recordSaving,back) {
-      val archiveBack=back.takeIf{entry?.id==destination.id&&isArchiveHandoffPath(path)&&
-       isArchiveHandoffPath(nav.previousBackStackEntry?.destination?.route)}
-      CompositionLocalProvider(LocalArchiveDrawn provides {archiveHandoff.drawn(destination.id)},
-       LocalArchiveBack provides archiveBack) { content(destination) }
+     CompositionLocalProvider(LocalRouteActive provides (entry?.id==destination.id),
+      LocalRouteIsCurrent provides {nav.currentBackStackEntry?.id==destination.id}) {
+      RoomRouteFrame(destination,performanceImmersive,!(path=="edit-profile"&&draft.saving)&&!recordSaving,back) {
+       content(destination)
+      }
      }
     }
    }
 
-   RoomWall(Modifier.fillMaxSize().onGloballyPositioned { coordinates ->
-    val bounds=coordinates.boundsInWindow()
-    archiveBounds=Rect(bounds.left.roundToInt(),bounds.top.roundToInt(),bounds.right.roundToInt(),bounds.bottom.roundToInt())
-   }) {
+   RoomWall(Modifier.fillMaxSize()) {
     NavHost(navController=nav,startDestination="room",modifier=Modifier.fillMaxSize(),
      enterTransition={
-      if(motion&&!archiveHandoff.holds(targetState.id))routeMotion(initialState.destination.route,targetState.destination.route,popping=false).enter()
+      if(motion)routeMotion(initialState.destination.route,targetState.destination.route).enter(initialAlpha=.55f)
       else EnterTransition.None
      },
-     exitTransition={if(motion&&!archiveHandoff.holds(targetState.id))ExitTransition.KeepUntilTransitionsFinished else ExitTransition.None},
-     popEnterTransition={EnterTransition.None},
-     popExitTransition={
-      if(motion&&!archiveHandoff.holds(targetState.id))routeMotion(initialState.destination.route,targetState.destination.route,popping=true).exit()
-      else ExitTransition.None
-     }) {
+     exitTransition={if(motion)ExitTransition.KeepUntilTransitionsFinished else ExitTransition.None},
+     popEnterTransition={
+      if(motion)routeMotion(initialState.destination.route,targetState.destination.route).enter(initialAlpha=.8f)
+      else EnterTransition.None
+     },
+     popExitTransition={ExitTransition.None}) {
      page("room"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
      page("catalogue"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
      page("album/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
@@ -416,6 +423,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      }
      page("account-profile"){profileScreen(owner.orEmpty())}
      page("place/{id}"){e->sourceCatalog.publicOnly().places.find{it.id==e.arguments?.getString("id")}?.let {place->
+      BackHandler(enabled=entry?.id==e.id,onBack=back)
       val origin=e.savedStateHandle.get<Bundle>(PlaceArchiveEntry)
       RoomPlaceDetail(place,origin?.getStringArrayList("scenes").orEmpty().toSet(),
        viewModel(key="place-$owner-${place.id}"),session,place.id in archiveState.places,archiveState.loading,{togglePlace(place.id)},login,openForm,openProfile,
@@ -429,7 +437,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      page("edit-profile"){e->
       LaunchedEffect(owner){editor.load(true)}
       RoomProfileEditor(draft,editor::nickname,editor::choosePhoto,editor::removePhoto,{
-       editor.save {updated->if(updated.optString("id")==owner){session.profile.value=updated;val task=pendingForm;pendingForm=null;nav.popBackStack();if(task!=null)navigate(task)else savedNotice="个人资料已更新"}}
+       editor.save {updated->if(updated.optString("id")==owner){session.profile.value=updated;val task=pendingForm;pendingForm=null;nav.popBackStack();if(task!=null)navigate(task)else showSaved("个人资料已更新")}}
       },{editor.load(true)})
       BackHandler(enabled=entry?.id==e.id,onBack=back)
      }
@@ -459,7 +467,7 @@ private fun isWebDetailRoute(route:String?)=when(route) {
       val photo by e.savedStateHandle.getStateFlow<String?>("camera_photo",null).collectAsState()
       LaunchedEffect(photo){photo?.let{vm.initialized.first{ready->ready};vm.photo(Uri.parse(it)).join();e.savedStateHandle["camera_photo"]=null}}
       if(kind in listOf("message","visit","recreation"))RoomRecordEditor(kind,target,editing,vm,back,
-       {savedNotice=if(editing==null)"记录已保存"else "已保存修改";nav.popBackStack()},
+       {if(nav.currentBackStackEntry?.id==e.id){nav.popBackStack();showSaved(if(editing==null)"记录已保存"else "已保存修改")}},
        {navigate("camera/${Uri.encode(it)}")},
        {guard->if(guard!=null){recordGuardOwner=vm;recordLeaveGuard=guard}else if(recordGuardOwner===vm){recordGuardOwner=null;recordLeaveGuard=null;recordSaving=false}},
        {saving->if(recordGuardOwner===vm)recordSaving=saving})
@@ -477,8 +485,8 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      visible=wallSection!=null,
      modifier=Modifier.align(Alignment.BottomCenter)
       .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal+WindowInsetsSides.Bottom)),
-     enter=if(motion)fadeIn(tween(140,easing=appMotionEasing))else EnterTransition.None,
-     exit=if(motion)fadeOut(tween(110,easing=appMotionEasing))else ExitTransition.None,
+     enter=if(motion)AppRouteMotion.Tab.enter(.55f)else EnterTransition.None,
+     exit=if(motion)fadeOut(tween(WallTabFadeMillis,easing=appMotionEasing))else ExitTransition.None,
     ) {
      SwissWallTabs(wallSection?:lastWallSection,chooseModule,enabled=wallSection!=null)
     }
@@ -487,12 +495,34 @@ private fun isWebDetailRoute(route:String?)=when(route) {
     musicUndo?.let{undo->RoomUndoNotice(undo.label,undo.token,{music.undoRemoval(undo.token)},{music.dismissUndo(undo.token)},Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())}
     placeUndo?.takeIf{it.owner==owner}?.let{undo->RoomUndoNotice("已取消地点收藏",undo.token,{archive.undoRemoval(undo.token)},{archive.dismissUndo(undo.token)},Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())}
    }
-   if(savedNotice!=null&&(route in listOf("me","place/{id}","profile/{id}","mine/{kind}")||archiveRoute))Surface(Modifier.align(Alignment.BottomCenter).padding(20.dp),color=RoomColors.Navy,shape=RoundedCornerShape(6.dp)){Text(savedNotice.orEmpty(),Modifier.padding(16.dp),color=RoomColors.Paper)}
    if(route in listOf("explore","place/{id}")&&archiveState.error!=null)Surface(Modifier.align(Alignment.BottomCenter).padding(16.dp),color=RoomColors.Paper,shape=RoundedCornerShape(6.dp),shadowElevation=4.dp){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Text(archiveState.error.orEmpty(),Modifier.weight(1f),color=RoomColors.Ink);TextButton(archive::reload){Text("重试")}}}
    }
-   ArchiveHandoffLayer(archiveHandoff,motion,Modifier.matchParentSize())
+   val notice=savedNotice?.takeIf{it.destination==entry?.id}
+   AnimatedVisibility(
+    visible=notice!=null,
+    modifier=Modifier.align(Alignment.BottomCenter)
+     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal+WindowInsetsSides.Bottom))
+     .padding(bottom=if(wallSection!=null)SwissWallTabsHeight+12.dp else 20.dp),
+    enter=if(motion)AppRouteMotion.Tab.enter(.55f)else EnterTransition.None,
+    exit=if(motion)fadeOut(tween(90,easing=appMotionEasing))else ExitTransition.None,
+   ) {
+    var message by remember{mutableStateOf(notice?.message.orEmpty())}
+    SideEffect {if(notice!=null)message=notice.message}
+    Surface(color=RoomColors.Navy,shape=RoundedCornerShape(6.dp)) {
+     Text(notice?.message?:message,Modifier.padding(horizontal=16.dp,vertical=12.dp)
+      .semantics{liveRegion=LiveRegionMode.Polite},color=RoomColors.Paper)
+    }
    }
-   sourceCatalog.publicOnly().places.find{it.id==addTripPlace}?.let{place->RoomAddToTripDialog(place,tripState,libraryOwner,tripCities,trips){addTripPlace=null}}
+   }
+   addTripPlace?.takeIf{addTripEntry==entry?.id}?.let { id ->
+    sourceCatalog.publicOnly().places.find{it.id==id}
+   }?.let{place->
+    RoomAddToTripDialog(place,tripState,libraryOwner,tripCities,trips,onAdded={
+     val onSource=nav.currentBackStackEntry?.id==addTripEntry
+     closeAddTrip()
+     if(onSource)showSaved("已加入行程")
+    },onClose=::closeAddTrip)
+   }
    if(discardAction!=null)RoomDiscardProfileDialog({discardAction=null},{val action=discardAction;discardAction=null;editor.discard();action?.invoke()})
    if(performanceLibraryUi.mobileConfirmation)AlertDialog(onDismissRequest=performanceLibrary::waitForWifi,
     title={Text("用移动网络准备音乐？")},text={
@@ -501,7 +531,6 @@ private fun isWebDetailRoute(route:String?)=when(route) {
      Column {Text("共 ${missing.size} 首，约 ${bytes/1048576} MB。下载完成后可离线演奏。")
       Spacer(Modifier.height(12.dp));Text(missing.joinToString("、"){it.song.title},style=MaterialTheme.typography.bodySmall)}
     },confirmButton={TextButton(performanceLibrary::allowMobile){Text("下载全部")}},dismissButton={TextButton(performanceLibrary::waitForWifi){Text("等待 Wi-Fi")}})
-  }
  }
 }
 

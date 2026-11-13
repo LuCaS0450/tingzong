@@ -75,6 +75,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.navigation:navigation-compose:2.8.9")
+    implementation("androidx.webkit:webkit:1.16.0")
     implementation("androidx.datastore:datastore-preferences:1.1.4")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("androidx.camera:camera-camera2:1.5.3")

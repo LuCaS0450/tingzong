@@ -13,8 +13,9 @@
  *      放大或靠近球心后平滑浮现等宽感数字。
  *    - 选中地点：针杆显著拔高、针头放大，配双重纸白/朱砂光环底座与针尖锚点。
  */
-window.TingzongSurfaceMarkers = function(canvas, globeBounds) {
+window.TingzongSurfaceMarkers = function(canvas, globeBounds, reducedMotion) {
   'use strict';
+  const reduced = reducedMotion || (() => false);
   const ctx = canvas.getContext('2d');
   const RED = [189, 56, 43];
   const VISITED = [59, 68, 63];
@@ -152,7 +153,7 @@ window.TingzongSurfaceMarkers = function(canvas, globeBounds) {
 
     // 选中地点的地面双环靶心（贴合地表椭圆，标示精确落点）
     if (isSelected) {
-      const pulse = smooth(0, 420, now - selectedTime);
+      const pulse = reduced() ? 1 : smooth(0, 420, now - selectedTime);
       const ringR = mix(4.5, selectionRingRadius(stand), pulse);
       drawGroundEllipse(x, y, ringR * ratio, ringR, angle);
       ctx.lineWidth = 2.2;
@@ -396,7 +397,7 @@ window.TingzongSurfaceMarkers = function(canvas, globeBounds) {
     }
     ctx.globalAlpha = 1;
 
-    if (currentSelectedKey && now - selectedTime < 460) {
+    if (!reduced() && currentSelectedKey && now - selectedTime < 460) {
       requestAnimationFrame(() => map.triggerRepaint());
     }
   }
