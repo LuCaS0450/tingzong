@@ -10,10 +10,13 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.*
@@ -22,10 +25,19 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -52,6 +64,7 @@ import cn.musicpilgrimage.app.ui.appMotionEasing
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
+import kotlin.math.roundToInt
 
 @Composable internal fun RoomContentCard(item:ContentItem,session:SessionViewModel,vm:FeatureViewModel,onEdit:(ContentItem)->Unit,onProfile:(String)->Unit,showAuthor:Boolean=true) {
     val owner by session.signedIn.collectAsState()
@@ -170,82 +183,83 @@ import org.json.JSONObject
         confirmButton={},dismissButton={SwissTextButton({reporting=false}){Text("取消")}})
 }
 
-private data class MessageMenuOrigin(val pivot: TransformOrigin, val travel: Float)
+private val MessageMenuButtonPlate = 34.dp
+private val MessageMenuSideMargin = 8.dp
+private val MessageMenuVerticalPadding = 48.dp
+
+private data class MessageMenuPlacement(val button: Rect, val menu: Rect)
 
 @Composable private fun MessageManagementMenu(
     id:String,busy:Boolean,canEdit:Boolean,onEdit:()->Unit,onDelete:()->Unit
 ) {
     var expanded by remember(id){mutableStateOf(false)}
-    var origin by remember(id){mutableStateOf<MessageMenuOrigin?>(null)}
+    var placement by remember(id){mutableStateOf<MessageMenuPlacement?>(null)}
+    val interactions=remember { MutableInteractionSource() }
+    val pressed by interactions.collectIsPressedAsState()
     val motion=LocalPhysicalMotion.current
     val transition=updateTransition(expanded,label="Message management")
     val progress by transition.animateFloat(transitionSpec={
-        if(motion)tween(if(targetState)95 else 70,easing=appMotionEasing) else snap()
+        if(motion)tween(if(targetState)190 else 145,easing=appMotionEasing) else snap()
     },label="Menu expansion"){if(it)1f else 0f}
+    val popupVisible=expanded||(motion&&(transition.currentState||transition.isRunning))
 
     Box {
         IconButton(
             onClick={expanded=!expanded},enabled=!busy,
+            interactionSource=interactions,
             modifier=Modifier.testTag("room-manage-$id").semantics {
                 stateDescription=if(expanded)"已展开" else "已收起"
             },
         ) {
-            Icon(Icons.Outlined.Settings,"管理留言",Modifier.size(20.dp).graphicsLayer {
-                rotationZ=if(motion)10f*progress else 0f
-            },tint=RoomColors.Ink)
+            Box(Modifier.size(MessageMenuButtonPlate).graphicsLayer {
+                alpha=if(motion&&popupVisible&&placement!=null)progress.coerceIn(0f,1f) else 1f
+            }.then(if(pressed||expanded&&placement==null)Modifier.background(RoomColors.Paper,CircleShape) else Modifier),
+                contentAlignment=Alignment.Center) {
+                Icon(Icons.Outlined.Settings,"管理留言",Modifier.size(20.dp),tint=RoomColors.Ink)
+            }
         }
-        if(expanded||transition.currentState||transition.isRunning) {
+        if(popupVisible) {
             val density=LocalDensity.current
-            DisposableEffect(Unit){onDispose{origin=null}}
+            DisposableEffect(Unit){onDispose{placement=null}}
             val position=remember(density) {
-                val margin=with(density){8.dp.roundToPx()}
+                val margin=with(density){MessageMenuSideMargin.roundToPx()}
+                val verticalPadding=with(density){MessageMenuVerticalPadding.roundToPx()}
+                val radius=with(density){MessageMenuButtonPlate.toPx()/2}
                 val overlap=with(density){4.dp.roundToPx()}
                 object : PopupPositionProvider {
                     override fun calculatePosition(
                         anchorBounds:IntRect,windowSize:IntSize,layoutDirection:LayoutDirection,popupContentSize:IntSize
                     ):IntOffset {
-                        val (menuWidth,menuHeight)=popupContentSize
-                        val x=(anchorBounds.right-menuWidth).coerceIn(0,(windowSize.width-menuWidth).coerceAtLeast(0))
+                        val width=(popupContentSize.width-2*margin).coerceAtLeast(1)
+                        val height=(popupContentSize.height-2*verticalPadding).coerceAtLeast(1)
+                        val x=(anchorBounds.right-popupContentSize.width).coerceIn(0,(windowSize.width-popupContentSize.width).coerceAtLeast(0))
                         val below=anchorBounds.bottom-overlap
-                        val above=anchorBounds.top+overlap-menuHeight
-                        val fitsBelow=below+menuHeight<=windowSize.height
+                        val above=anchorBounds.top+overlap-height
+                        val fitsBelow=below+height+margin<=windowSize.height
                         val moreSpaceBelow=windowSize.height-anchorBounds.bottom>=anchorBounds.top
-                        val y=if(fitsBelow||above<0&&moreSpaceBelow)below else above
-                        val top=y.coerceIn(0,(windowSize.height-menuHeight).coerceAtLeast(0))
-                        val width=(menuWidth-2*margin).coerceAtLeast(1)
-                        val height=(menuHeight-2*margin).coerceAtLeast(1)
-                        val anchorX=(anchorBounds.center.x-x-margin).toFloat()
-                        val anchorY=(anchorBounds.center.y-top-margin).toFloat()
-                        val pivotX=(anchorX/width).coerceIn(0f,1f)
-                        val pivotY=(anchorY/height).coerceIn(0f,1f)
-                        val travel=(anchorY-pivotY*height).coerceIn(-overlap.toFloat(),overlap.toFloat())
-                        origin=MessageMenuOrigin(TransformOrigin(pivotX,pivotY),travel)
-                        return IntOffset(x,top)
+                        val top=(if(fitsBelow||above<margin&&moreSpaceBelow)below else above)
+                            .coerceIn(margin,(windowSize.height-height-margin).coerceAtLeast(margin))
+                        val y=(top-verticalPadding).coerceIn(0,(windowSize.height-popupContentSize.height).coerceAtLeast(0))
+                        val center=Offset((anchorBounds.center.x-x).toFloat(),(anchorBounds.center.y-y).toFloat())
+                        val menu=Rect(Offset(margin.toFloat(),(top-y).toFloat()),Size(width.toFloat(),height.toFloat()))
+                        placement=MessageMenuPlacement(Rect(center,radius),menu)
+                        return IntOffset(x,y)
                     }
                 }
             }
             Popup(popupPositionProvider=position,onDismissRequest={expanded=false},properties=PopupProperties(focusable=expanded)) {
-                Box(Modifier.padding(8.dp)) {
-                    Surface(
-                        modifier=Modifier.testTag("room-message-menu-$id").graphicsLayer {
-                            val placement=origin
-                            val amount=if(motion)progress else if(expanded)1f else 0f
-                            alpha=when {
-                                placement==null -> 0f
-                                expanded -> amount.coerceAtLeast(.7f)
-                                else -> amount
-                            }
-                            if(placement!=null) {
-                                transformOrigin=placement.pivot
-                                scaleX=.94f+.06f*amount
-                                scaleY=scaleX
-                                translationY=placement.travel*(1f-amount)
-                            }
-                        },
-                        shape=RoundedCornerShape(6.dp),color=RoomColors.Paper,
-                        border=BorderStroke(1.dp,RoomColors.Line),shadowElevation=4.dp,
-                    ) {
-                        Column(Modifier.width(IntrinsicSize.Max)) {
+                Box(Modifier.pointerInput(busy) {
+                    detectTapGestures { touch ->
+                        if(expanded)expanded=false
+                        else if(!busy&&placement?.button?.inflate(7.dp.toPx())?.contains(touch)==true)expanded=true
+                    }
+                }) {
+                    Box(Modifier.messageMenuPlate({placement},{if(motion)progress else 1f})) {
+                        Column(Modifier.padding(horizontal=MessageMenuSideMargin,vertical=MessageMenuVerticalPadding)
+                            .offset {
+                                val top=placement?.menu?.top?.roundToInt() ?: MessageMenuVerticalPadding.roundToPx()
+                                IntOffset(0,top-MessageMenuVerticalPadding.roundToPx())
+                            }.width(IntrinsicSize.Max).testTag("room-message-menu-$id")) {
                             if(canEdit)MessageMenuAction("编辑",Icons.Outlined.Edit,RoomColors.Ink,expanded&&!busy) {
                                 expanded=false
                                 onEdit()
@@ -256,9 +270,48 @@ private data class MessageMenuOrigin(val pivot: TransformOrigin, val travel: Flo
                             }
                         }
                     }
+                    if(motion) Icon(Icons.Outlined.Settings,null,Modifier.offset {
+                        val center=placement?.button?.center ?: Offset.Zero
+                        val half=10.dp.toPx()
+                        IntOffset((center.x-half).roundToInt(),(center.y-half).roundToInt())
+                    }.size(20.dp).graphicsLayer {
+                        alpha=if(placement==null)0f else 1f-progress.coerceIn(0f,1f)
+                    },tint=RoomColors.Ink)
                 }
             }
         }
+    }
+}
+
+private fun Modifier.messageMenuPlate(
+    placement:()->MessageMenuPlacement?, progress:()->Float,
+):Modifier=drawWithCache {
+    val clip=Path()
+    val border=Stroke(1.dp.toPx())
+    val buttonRadius=MessageMenuButtonPlate.toPx()/2
+    val menuRadius=6.dp.toPx()
+    val shadowSpread=5.dp.toPx()
+    val shadowDrop=2.dp.toPx()
+    onDrawWithContent {
+        val geometry=placement() ?: return@onDrawWithContent
+        val amount=progress().coerceIn(0f,1f)
+        fun mix(start:Float,end:Float)=start+(end-start)*amount
+        val start=geometry.button
+        val end=geometry.menu
+        val bounds=Rect(mix(start.left,end.left),mix(start.top,end.top),
+            mix(start.right,end.right),mix(start.bottom,end.bottom))
+        val radius=mix(buttonRadius,menuRadius)
+        for(layer in 5 downTo 1) {
+            val spread=shadowSpread*layer/5*amount
+            drawRoundRect(RoomColors.Ink.copy(alpha=(6-layer)*.012f*amount),
+                Offset(bounds.left-spread,bounds.top+shadowDrop*amount-spread),
+                Size(bounds.width+2*spread,bounds.height+2*spread),CornerRadius(radius+spread))
+        }
+        drawRoundRect(RoomColors.Paper,bounds.topLeft,bounds.size,CornerRadius(radius))
+        drawRoundRect(RoomColors.Line.copy(alpha=amount),bounds.topLeft,bounds.size,CornerRadius(radius),style=border)
+        clip.rewind()
+        clip.addRoundRect(RoundRect(bounds,CornerRadius(radius)))
+        clipPath(clip) { this@onDrawWithContent.drawContent() }
     }
 }
 

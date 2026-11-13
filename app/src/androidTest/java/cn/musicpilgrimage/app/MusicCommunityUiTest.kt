@@ -3,6 +3,9 @@ package cn.musicpilgrimage.app
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
@@ -16,6 +19,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.test.platform.app.InstrumentationRegistry
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.ui.PilgrimageTheme
+import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.room.*
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
@@ -74,6 +78,62 @@ class MusicCommunityUiTest {
         compose.waitUntil(5000){androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())!=true}
         compose.onNodeWithTag("room-record-editor").performScrollToKey("actions")
     }
+
+    @Test fun messageMenuCanReverseFromTheGearBeforeClosingFinishes() {
+        var motion by mutableStateOf(true)
+        val message=item("morph","message")
+        show("评论菜单") {
+            CompositionLocalProvider(LocalPhysicalMotion provides motion) {
+                RoomContentEntry(message,"fixture-owner",true,false,null,null,null,
+                    onEdit={},onProfile={},onAction={_,_->})
+            }
+        }
+        val gear=compose.onNodeWithTag("room-manage-morph")
+        val menu=compose.onNodeWithTag("room-message-menu-morph")
+        val center=gear.fetchSemanticsNode().boundsInWindow.center
+        val origin=IntArray(2)
+        compose.runOnUiThread {compose.activity.window.decorView.getLocationOnScreen(origin)}
+        val automation=instrumentation.uiAutomation
+        fun tapGear() {
+            val down=SystemClock.uptimeMillis()
+            for(action in listOf(MotionEvent.ACTION_DOWN,MotionEvent.ACTION_UP)) {
+                val event=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,
+                    center.x+origin[0],center.y+origin[1],0)
+                event.source=InputDevice.SOURCE_TOUCHSCREEN
+                try {assertTrue(automation.injectInputEvent(event,true))} finally {event.recycle()}
+            }
+        }
+        fun assertExpanded() {
+            gear.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"已展开"))
+        }
+        compose.mainClock.autoAdvance=false
+        try {
+            gear.performClick()
+            compose.mainClock.advanceTimeBy(70)
+            compose.waitForIdle()
+            menu.assertExists()
+            capture("message-menu-opening")
+            tapGear()
+            compose.mainClock.advanceTimeBy(48)
+            compose.waitForIdle()
+            gear.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"已收起"))
+            menu.assertExists()
+            capture("message-menu-closing")
+            tapGear()
+            compose.mainClock.advanceTimeBy(240)
+            assertExpanded()
+            menu.assertIsDisplayed()
+            capture("message-menu-expanded")
+        } finally {
+            compose.mainClock.autoAdvance=true
+        }
+        compose.runOnIdle {motion=false}
+        gear.performClick()
+        menu.assertDoesNotExist()
+        gear.performClick()
+        menu.assertIsDisplayed()
+    }
+
     @Test fun communityTabsOwnManagementAndDeleteConfirmationKeepCertification() {
         var actions=mutableListOf<String>()
         val message=item("message","message").also {
