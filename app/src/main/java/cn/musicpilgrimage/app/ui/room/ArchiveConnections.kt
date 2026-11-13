@@ -6,6 +6,7 @@ import cn.musicpilgrimage.app.data.MusicPlaceLink
 import cn.musicpilgrimage.app.data.Place
 import cn.musicpilgrimage.app.data.Scene
 import cn.musicpilgrimage.app.data.musicTerm
+import java.io.FileNotFoundException
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -110,9 +111,22 @@ internal data class ArchivePhoto(
 internal object ArchivePhotography {
     private var manifest: JSONObject? = null
 
+    private fun readManifest(context: Context, name: String): JSONObject =
+        context.assets.open("design/swiss-details/$name").bufferedReader().use { JSONObject(it.readText()) }
+
+    private fun loadManifest(context: Context): JSONObject {
+        val photos = readManifest(context, "place-photos.json")
+        val localPhotos = try {
+            readManifest(context, "place-photos.local.json")
+        } catch (_: FileNotFoundException) {
+            return photos
+        }
+        localPhotos.keys().forEach { id -> photos.put(id, localPhotos.getJSONObject(id)) }
+        return photos
+    }
+
     @Synchronized fun photo(context: Context, place: Place): ArchivePhoto? {
-        val data = manifest ?: JSONObject(context.assets.open("design/swiss-details/place-photos.json")
-            .bufferedReader().use { it.readText() }).also { manifest = it }
+        val data = manifest ?: loadManifest(context).also { manifest = it }
         val row = data.optJSONObject(place.id) ?: return null
         return ArchivePhoto(
             asset = "file:///android_asset/design/swiss-details/media/place-photography/${place.id}.webp",
