@@ -115,14 +115,21 @@ internal object ArchivePhotography {
         context.assets.open("design/swiss-details/$name").bufferedReader().use { JSONObject(it.readText()) }
 
     private fun loadManifest(context: Context): JSONObject {
-        val photos = readManifest(context, "place-photos.json")
-        val localPhotos = try {
-            readManifest(context, "place-photos-preview.json")
-        } catch (_: FileNotFoundException) {
-            return photos
+        val overlays = listOf("place-photos-local.json", "place-photos-preview.json").mapNotNull { name ->
+            try {
+                readManifest(context, name)
+            } catch (_: FileNotFoundException) {
+                null
+            }
         }
-        localPhotos.keys().forEach { id -> photos.put(id, localPhotos.getJSONObject(id)) }
-        return photos
+        return mergePhotoManifests(readManifest(context, "place-photos.json"), *overlays.toTypedArray())
+    }
+
+    internal fun mergePhotoManifests(base: JSONObject, vararg overlays: JSONObject): JSONObject {
+        overlays.forEach { overlay ->
+            overlay.keys().forEach { id -> base.put(id, overlay.getJSONObject(id)) }
+        }
+        return base
     }
 
     @Synchronized fun photo(context: Context, place: Place): ArchivePhoto? {
