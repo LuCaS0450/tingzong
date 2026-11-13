@@ -117,7 +117,7 @@ internal object ArchivePhotography {
     private fun loadManifest(context: Context): JSONObject {
         val photos = readManifest(context, "place-photos.json")
         val localPhotos = try {
-            readManifest(context, "place-photos.local.json")
+            readManifest(context, "place-photos-preview.json")
         } catch (_: FileNotFoundException) {
             return photos
         }
