@@ -13,14 +13,14 @@
  *      放大或靠近球心后平滑浮现等宽感数字。
  *    - 选中地点：针杆显著拔高、针头放大，配双重纸白/朱砂光环底座与针尖锚点。
  */
-window.TingzongSurfaceMarkers = function(canvas, globeBounds, reducedMotion) {
+window.TingzongSurfaceMarkers = function(canvas, globeBounds, reducedMotion, palette) {
   'use strict';
   const reduced = reducedMotion || (() => false);
   const ctx = canvas.getContext('2d');
-  const RED = [189, 56, 43];
+  const RED = palette?.red || [189, 56, 43];
   const VISITED = [59, 68, 63];
   const IVORY = [245, 242, 234];
-  const INK = [36, 43, 39];
+  const INK = palette?.ink || [36, 43, 39];
   const LIGHT = [-0.49, -0.55, 0.68];
 
   let dirty = true;
@@ -153,8 +153,17 @@ window.TingzongSurfaceMarkers = function(canvas, globeBounds, reducedMotion) {
 
     // 选中地点的地面双环靶心（贴合地表椭圆，标示精确落点）
     if (isSelected) {
-      const pulse = reduced() ? 1 : smooth(0, 420, now - selectedTime);
-      const ringR = mix(4.5, selectionRingRadius(stand), pulse);
+      const elapsed = now - selectedTime;
+      const pulse = reduced() ? 1 : smooth(0, 320, elapsed);
+      const flare = (!reduced() && elapsed < 360) ? (1 - elapsed / 360) : 0;
+      const ringR = mix(3.8, selectionRingRadius(stand), pulse) + flare * 1.6;
+      if (flare > 0.02) {
+        const rippleR = mix(ringR, ringR + 8.5, 1 - flare);
+        drawGroundEllipse(x, y, rippleR * ratio, rippleR, angle);
+        ctx.lineWidth = 1.1;
+        ctx.strokeStyle = rgba(RED, light, 0, 0.55 * flare * flare * opacity);
+        ctx.stroke();
+      }
       drawGroundEllipse(x, y, ringR * ratio, ringR, angle);
       ctx.lineWidth = 2.2;
       ctx.strokeStyle = `rgba(247, 246, 242, ${0.92 * opacity})`;

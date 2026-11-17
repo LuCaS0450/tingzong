@@ -30,9 +30,14 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import cn.musicpilgrimage.app.ui.AppCenterConfirmDialog
+import cn.musicpilgrimage.app.ui.AppBottomSheet
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -158,7 +163,6 @@ import org.json.JSONObject
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun RoomProfileManagement(
     email:String,favorites:Int?,visits:Int?,disabled:Boolean,
     onEdit:()->Unit,onRoute:(String)->Unit,error:String?,onRetry:()->Unit
@@ -169,9 +173,9 @@ import org.json.JSONObject
             AccountLink("本人管理",Icons.Outlined.PersonOutline,last=true){expanded=true}
         }
     }
-    if(expanded)ModalBottomSheet(onDismissRequest={expanded=false},containerColor=RoomColors.Paper,
-        sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),shape=RoundedCornerShape(0.dp)) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start=24.dp,end=24.dp,bottom=24.dp),
+    AppBottomSheet(visible=expanded,busy=false,onDismissRequest={expanded=false},allowExpandDetent=false) { _,_ ->
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start=24.dp,end=24.dp,bottom=24.dp)
+            .testTag("account-management-sheet"),
             verticalArrangement=Arrangement.spacedBy(16.dp)) {
             Text("本人管理",fontSize=22.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -230,10 +234,24 @@ import org.json.JSONObject
     }
 }
 
-@Composable internal fun RoomSettings(pref:AppPreferencesState,signedIn:Boolean,busy:Boolean,error:String?,onMuted:(Boolean)->Unit,onMotion:(Boolean)->Unit,onRoute:(String)->Unit,onSignOut:()->Unit) {
+@Composable internal fun RoomSettings(pref:AppPreferencesState,signedIn:Boolean,busy:Boolean,error:String?,onMuted:(Boolean)->Unit,onMotion:(Boolean)->Unit,onRoute:(String)->Unit,onSignOut:()->Unit,onCollapsedTitleChanged:(Boolean)->Unit={}) {
     var signOut by rememberSaveable{mutableStateOf(false)}
-    LazyColumn(Modifier.fillMaxSize().testTag("room-settings"),contentPadding=PaddingValues(24.dp,14.dp,24.dp,30.dp),
+    val list=rememberLazyListState()
+    val showCollapsedTitle by remember {
+        derivedStateOf { list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 72 }
+    }
+    LaunchedEffect(showCollapsedTitle) { onCollapsedTitleChanged(showCollapsedTitle) }
+    DisposableEffect(Unit) { onDispose { onCollapsedTitleChanged(false) } }
+    LazyColumn(Modifier.fillMaxSize().testTag("room-settings"),state=list,contentPadding=PaddingValues(24.dp,8.dp,24.dp,30.dp),
         verticalArrangement=Arrangement.spacedBy(24.dp)) {
+        item("large-title") {
+            Column(Modifier.fillMaxWidth().padding(top=4.dp,bottom=4.dp)
+                .then(if(showCollapsedTitle)Modifier.clearAndSetSemantics{} else Modifier.semantics{heading()}),
+                verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                SwissEyebrow("04 / SETTINGS")
+                Text("设置",fontSize=30.sp,fontWeight=FontWeight.Bold,color=RoomColors.Ink)
+            }
+        }
         item {
             AccountSection("01","播放与动效") {
                 SettingToggle("静音",pref.muted,onMuted,"account-muted")
@@ -255,7 +273,17 @@ import org.json.JSONObject
         if(error!=null)item{Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)}
         if(signedIn)item{SwissOutlinedButton({signOut=true},Modifier.fillMaxWidth().height(50.dp).testTag("account-sign-out"),enabled=!busy,shape=androidx.compose.ui.graphics.RectangleShape){Text("退出登录")}}
     }
-    if(signOut)AlertDialog(onDismissRequest={if(!busy)signOut=false},shape=androidx.compose.ui.graphics.RectangleShape,title={Text("退出登录？")},text={Column{Text("退出后需重新登录才能查看个人内容。");if(error!=null)Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)}},confirmButton={SwissTextButton({onSignOut()},enabled=!busy){Text(if(busy)"正在退出…" else "退出登录")}},dismissButton={SwissTextButton({signOut=false},enabled=!busy){Text("取消")}})
+    if(signOut)AppCenterConfirmDialog(onDismissRequest={if(!busy)signOut=false},dismissOnBackPress=!busy,dismissOnClickOutside=!busy) {
+        Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text("退出登录？",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
+            Text("退出后需重新登录才能查看个人内容。",fontSize=14.sp,color=RoomColors.Muted)
+            if(error!=null)Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+                SwissTextButton({signOut=false},enabled=!busy){Text("取消")}
+                SwissTextButton({onSignOut()},enabled=!busy){Text(if(busy)"正在退出…" else "退出登录")}
+            }
+        }
+    }
 }
 
 @Composable private fun SettingToggle(title:String,checked:Boolean,onChange:(Boolean)->Unit,tag:String) {
@@ -344,9 +372,29 @@ import org.json.JSONObject
             }
         }
     }
-    if(deleting)AlertDialog(onDismissRequest={if(!busy)deleting=false},shape=androidx.compose.ui.graphics.RectangleShape,title={Text("注销账号")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){Text("账号注销后无法恢复，个人记录、媒体与互动将删除。留言匿名保留，已采纳投稿解除身份关联。");OutlinedTextField(confirmation,{confirmation=it},enabled=!busy,label={Text("输入“删除账号”")},singleLine=true);if(error!=null)Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)}},confirmButton={SwissTextButton(onDelete,enabled=confirmation=="删除账号"&&!busy){Text(if(busy)"正在注销…" else "确认注销")}},dismissButton={SwissTextButton({deleting=false},enabled=!busy){Text("取消")}})
+    if(deleting)AppCenterConfirmDialog(onDismissRequest={if(!busy)deleting=false},dismissOnBackPress=!busy,dismissOnClickOutside=!busy) {
+        Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text("注销账号",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
+            Text("账号注销后无法恢复，个人记录、媒体与互动将删除。留言匿名保留，已采纳投稿解除身份关联。",fontSize=14.sp,color=RoomColors.Muted)
+            OutlinedTextField(confirmation,{confirmation=it},enabled=!busy,label={Text("输入“删除账号”")},singleLine=true)
+            if(error!=null)Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+                SwissTextButton({deleting=false},enabled=!busy){Text("取消")}
+                SwissTextButton(onDelete,enabled=confirmation=="删除账号"&&!busy){Text(if(busy)"正在注销…" else "确认注销")}
+            }
+        }
+    }
 }
 
 @Composable internal fun RoomDiscardProfileDialog(onCancel:()->Unit,onDiscard:()->Unit) {
-    AlertDialog(onDismissRequest=onCancel,shape=androidx.compose.ui.graphics.RectangleShape,title={Text("放弃修改？")},text={Text("尚未保存的头像或昵称修改会丢失。")},confirmButton={SwissTextButton(onDiscard,Modifier.testTag("account-discard-confirm")){Text("放弃修改")}},dismissButton={SwissTextButton(onCancel){Text("继续编辑")}})
+    AppCenterConfirmDialog(onDismissRequest=onCancel) {
+        Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
+            Text("放弃修改？",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
+            Text("尚未保存的头像或昵称修改会丢失。",fontSize=14.sp,color=RoomColors.Muted)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+                SwissTextButton(onCancel){Text("继续编辑")}
+                SwissTextButton(onDiscard,Modifier.testTag("account-discard-confirm")){Text("放弃修改")}
+            }
+        }
+    }
 }

@@ -35,6 +35,7 @@ import androidx.compose.ui.window.Dialog
 import cn.musicpilgrimage.app.MusicArchiveState
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
+import cn.musicpilgrimage.app.ui.AppConfirmation
 import cn.musicpilgrimage.app.ui.PrivatePhoto
 import kotlinx.coroutines.delay
 
@@ -134,7 +135,7 @@ import kotlinx.coroutines.delay
                                     Text(place?.let{PlaceEditorialCopy.name(context,it)}?:"地点暂未收录",
                                         maxLines=2,overflow=TextOverflow.Ellipsis,fontSize=16.sp,lineHeight=22.sp,
                                         fontWeight=FontWeight.Medium,color=RoomColors.Ink)
-                                    Text(listOfNotNull(place?.city,place?.country).joinToString(" · "),fontSize=12.sp,
+                                    Text(place?.locationLabel().orEmpty(),fontSize=12.sp,
                                         color=RoomColors.Muted,maxLines=1,overflow=TextOverflow.Ellipsis)
                                 }
                             }
@@ -151,7 +152,7 @@ import kotlinx.coroutines.delay
 
 @Composable internal fun RoomFootprints(
     archive:MusicArchiveState,places:List<Place>,initialTab:String,onPlace:(String)->Unit,onLogin:()->Unit,
-    onReload:()->Unit,onEdit:(ContentItem)->Unit,onDelete:(ContentItem)->Unit,services:AppServices,
+    onReload:()->Unit,onEdit:(ContentItem)->Unit,onDelete:(ContentItem,(String?)->Unit)->Unit,services:AppServices,
     records:@Composable (String)->Unit
 ) {
     var tab by rememberSaveable(initialTab) {mutableStateOf(initialTab)}
@@ -208,7 +209,7 @@ private fun LazyListScope.archiveStatus(archive:MusicArchiveState,onReload:()->U
 
 private fun visitDate(item:ContentItem)=item.raw.optString("verified_at").takeIf{it.length>=10&&it!="null"}?.take(10)?:item.date
 
-@Composable private fun FootprintCard(place:Place?,records:List<ContentItem>,onPlace:()->Unit,onEdit:(ContentItem)->Unit,onDelete:(ContentItem)->Unit,services:AppServices) {
+@Composable private fun FootprintCard(place:Place?,records:List<ContentItem>,onPlace:()->Unit,onEdit:(ContentItem)->Unit,onDelete:(ContentItem,(String?)->Unit)->Unit,services:AppServices) {
     var expanded by rememberSaveable{mutableStateOf(false)}
     val motion=LocalPhysicalMotion.current
     RoomPaper(Modifier.fillMaxWidth().testTag("archive-footprint-${records.first().location}")) {
@@ -228,8 +229,10 @@ private fun visitDate(item:ContentItem)=item.raw.optString("verified_at").takeIf
 }
 
 @OptIn(ExperimentalFoundationApi::class)
-@Composable internal fun VisitTimelineRow(record:ContentItem,onEdit:(ContentItem)->Unit,onDelete:(ContentItem)->Unit,services:AppServices) {
+@Composable private fun VisitTimelineRow(record:ContentItem,onEdit:(ContentItem)->Unit,onDelete:(ContentItem,(String?)->Unit)->Unit,services:AppServices) {
     var menu by remember{mutableStateOf(false)};var remove by remember{mutableStateOf(false)};var photo by remember{mutableStateOf(false)}
+    var deleting by remember{mutableStateOf(false)}
+    var deleteError by remember{mutableStateOf<String?>(null)}
     var opened by remember{mutableStateOf(false)};var dragging by remember{mutableStateOf(false)};var raw by remember{mutableFloatStateOf(0f)}
     val width=with(LocalDensity.current){102.dp.toPx()}
     val offset by animateFloatAsState(if(dragging)raw else if(opened)-width else 0f,tween(if(dragging)0 else 140),label="visit actions")
@@ -247,7 +250,22 @@ private fun visitDate(item:ContentItem)=item.raw.optString("verified_at").takeIf
             }
         }
     }
-    if(remove)AlertDialog(onDismissRequest={remove=false},title={Text("删除感想与照片？")},text={Text("到访日期与已经获得的认证会保留。")},confirmButton={SwissTextButton({remove=false;onDelete(record)}){Text("删除")}},dismissButton={SwissTextButton({remove=false}){Text("取消")}})
+    if(remove)AppConfirmation(
+        title="删除感想与照片？",message="到访日期与已经获得的认证会保留。",
+        confirmLabel=if(deleting)"正在删除…" else "删除",destructive=true,
+        onConfirm={
+            if(!deleting) {
+                deleting=true
+                deleteError=null
+                onDelete(record){problem->
+                    deleting=false
+                    deleteError=problem
+                    if(problem==null)remove=false
+                }
+            }
+        },
+        onDismiss={remove=false;deleteError=null},busy=deleting,error=deleteError,
+    )
     if(photo&&record.mediaId!=null)Dialog(onDismissRequest={photo=false}) {RoomPaper{Column(Modifier.padding(12.dp)){PrivatePhoto(record.mediaId!!,services,Modifier.fillMaxWidth().heightIn(min=180.dp,max=470.dp));SwissTextButton({photo=false},Modifier.align(Alignment.End)){Text("关闭")}}}}
 }
 

@@ -11,6 +11,9 @@ import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,10 +34,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.musicpilgrimage.app.MusicTripState
 import cn.musicpilgrimage.app.MusicTripViewModel
 import cn.musicpilgrimage.app.data.*
+import cn.musicpilgrimage.app.ui.AppBottomSheet
+import cn.musicpilgrimage.app.ui.AppConfirmation
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 @Composable internal fun RoomTripList(state:MusicTripState,owner:String,cities:List<MusicTripCity>,vm:MusicTripViewModel,onOpen:(String)->Unit) {
@@ -61,18 +65,13 @@ import kotlin.math.roundToInt
     }
     if(deleting!=null) {
         val close={deleteId=null;revealedId=null;vm.dismissError()}
-        TripPanel("删除行程？",state.busy,close,animated=false) {
-            Text("「${deleting.name}」及每天的全部安排都会被删除。此操作无法撤销。",
-                color=RoomColors.Ink,fontSize=15.sp,lineHeight=24.sp)
-            TripError(state.error)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
-                SwissTextButton(close,enabled=!state.busy){Text("取消")}
-                SwissButton({vm.deleteTrip(owner,deleting.id,close)},enabled=!state.busy,
-                    colors=ButtonDefaults.buttonColors(containerColor=RoomColors.Red,contentColor=RoomColors.Paper)) {
-                    Text(if(state.busy)"正在删除…" else "删除行程")
-                }
-            }
-        }
+        AppConfirmation(
+            title="删除行程？",
+            message="「${deleting.name}」及每天的全部安排都会被删除。此操作无法撤销。",
+            confirmLabel=if(state.busy)"正在删除…" else "删除行程",
+            onConfirm={vm.deleteTrip(owner,deleting.id,close)},
+            onDismiss=close,busy=state.busy,error=state.error,destructive=true,
+        )
     }
 }
 
@@ -119,7 +118,7 @@ private enum class TripRowPosition { Closed, Delete }
             Column(Modifier.fillMaxWidth().padding(vertical=rowPadding),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                 Text(trip.name,fontSize=19.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
                 Text("${trip.start} — ${trip.end} · ${trip.days}天",fontSize=13.sp,color=RoomColors.Muted)
-                Text(trip.cities.joinToString(" · "){it.label},fontSize=13.sp,color=RoomColors.Ink)
+                Text(trip.cities.distinctBy{it.pickerKey}.joinToString(" · "){it.label},fontSize=13.sp,color=RoomColors.Ink)
                 HorizontalDivider(Modifier.padding(top=8.dp),color=RoomColors.Line)
             }
         }
@@ -135,106 +134,125 @@ private enum class TripRowPosition { Closed, Delete }
     val today=LocalDate.now()
     val choices=state.trips.filter{it.acceptsNewPlacesOn(today)}
     val trip=choices.find{it.id==selected}
+    val primaryColors=ButtonDefaults.buttonColors(containerColor=RoomColors.Red,contentColor=RoomColors.Paper)
     if(creating) {
-        RoomTripCreateDialog(cities,state.busy,state.error,{creating=false},initialCity=MusicTripCity(place.city,place.country)){name,start,end,rows->
+        RoomTripCreateDialog(cities,state.busy,state.error,{creating=false},initialCity=MusicTripCity(place.city,place.country),
+            actionColors=primaryColors){name,start,end,rows->
             vm.create(owner,name,start,end,rows){id->selected=id;creating=false}
         }
         return
     }
 
-    TripPanel(if(trip==null)"加入行程" else "选择加入日期",state.busy,onClose) {
-        Text(place.name,fontSize=15.sp,color=RoomColors.Muted)
-        if(trip==null) {
-            if(choices.isEmpty()) {
-                Text("没有未结束的行程。",fontSize=14.sp,color=RoomColors.Muted)
-            } else {
-                LazyColumn(Modifier.weight(1f,fill=false),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                    items(choices,key={it.id}){row->
-                        SwissOutlinedButton({selected=row.id;vm.dismissError()},
-                            Modifier.fillMaxWidth().testTag("trip-choice-${row.id}"),enabled=!state.busy) {
-                            Column(Modifier.fillMaxWidth()) {
-                                Text(row.name)
-                                Text("${row.start} — ${row.end}",fontSize=12.sp)
+    val compact=trip==null&&choices.isEmpty()
+    val dateFormat=remember{DateTimeFormatter.ofPattern("M月d日")}
+    AppBottomSheet(visible=true,busy=state.busy,onDismissRequest=onClose,allowExpandDetent=!compact) { _,_ ->
+        Column(Modifier.fillMaxWidth().padding(start=24.dp,end=24.dp,bottom=20.dp),
+            verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                IconButton(
+                    onClick={if(trip==null)onClose() else {selected=null;vm.dismissError()}},
+                    modifier=Modifier.offset(x=(-10).dp),enabled=!state.busy,
+                ) {
+                    if(trip==null)Icon(Icons.Outlined.Close,"关闭加入行程",tint=RoomColors.Ink)
+                    else Icon(Icons.AutoMirrored.Outlined.ArrowBack,"返回选择行程",tint=RoomColors.Ink)
+                }
+                Text(if(trip==null)"加入行程" else "选择日期",fontSize=22.sp,
+                    fontWeight=FontWeight.Medium,color=RoomColors.Ink)
+            }
+            when {
+                compact -> Text("新建行程后，为这个地点选择日期。",fontSize=14.sp,color=RoomColors.Muted)
+                trip==null -> {
+                    Text(place.regionalTitle(place.name),fontSize=14.sp,color=RoomColors.Muted)
+                    LazyColumn(Modifier.weight(1f,fill=false).fillMaxWidth().testTag("add-trip-choices")) {
+                        items(choices,key={it.id}){row->
+                            val format=if(row.start.year==row.end.year)dateFormat else DateTimeFormatter.ofPattern("yyyy年M月d日")
+                            AddTripOption(row.name,"${row.start.format(format)} – ${row.end.format(format)}",
+                                !state.busy,Modifier.testTag("trip-choice-${row.id}")) {
+                                selected=row.id
+                                vm.dismissError()
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    Text(trip.name,fontSize=15.sp,color=RoomColors.Muted)
+                    val existing=trip.stops.filter{it.placeId==place.id}.mapNotNull{it.day}.toSet()
+                    LazyColumn(Modifier.weight(1f,fill=false).fillMaxWidth()) {
+                        items(trip.days) { index ->
+                            val day=index+1
+                            val date=trip.start.plusDays(index.toLong())
+                            AddTripOption(
+                                "第 ${day} 天 · ${date.format(dateFormat)}",
+                                if(day in existing)"已安排" else null,
+                                !state.busy&&day !in existing,Modifier.testTag("trip-date-$day"),
+                            ) {
+                                vm.add(owner,trip.id,place,date,requireActive=true,done=onAdded?:onClose)
                             }
                         }
                     }
                 }
             }
-            SwissTextButton({creating=true;vm.dismissError()},enabled=!state.busy){Text("新建行程")}
-        } else {
-            Text(trip.name,fontSize=17.sp,color=RoomColors.Ink)
-            val existing=trip.stops.filter{it.placeId==place.id}.mapNotNull{it.day}.toSet()
-            TripDateOptions(trip,existing,state.busy,Modifier.weight(1f,fill=false)){day->
-                vm.add(owner,trip.id,place,trip.start.plusDays(day-1L),requireActive=true,done=onAdded?:onClose)
+            TripError(state.error)
+            if(trip==null) {
+                val createTrip={creating=true;vm.dismissError()}
+                SwissButton(createTrip,Modifier.fillMaxWidth().heightIn(min=48.dp),enabled=!state.busy,colors=primaryColors) {
+                    Text("新建行程",fontSize=15.sp)
+                }
             }
-            SwissTextButton({selected=null;vm.dismissError()},enabled=!state.busy){Text("返回选择行程")}
         }
-        TripError(state.error)
-        SwissTextButton(onClose,Modifier.align(Alignment.End),enabled=!state.busy){Text("取消")}
     }
 }
 
-@Composable internal fun RoomTripDetail(trip:MusicTrip,state:MusicTripState,owner:String,vm:MusicTripViewModel,onPlace:(String)->Unit) {
-    RoomTripDetailWeb(trip,state,owner,vm,onPlace)
+@Composable private fun AddTripOption(title:String,subtitle:String?,enabled:Boolean,modifier:Modifier,onClick:()->Unit) {
+    Column {
+        Row(modifier.fillMaxWidth().heightIn(min=48.dp).clickable(enabled=enabled,role=Role.Button,onClick=onClick)
+            .padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
+                Text(title,fontSize=16.sp,fontWeight=FontWeight.Medium,color=if(enabled)RoomColors.Ink else RoomColors.Muted)
+                if(subtitle!=null)Text(subtitle,fontSize=13.sp,color=RoomColors.Muted)
+            }
+            if(enabled)Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight,null,Modifier.size(20.dp),tint=RoomColors.Muted)
+        }
+        HorizontalDivider(color=RoomColors.Line)
+    }
 }
 
-@Composable internal fun RoomTripDetailWeb(
+private enum class TripSettingsPane { Menu, Dates, Details }
+
+@Composable internal fun RoomTripDetail(
     trip:MusicTrip,state:MusicTripState,owner:String,vm:MusicTripViewModel,onPlace:(String)->Unit,
     onBack:()->Unit={},onDiscover:()->Unit={},catalog:Catalog=Catalog()
 ) {
-    var editingDates by rememberSaveable(trip.id){mutableStateOf(false)}
+    var settings by rememberSaveable(trip.id){mutableStateOf<TripSettingsPane?>(null)}
     var editingDay by rememberSaveable(trip.id){mutableIntStateOf(0)}
     var moving by rememberSaveable(trip.id){mutableStateOf<String?>(null)}
     var deleting by rememberSaveable(trip.id){mutableStateOf<String?>(null)}
     var custom by rememberSaveable(trip.id){mutableStateOf(false)}
-    var details by rememberSaveable(trip.id){mutableStateOf(false)}
-    var editingMenu by rememberSaveable(trip.id){mutableStateOf(false)}
-    val context=LocalContext.current
-    val media=remember(context){SwissDetailMedia(context)}
-    val scheduled=trip.stops.filter{it.day!=null}
-    val stopData=scheduled.map{stop->
-        JSONObject().put("id",stop.id).put("place",stop.placeId?:"custom:${stop.id}").put("day",stop.day!!-1)
-    }
-    val places=scheduled.distinctBy{it.placeId?:it.id}.map{stop->
-        val real=catalog.places.find{it.id==stop.placeId}
-        val destination=trip.cities.find{it.name==stop.city&&it.country==stop.country}
-        if(real!=null)media.place(real) else JSONObject().put("id",stop.placeId?:"custom:${stop.id}")
-            .put("name",stop.name).put("city",destination?.label?:stop.city).put("work",stop.note).put("image","")
-    }
-    val row=JSONObject().put("id",trip.id).put("name",trip.name).put("start",trip.start.toString()).put("end",trip.end.toString())
-        .put("days",trip.days).put("destinations",JSONArray(trip.cities.map{it.label})).put("stops",JSONArray(stopData))
-    val data=swissDetailData("trip",trip.id).put("trip",row).put("places",JSONArray(places)).put("busy",state.busy)
-    SwissWebDetail(data){action,args->
-        when(action) {
-            "back"->onBack()
-            "world-root"->onDiscover()
-            "place"->scheduled.firstOrNull{it.placeId==args.optString("id")}?.placeId?.let(onPlace)
-            "trip-edit"->if(!state.busy)editingMenu=true
-            "trip-edit-day"->if(!state.busy) {
-                val day=args.optInt("day")
-                if(day in 1..trip.days){vm.dismissError();editingDay=day}
-            }
-            "move-stop"->if(!state.busy)scheduled.getOrNull(args.optInt("index",-1))?.let{vm.dismissError();moving=it.id}
-            "remove-stop"->if(!state.busy)scheduled.getOrNull(args.optInt("index",-1))?.let{vm.dismissError();deleting=it.id}
-            "trip-reorder"->if(!state.busy){
-                val id=args.optString("id")
-                val day=args.optInt("day")
-                if(scheduled.any{it.id==id}&&day in 1..trip.days)vm.move(owner,trip.id,id,day,args.optInt("index").coerceAtLeast(0))
-            }
+    val scheduled=remember(trip.stops){trip.stops.filter{it.day!=null}}
+    NativeTripArchive(
+        trip=trip,owner=owner,scheduled=scheduled,catalog=catalog,busy=state.busy,error=state.error,
+        onBack=onBack,onDiscover=onDiscover,onPlace=onPlace,
+        onSettings={vm.dismissError();settings=TripSettingsPane.Menu},
+        onEditDay={day->vm.dismissError();editingDay=day},
+        onMoveDay={id->vm.dismissError();moving=id},
+        onRemove={id->vm.dismissError();deleting=id},
+        onReorder={id,day,index,done->vm.move(owner,trip.id,id,day,index,settled=done)},
+    )
+    if(settings==TripSettingsPane.Menu) {
+        TripPanel("行程设置",state.busy,{settings=null},animated=false) {
+            SwissTextButton({vm.dismissError();settings=TripSettingsPane.Dates}){Text("修改日期")}
+            SwissTextButton({vm.dismissError();settings=TripSettingsPane.Details}){Text("名称与目的地")}
+            TripError(state.error)
+            SwissTextButton({settings=null},Modifier.align(Alignment.End)){Text("关闭")}
         }
     }
-    if(editingMenu)AlertDialog(onDismissRequest={editingMenu=false},title={Text("行程设置")},text={Column {
-        SwissTextButton({editingMenu=false;editingDates=true;vm.dismissError()}){Text("修改日期")}
-        SwissTextButton({editingMenu=false;details=true;vm.dismissError()}){Text("名称与目的地")}
-        TripError(state.error)
-    }},confirmButton={SwissTextButton({editingMenu=false}){Text("关闭")}})
 
-    if(editingDates)TripDateDialog(trip,{editingDates=false;vm.dismissError()},state.busy,state.error){from,to,beforeStart,beforeEnd->
-        vm.dates(owner,trip.id,from,to,beforeStart,beforeEnd){editingDates=false}
+    if(settings==TripSettingsPane.Dates)TripDateDialog(trip,{settings=null;vm.dismissError()},state.busy,state.error){from,to,beforeStart,beforeEnd->
+        vm.dates(owner,trip.id,from,to,beforeStart,beforeEnd){settings=null}
     }
-    if(details) {
+    if(settings==TripSettingsPane.Details) {
         val cities=remember(catalog){musicMapCities(catalog,null).map{MusicTripCity(it.name,it.country)}}
-        TripDetailsDialog(trip,cities,state,owner,vm){details=false;vm.dismissError()}
+        TripDetailsDialog(trip,cities,state,owner,vm){settings=null;vm.dismissError()}
     }
     if(editingDay in 1..trip.days && moving==null && deleting==null && !custom) {
         val publicPlaces=remember(catalog){catalog.publicOnly().places}
@@ -261,12 +279,12 @@ private enum class TripRowPosition { Closed, Delete }
             SwissTextButton({moving=null;vm.dismissError()},Modifier.align(Alignment.End),enabled=!state.busy){Text("取消")}
         }
     }
-    if(deleting!=null)AlertDialog(
-        onDismissRequest={if(!state.busy){deleting=null;vm.dismissError()}},
-        title={Text("从行程移出这个活动？")},
-        text={Column{Text("地点收藏和到访认证会保留。");TripError(state.error)}},
-        confirmButton={SwissTextButton({deleting?.let{vm.remove(owner,trip.id,it){deleting=null}}},enabled=!state.busy){Text("移出")}},
-        dismissButton={SwissTextButton({deleting=null;vm.dismissError()},enabled=!state.busy){Text("取消")}}
+    if(deleting!=null)AppConfirmation(
+        title="从行程移出这个活动？",
+        message="地点收藏和到访认证会保留。",
+        confirmLabel=if(state.busy)"正在移出…" else "移出",
+        onConfirm={deleting?.let{vm.remove(owner,trip.id,it){deleting=null}}},
+        onDismiss={deleting=null;vm.dismissError()},busy=state.busy,error=state.error,destructive=true,
     )
     LaunchedEffect(trip.days,movingStop) {
         if(editingDay !in 1..trip.days){editingDay=0;custom=false}
@@ -315,6 +333,7 @@ private enum class TripRowPosition { Closed, Delete }
 
 @Composable private fun RoomTripCreateDialog(
     cities:List<MusicTripCity>,busy:Boolean,error:String?,onClose:()->Unit,initialCity:MusicTripCity?=null,
+    actionColors:ButtonColors=ButtonDefaults.buttonColors(),
     onCreate:(String,LocalDate,LocalDate,List<MusicTripCity>)->Unit
 ) {
     var step by rememberSaveable{mutableIntStateOf(0)}
@@ -337,9 +356,9 @@ private enum class TripRowPosition { Closed, Delete }
             TripDestinationFields(name,{name=it},cities,selected,{selection=it.destinationFields()},busy,Modifier.weight(1f,fill=false))
         }
         TripError(error)
-        if(step==0)SwissButton({step=1},Modifier.fillMaxWidth(),enabled=valid&&!busy){Text("下一步")}
+        if(step==0)SwissButton({step=1},Modifier.fillMaxWidth(),enabled=valid&&!busy,colors=actionColors){Text("下一步")}
         else SwissButton({onCreate(name,from,to,selected)},Modifier.fillMaxWidth().testTag("trip-create-save"),
-            enabled=!busy&&name.isNotBlank()&&selected.isNotEmpty()){Text(if(busy)"正在保存…" else "创建行程")}
+            enabled=!busy&&name.isNotBlank()&&selected.isNotEmpty(),colors=actionColors){Text(if(busy)"正在保存…" else "创建行程")}
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
             if(step==1)SwissTextButton({step=0},enabled=!busy){Text("返回日期")}
             SwissTextButton(onClose,enabled=!busy){Text("取消")}

@@ -14,12 +14,14 @@ import androidx.compose.ui.unit.dp
 internal object AppArt {
     val Red=Color(0xFFBD382B)
     val RedInk=Color(0xFF77352F)
-    val Blue=Color(0xFF242B27)
     val Yellow=Color(0xFFDEE5ED)
     val Ink=Color(0xFF242B27)
+    val Blue=Ink
     val Muted=Color(0xFF686E67)
+    val WallMuted=Color(0xFF5C625C)
     val Base=Color(0xFFF7F6F2)
-    val Paper=Color(0xFFF7F6F2)
+    val Paper=Base
+    val Line=Color(0xFFD8D8D0)
     val Edge=Color(0xFF9DABAB)
     val Green=Color(0xFF286257)
     val Sand=Color(0xFFE9E9DF)

@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.musicpilgrimage.app.*
 import cn.musicpilgrimage.app.data.*
-import org.json.JSONObject
 
 @Composable internal fun RoomPlaceDetail(
     place:Place,entryScenes:Set<String>,vm:PlaceViewModel,session:SessionViewModel,
@@ -43,12 +42,9 @@ import org.json.JSONObject
     val recreation=remember(place,entryScenes){place.scenes.firstOrNull{it.id in entryScenes&&it.canRecreate}
         ?:place.scenes.firstOrNull{it.canRecreate}}
     var sources by rememberSaveable(place.id){mutableStateOf(false)}
-    var archiveImage by remember(place.id){mutableStateOf<JSONObject?>(null)}
     var referenceReady by remember(recreation?.id){mutableStateOf(false)}
     val targets=remember(catalog,place.id){catalog.placeArchiveTargets(place.id)}
     val archivePlace=remember(place,photo,entryScenes,targets){media.placeArchive(place,photo,entryScenes,targets)}
-    val data=swissDetailData("place",place.id).put("places",org.json.JSONArray().put(archivePlace))
-        .put("favorites",org.json.JSONArray(if(favorite)listOf(place.id)else emptyList<String>())).put("fallbacks",media.fallbacks)
     BoxWithConstraints(Modifier.fillMaxSize().background(RoomColors.Paper)
         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal+WindowInsetsSides.Bottom))
         .testTag("room-place-detail")) {
@@ -60,32 +56,18 @@ import org.json.JSONObject
             HorizontalDivider(color=RoomColors.Line)
             Box(Modifier.weight(1f)) {
                 RoomPlaceCommunity(place,vm,session,onLogin,onForm,onProfile) {
-                    SwissWebDetail(data){action,args->when(action) {
-                        "connection"->targets[args.optString("id")]?.let(onMusicArchive)
-                        "favorite"->if(!favoriteBusy)onFavorite()
-                        "add-trip"->onAdd()
-                        "map-place"->onMap()
-                        "sources"->sources=true
-                        "archive-image"->if(args.stringOrNull("src")!=null)archiveImage=args
-                    }}
+                    NativePlaceArchive(place,archivePlace,photo,targets,media.fallbacks,favorite,favoriteBusy,
+                        onFavorite,onAdd,onMap,onMusicArchive,{sources=true})
                 }
             }
         }
-    }
-    archiveImage?.let { image ->
-        RoomCommunityPhotoViewer(image.optString("src"),image.optString("description"),
-            credit=image.stringOrNull("credit"),onSources={archiveImage=null;sources=true}){archiveImage=null}
     }
     if(sources)AppMotionDialog({sources=false},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)) {
         RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {Column {
             RoomHeader("资料来源",onBack={sources=false},onSpace={})
             LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(25.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
                 item {
-                    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                        Text(PlaceEditorialCopy.name(context,place),fontSize=25.sp,lineHeight=34.sp,color=RoomColors.Ink)
-                        val intro=PlaceEditorialCopy.intro(context,place)
-                        if(intro.isNotBlank())Text(intro,fontSize=14.sp,lineHeight=24.sp,color=RoomColors.Muted)
-                    }
+                    Text(PlaceEditorialCopy.name(context,place),fontSize=25.sp,lineHeight=34.sp,color=RoomColors.Ink)
                 }
                 if(photo!=null)item {
                     Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
@@ -130,10 +112,6 @@ import org.json.JSONObject
         }}
     }
 }
-@Composable private fun RoomDisclosureTitle(title:String,expanded:Boolean,onClick:()->Unit) {
-    Row(Modifier.fillMaxWidth().clickable(role=Role.Button,onClick=onClick),verticalAlignment=Alignment.CenterVertically){Text(title,Modifier.weight(1f),fontSize=17.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink);Icon(if(expanded)Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,if(expanded)"收起$title" else "展开$title",tint=RoomColors.Muted)}
-}
-
 @Composable internal fun RoomSourceLink(title:String,url:String) {
     val context=LocalContext.current
     SwissTextButton({runCatching{context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))}.onFailure{Toast.makeText(context,"暂时无法打开链接",Toast.LENGTH_SHORT).show()}}){Icon(Icons.Outlined.OpenInNew,null,Modifier.size(15.dp));Spacer(Modifier.width(7.dp));Text(title)}

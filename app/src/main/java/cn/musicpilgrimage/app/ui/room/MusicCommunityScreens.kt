@@ -146,21 +146,28 @@ import org.json.JSONObject
 }
 
 @Composable internal fun RoomPersonalContentScreen(kind:String,vm:PersonalViewModel,session:SessionViewModel,onForm:(String,String,ContentItem?)->Unit,onProfile:(String)->Unit) {
-    val rows by vm.items.collectAsState()
+    val owner by session.signedIn.collectAsState()
+    val account=owner ?: return
+    val load by vm.records.collectAsState()
+    val current=load?.takeIf{it.owner==account&&it.kind==kind}
+    val page=current?.page ?: vm.cachedRecords(account,kind)
+    val rows=page?.rows.orEmpty()
     val revision by session.services.changed.collectAsState()
-    val busy by vm.busy.collectAsState()
-    val error by vm.error.collectAsState()
     val list=rememberLazyListState()
-    LaunchedEffect(kind,revision){vm.load(kind)}
+    LaunchedEffect(account,kind,revision){vm.refreshRecords(kind)}
     LazyColumn(Modifier.fillMaxSize().testTag("room-personal-records"),state=list,
         contentPadding=PaddingValues(31.dp,20.dp,31.dp,88.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         item("status"){Column {
             ViewModelStatus(vm)
-            if(error!=null)SwissTextButton({vm.load(kind)}){Text("重试")}
-            if(rows.isEmpty()&&!busy&&error==null)Text(if(kind=="message")"还没有留言。" else "还没有复刻记录。",
+            if(current?.error!=null){
+                Text("暂时无法更新记录。",fontSize=13.sp,color=RoomColors.Muted)
+                SwissTextButton({vm.refreshRecords(kind,force=true)}){Text("重试")}
+            }
+            if(page==null&&current?.error==null)Text("正在读取记录…",fontSize=13.sp,color=RoomColors.Muted)
+            if(page!=null&&rows.isEmpty())Text(if(kind=="message")"还没有留言。" else "还没有复刻记录。",
                 fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)
         }}
         items(rows,key={it.id}){item->RoomContentCard(item,session,vm,{onForm(it.kind,if(it.kind=="recreation")it.sceneId else it.location,it)},onProfile)}
-        if(rows.size>=30)item("more"){SwissTextButton({vm.load(kind,true)}){Text("加载更多")}}
+        if(page?.nextOffset!=null)item("more"){SwissTextButton({vm.refreshRecords(kind,more=true)},enabled=current?.loading!=true){Text("加载更多")}}
     }
 }

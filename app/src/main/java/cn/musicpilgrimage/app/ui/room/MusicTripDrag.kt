@@ -161,6 +161,7 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
 @Composable internal fun RoomTripDragSurface(
     trip:MusicTrip,owner:String,list:LazyListState,busy:Boolean,
     onDrop:(String,Int,Int,()->Unit)->Unit,
+    modifier:Modifier=Modifier,
     content:@Composable (MusicTripDragState)->Unit
 ) {
     val scope=rememberCoroutineScope()
@@ -185,7 +186,7 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
     }
     LaunchedEffect(busy,trip.stops){if(drag.dragging&&(busy||trip.stops.none{it.id==drag.source?.id}))drag.finish(false,motion)}
     BackHandler(drag.active){if(drag.dragging)drag.finish(false,motion)else drag.clear()}
-    Box(Modifier.fillMaxSize().clipToBounds().onGloballyPositioned{drag.container=it.boundsInWindow()}
+    Box(modifier.fillMaxSize().clipToBounds().onGloballyPositioned{drag.container=it.boundsInWindow()}
         .pointerInput(drag,busy,motion) {
             if(!busy)awaitEachGesture {
                 val down=awaitFirstDown(requireUnconsumed=false)

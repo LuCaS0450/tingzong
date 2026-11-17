@@ -4,6 +4,10 @@ import java.text.Collator
 import java.util.Locale
 
 internal data class MusicMapCity(val key:String,val name:String,val country:String,val places:List<Place>)
+internal fun musicMapCityKey(city:String,country:String):String {
+    val region=canonicalRegionName(country)
+    return "$region::${unifiedDestinationRegion(region)?:city}"
+}
 
 /** City boundaries come from the reviewed catalogue, never from artwork pixels. */
 internal fun musicMapCities(catalog:Catalog,work:MusicWork?):List<MusicMapCity> {
@@ -13,7 +17,9 @@ internal fun musicMapCities(catalog:Catalog,work:MusicWork?):List<MusicMapCity> 
             (links==null||p.id in links)
     }.map {p->if(links==null)p else p.copy(scenes=p.scenes.filter{s->links[p.id]!!.scenes.any{it.id==s.id}})}.filter{it.scenes.isNotEmpty()}
     val collator=Collator.getInstance(Locale.SIMPLIFIED_CHINESE)
-    return places.groupBy{it.country+"::"+it.city}.map{(key,rows)->MusicMapCity(key,rows.first().city,rows.first().country,rows)}
+    return places.groupBy{musicMapCityKey(it.city,it.country)}.map{(key,rows)->
+        MusicMapCity(key,rows.first().let{unifiedDestinationRegion(it.country)?:it.city},canonicalRegionName(rows.first().country),rows)
+    }
         .sortedWith{a,b->collator.compare(a.name,b.name).takeIf{it!=0} ?: collator.compare(a.country,b.country)}
 }
 

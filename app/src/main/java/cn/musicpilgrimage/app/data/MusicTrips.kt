@@ -10,7 +10,9 @@ import java.util.UUID
 internal data class MusicTripCity(val name:String,val country:String) {
     val key get()="$country::$name"
     val isCountry get()=name==countryName(country)
-    val label get()=if(isCountry) country else name
+    val region get()=unifiedDestinationRegion(country)
+    val pickerKey get()=region?.let{"region:$it"}?:key
+    val label get()=region?:if(isCountry) country else name
 
     companion object {
         // Keep country destinations in the existing name/country sync format.
@@ -57,10 +59,12 @@ internal data class MusicTrip(val id:String,val name:String,val start:LocalDate,
     fun add(place:Place,day:Int):MusicTrip {
         require(day in 1..days){"请输入1至${days}之间的天数"}
         require(stops.none{it.placeId==place.id&&it.day==day}){"这个地点已经安排在第${day}天，可查看原安排或选择另一天"}
-        val destination=MusicTripCity(place.city,place.country)
+        val placeCity=MusicTripCity(place.city,place.country)
+        val destination=cities.firstOrNull{it.pickerKey==placeCity.pickerKey}
+            ?:placeCity.region?.let{MusicTripCity.country(it)}?:placeCity
         val destinations=if(cities.any{it.key==destination.key}) cities else cities+destination
         require(destinations===cities||destinations.size<=MAX_DESTINATIONS){"每个行程最多 $MAX_DESTINATIONS 个目的地"}
-        val stop=MusicTripStop(UUID.randomUUID().toString(),place.id,place.name,place.city,place.country,day)
+        val stop=MusicTripStop(UUID.randomUUID().toString(),place.id,place.name,destination.name,destination.country,day)
         val index=stops.indexOfLast{it.day==day}.takeIf{it>=0}?.plus(1) ?: stops.indexOfFirst{it.day==null||(it.day?:0)>day}.takeIf{it>=0} ?: stops.size
         return copy(cities=destinations,stops=stops.toMutableList().apply{add(index,stop)})
     }

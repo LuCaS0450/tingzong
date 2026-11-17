@@ -7,8 +7,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
@@ -25,7 +28,7 @@ import kotlin.math.hypot
 /** Physical Android multi-pointer input, covering the globe's most failure-prone gesture path. */
 @RunWith(AndroidJUnit4::class)
 class WorldGestureInputTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val compose = createAndroidComposeRule<MusicSpacePreviewActivity>()
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
 
     private fun findWeb(view: View): WebView? {
@@ -81,20 +84,37 @@ class WorldGestureInputTest {
     }
 
     @Test fun physicalPinchLocksFocusAndReverseKeepsTheBrowseState() {
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(androidx.compose.ui.test.hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("wall-tab-1").performClick()
         var candidate: WebView? = null
         compose.waitUntil(15_000) { instrumentation.runOnMainSync { candidate = findWeb(compose.activity.window.decorView) }; candidate != null }
-        val web = checkNotNull(candidate)
-        var ready = false
-        repeat(60) {
-            if (!ready) { ready = runCatching { evaluate(web, "worldDiagnostics()").optBoolean("ready") }.getOrDefault(false); if (!ready) SystemClock.sleep(100) }
+        var lastDiag = "none"
+        var lastError = "none"
+        runCatching {
+            compose.waitUntil(20_000) {
+                instrumentation.runOnMainSync { findWeb(compose.activity.window.decorView)?.let { candidate = it } }
+                val currentWeb = candidate ?: return@waitUntil false
+                runCatching {
+                    val d = evaluate(currentWeb, "worldDiagnostics()")
+                    lastDiag = d.toString()
+                    d.optBoolean("ready") && d.optInt("places") > 0
+                }.onFailure {
+                    lastError = it.message ?: it.javaClass.simpleName
+                }.getOrDefault(false)
+            }
+        }.onFailure { err ->
+            throw IllegalStateException("World did not become ready within 20s (lastError=$lastError, lastDiag=$lastDiag)", err)
         }
-        check(ready)
+        val web = checkNotNull(candidate)
         // Seed a representative latitude through the real place list. At the ±80° limit
         // a north-up globe intentionally constrains otherwise impossible grab positions.
-        evaluate(web,"(()=>{document.getElementById('list').click();const b=[...document.querySelectorAll('#options button')].find(b=>b.firstElementChild.textContent==='蓝色列车餐厅');if(!b)throw Error('Review place missing');b.click();return {ok:true};})()")
+        compose.onNodeWithTag("world-place-list").performClick()
+        compose.onNodeWithTag("world-place-query").performTextInput("蓝色列车餐厅")
+        compose.onNode(hasText("蓝色列车餐厅") and !hasTestTag("world-place-query")).performClick()
         idle(web)
-        evaluate(web,"(()=>{if(!document.getElementById('summary').hidden)document.getElementById('close').click();return {ok:true};})()")
+        compose.onNodeWithTag("world-summary-close").performClick()
         // The globe control retains this center; subsequent zooms focus an arbitrary map coordinate.
         evaluate(web, "(()=>{document.querySelector('[data-zoom=\"0.5\"]').click();return {ok:true};})()")
         idle(web)

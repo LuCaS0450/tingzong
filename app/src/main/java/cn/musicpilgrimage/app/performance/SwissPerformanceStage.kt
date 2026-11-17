@@ -34,27 +34,65 @@ private fun stageMaterial(id:String):StageMaterial = when(id) {
     else->StageMaterial(Math.floorMod(id.hashCode(),15),Color(0xFF7D8370),Color(0xFFF6F3E9))
 }
 
-@Composable internal fun SwissPerformanceStage(song:SongPackage,ui:PerformanceUi,motion:Boolean,modifier:Modifier=Modifier) {
+@Composable internal fun SwissPerformanceStage(
+    song:SongPackage,
+    ui:PerformanceUi,
+    motion:Boolean,
+    modifier:Modifier=Modifier,
+    stageLightIntensity:Float=1f,
+    ambientGlow:Float=0f,
+    residualGlow:Float=0f,
+) {
     val material=remember(song.id){stageMaterial(song.id)}
+    val lightLevel=stageLightIntensity.coerceIn(0f,1.15f)
     Canvas(modifier) {
         val u=size.width/360f
-        drawRect(Brush.radialGradient(listOf(material.light,Color(0xFFE5E6DB),Color(0xFFC9CDBF)),center=Offset(size.width*.16f,size.height*.15f),radius=size.height*.9f))
+        val topWash=lerp(Color(0xFFD5D7CB),material.light,lightLevel.coerceIn(0f,1f))
+        val midWash=lerp(Color(0xFFC2C6B8),Color(0xFFE5E6DB),(.45f+.55f*lightLevel).coerceIn(0f,1f))
+        val deepWash=lerp(Color(0xFFA9AEA0),Color(0xFFC9CDBF),(.5f+.5f*lightLevel).coerceIn(0f,1f))
+        val beamRadius=size.height*(.68f+.26f*lightLevel.coerceIn(0f,1f))
+        drawRect(Brush.radialGradient(listOf(topWash,midWash,deepWash),center=Offset(size.width*.16f,size.height*.15f),radius=beamRadius))
+
+        // Finite-duration section-boundary ambient glow stays behind the lane board and pedestal.
+        val calmAmbient=ambientGlow.coerceIn(0f,1f)
+        if(motion&&calmAmbient>0.005f) {
+            val ambientCenter=Offset(size.width*.50f,size.height*.41f)
+            drawCircle(
+                Brush.radialGradient(
+                    listOf(
+                        Color(0xFFFFF5DC).copy(alpha=0.22f*calmAmbient),
+                        material.light.copy(alpha=0.14f*calmAmbient),
+                        Color.Transparent,
+                    ),
+                    center=ambientCenter,
+                    radius=size.width*.66f,
+                ),
+                radius=size.width*.66f,
+                center=ambientCenter,
+            )
+        }
+
         val feedback=ui.feedbacks.lastOrNull{it.kind.success}
         val age=feedback?.let{(ui.positionUs-it.atUs)/1_000_000f}?:1f
-        if(motion&&age in 0f..0.5f)drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha=(1-age*2)*.1f),Color.Transparent),center=Offset(size.width*.58f,size.height*.3f),radius=size.width*.6f),radius=size.width*.6f,center=Offset(size.width*.58f,size.height*.3f))
+        if(motion&&lightLevel>0.5f&&age in 0f..0.5f)drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha=(1-age*2)*.1f*lightLevel),Color.Transparent),center=Offset(size.width*.58f,size.height*.3f),radius=size.width*.6f),radius=size.width*.6f,center=Offset(size.width*.58f,size.height*.3f))
         val artBottom=size.height*.43f-6*u
         val artScale=min(u,size.height*.19f/155f)
-        drawOval(Brush.radialGradient(listOf(Color(0xFF4E5443).copy(alpha=.15f),Color.Transparent),center=Offset(size.width*.54f,artBottom-2*u),radius=110*u),Offset(size.width*.23f,artBottom-8*u),Size(size.width*.64f,18*u))
+        drawOval(Brush.radialGradient(listOf(Color(0xFF4E5443).copy(alpha=.15f*(.55f+.45f*lightLevel)),Color.Transparent),center=Offset(size.width*.54f,artBottom-2*u),radius=110*u),Offset(size.width*.23f,artBottom-8*u),Size(size.width*.64f,18*u))
         withTransform({translate(size.width/2-130*artScale,artBottom-153*artScale);scale(artScale,artScale,Offset.Zero)}) {
             stageObject(material)
             drawRect(Brush.verticalGradient(listOf(Color(0xFFDDC9AA),Color(0xFFB69C79),Color(0xFF9C8568))),Offset(15f,146f),Size(230f,8f))
-            drawLine(Color.White.copy(alpha=.45f),Offset(15f,146f),Offset(245f,146f),1f)
+            drawLine(Color.White.copy(alpha=.45f*lightLevel.coerceIn(.4f,1f)),Offset(15f,146f),Offset(245f,146f),1f)
         }
         val left=17*u;val top=size.height*.43f;val width=size.width-34*u;val height=size.height*.515f
         repeat(4){i->drawRect(Color(0xFF2A3322).copy(alpha=.018f*(4-i)),Offset(left+(i+2)*u,top+(i+4)*u),Size(width,height))}
         drawRect(Brush.linearGradient(listOf(Color(0xFF3D4539),Color(0xFF252E26),Color(0xFF333D2E)),Offset(left,top),Offset(size.width,size.height)),Offset(left,top),Size(width,height))
-        drawLine(Color(0xFFEAEDCF).copy(alpha=.4f),Offset(left,top),Offset(left+width,top),.75f*u)
-        drawLine(Color(0xFFEAEDCF).copy(alpha=.15f),Offset(left,top),Offset(left,top+height),.75f*u)
+        drawLine(Color(0xFFEAEDCF).copy(alpha=.4f*lightLevel.coerceIn(.35f,1f)),Offset(left,top),Offset(left+width,top),.75f*u)
+        drawLine(Color(0xFFEAEDCF).copy(alpha=.15f*lightLevel.coerceIn(.35f,1f)),Offset(left,top),Offset(left,top+height),.75f*u)
+
+        val dimAlpha=((1f-lightLevel).coerceIn(0f,0.75f)*0.24f+(1f-residualGlow.coerceIn(0f,1f))*0f).coerceIn(0f,0.22f)
+        if(dimAlpha>0.005f) {
+            drawRect(Color(0xFF1F2721).copy(alpha=dimAlpha))
+        }
     }
 }
 

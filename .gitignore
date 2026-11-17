@@ -40,13 +40,12 @@
 !/scripts/sync_private_materials.py
 !/scripts/test_repository_controls.py
 
-# The detail renderer is source; its photographs remain local.
+# Current map and archive assets. Photographs remain local.
 /app/src/main/assets/*
 !/app/src/main/assets/design/
 !/app/src/main/assets/performance/
 /app/src/main/assets/design/*
 !/app/src/main/assets/design/fonts/
-!/app/src/main/assets/design/map-labels/
 !/app/src/main/assets/design/swiss-details/
 !/app/src/main/assets/design/swiss-world/
 /app/src/main/assets/design/swiss-world/*
@@ -66,10 +65,6 @@
 !/app/src/main/assets/design/swiss-world/vendor/maplibre-gl.css
 !/app/src/main/assets/design/swiss-world/vendor/LICENSE.txt
 /app/src/main/assets/design/swiss-details/*
-!/app/src/main/assets/design/swiss-details/index.html
-!/app/src/main/assets/design/swiss-details/approved-renderers.js
-!/app/src/main/assets/design/swiss-details/approved-styles.css
-!/app/src/main/assets/design/swiss-details/native-adapter.js
 !/app/src/main/assets/design/swiss-details/place-copy.json
 !/app/src/main/assets/design/swiss-details/media-index.json
 !/app/src/main/assets/design/swiss-details/place-photos.json
@@ -78,7 +73,15 @@
 # Commercial recordings, song charts, artwork and old fixtures stay local.
 /app/src/main/assets/performance/*
 !/app/src/main/assets/performance/piano/
-/app/src/debug/assets/
+/app/src/debug/assets/*
+!/app/src/debug/assets/design/
+/app/src/debug/assets/design/*
+!/app/src/debug/assets/design/swiss-details/
+/app/src/debug/assets/design/swiss-details/*
+!/app/src/debug/assets/design/swiss-details/index.html
+!/app/src/debug/assets/design/swiss-details/approved-renderers.js
+!/app/src/debug/assets/design/swiss-details/approved-styles.css
+!/app/src/debug/assets/design/swiss-details/native-adapter.js
 
 # Media is opt-in; see docs/PUBLIC_ASSETS.md before adding an exception.
 *.png

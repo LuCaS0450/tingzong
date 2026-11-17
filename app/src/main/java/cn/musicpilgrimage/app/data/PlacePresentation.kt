@@ -3,7 +3,12 @@ package cn.musicpilgrimage.app.data
 data class PlaceHeading(val title:String,val qualifier:String="")
 
 /** Display only: retain the full official/catalogue name for search, navigation and accessibility. */
-fun Place.heading():PlaceHeading = placeHeading(name,id)
+fun Place.heading():PlaceHeading = placeHeading(name,id).let{heading->
+    heading.copy(title=regionalTitle(heading.title))
+}
+
+internal fun Place.regionalTitle(title:String):String =
+    unifiedDestinationRegion(country)?.takeIf{canonicalRegionName(placeHeading(title,id).title)==it}?:title
 
 fun placeHeading(name:String,id:String=""):PlaceHeading = when {
  id=="beverly-hills-hotel-reference" || name=="Beverly Hills Hotel（外部参考点）" -> PlaceHeading("Beverly Hills Hotel","外部参考点 · 封面取景")

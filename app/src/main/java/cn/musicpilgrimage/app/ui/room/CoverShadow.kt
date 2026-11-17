@@ -10,10 +10,41 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
+
+/** A softly uneven paper edge. Cache the normalized mask so resizing never blurs a new bitmap. */
+internal fun Modifier.sleeveShadow(): Modifier = drawWithCache {
+    val mask = RoomShadowCache.image("record-sleeve-shadow") {
+        val bitmap = Bitmap.createBitmap(272, 272, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(49, 30, 39, 30)
+            maskFilter = BlurMaskFilter(5f, BlurMaskFilter.Blur.NORMAL)
+        }
+        val edge = android.graphics.Path().apply {
+            moveTo(17f, 16f)
+            lineTo(255f, 17f)
+            lineTo(259f, 250f)
+            quadTo(233f, 258f, 198f, 255f)
+            quadTo(128f, 252f, 18f, 257f)
+            close()
+        }
+        canvas.drawPath(edge, paint)
+        paint.color = android.graphics.Color.argb(50, 30, 39, 30)
+        paint.maskFilter = BlurMaskFilter(1.7f, BlurMaskFilter.Blur.NORMAL)
+        canvas.drawRect(17f, 17f, 253f, 253f, paint)
+        bitmap.asImageBitmap()
+    }
+    onDrawBehind {
+        scale(size.width / 240f, size.height / 240f, pivot = Offset.Zero) {
+            drawImage(mask, topLeft = Offset(-16f, -16f))
+        }
+    }
+}
 
 /** Share immutable blurs across the covers and adjacent pages of the record rack. */
 internal object RoomShadowCache {
@@ -51,23 +82,24 @@ internal fun Modifier.coverShadow(): Modifier = drawWithCache {
     onDrawBehind { drawImage(image, topLeft = Offset(-pad.toFloat(), -pad.toFloat())) }
 }
 
-/** A physical paper sleeve belongs to the rack; other covers retain a plain edge. */
-internal fun Modifier.coverSleeve(): Modifier = drawWithCache {
+/** Paper edge shared by the rack, the moving cover and the release archive. */
+internal fun Modifier.coverSleeve(strength: () -> Float = { 1f }): Modifier = drawWithCache {
     val u=size.width/141f
     val edge=2.6f*u
     val rim=.65f*u
     val paperEdge=Brush.horizontalGradient(listOf(Color(0xFFF1EBDD),Color(0xFFD0C6B4),Color(0xFFA89D89)),startX=size.width,endX=size.width+edge)
     onDrawWithContent {
-        drawRect(Color(0xFFDDD5C6),topLeft=Offset(edge,edge*.55f),size=size)
+        val alpha=strength().coerceIn(0f,1f)
+        drawRect(Color(0xFFDDD5C6).copy(alpha=alpha),topLeft=Offset(edge,edge*.55f),size=size)
         drawRect(paperEdge,
-            topLeft=Offset(size.width,edge*.55f),size=Size(edge,size.height))
-        drawLine(Color(0xFFF8F2E4),Offset(size.width+edge*.42f,edge*.55f),Offset(size.width+edge*.42f,size.height+edge*.55f),.45f*u)
-        drawLine(Color(0xFF756B59),Offset(size.width+edge,edge*.55f),Offset(size.width+edge,size.height+edge*.55f),.45f*u)
+            topLeft=Offset(size.width,edge*.55f),size=Size(edge,size.height),alpha=alpha)
+        drawLine(Color(0xFFF8F2E4).copy(alpha=alpha),Offset(size.width+edge*.42f,edge*.55f),Offset(size.width+edge*.42f,size.height+edge*.55f),.45f*u)
+        drawLine(Color(0xFF756B59).copy(alpha=alpha),Offset(size.width+edge,edge*.55f),Offset(size.width+edge,size.height+edge*.55f),.45f*u)
         drawContent()
-        drawRect(Color(0xFFF0EADC),size=Size(size.width,rim))
-        drawRect(Color(0xFFECE5D7),size=Size(rim,size.height))
-        drawLine(Color(0xFF756B59).copy(alpha=.65f),Offset(size.width-rim*.5f,rim),Offset(size.width-rim*.5f,size.height),.45f*u)
-        drawRect(Color(0xFFDAD0BE),topLeft=Offset(0f,size.height-rim),size=Size(size.width,rim))
-        drawLine(Color(0xFF29261F).copy(alpha=.45f),Offset(0f,size.height),Offset(size.width,size.height),.5f*u)
+        drawRect(Color(0xFFF0EADC).copy(alpha=alpha),size=Size(size.width,rim))
+        drawRect(Color(0xFFECE5D7).copy(alpha=alpha),size=Size(rim,size.height))
+        drawLine(Color(0xFF756B59).copy(alpha=.65f*alpha),Offset(size.width-rim*.5f,rim),Offset(size.width-rim*.5f,size.height),.45f*u)
+        drawRect(Color(0xFFDAD0BE).copy(alpha=alpha),topLeft=Offset(0f,size.height-rim),size=Size(size.width,rim))
+        drawLine(Color(0xFF29261F).copy(alpha=.45f*alpha),Offset(0f,size.height),Offset(size.width,size.height),.5f*u)
     }
 }

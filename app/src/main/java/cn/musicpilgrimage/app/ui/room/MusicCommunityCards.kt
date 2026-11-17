@@ -25,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import cn.musicpilgrimage.app.ui.AppCenterConfirmDialog
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -175,14 +176,29 @@ import kotlin.math.roundToInt
             }
         }
     }
-    if(removing)AlertDialog(onDismissRequest={if(!busy)removing=false},containerColor=RoomColors.Paper,shape=androidx.compose.ui.graphics.RectangleShape,
-        title={Text(if(item.kind=="visit")"删除感想与照片？"else "删除这条内容？")},
-        text={Text(if(item.kind=="visit")"只移除感想和照片，到访日期与认证会保留。"else "删除后无法恢复。")},
-        confirmButton={SwissTextButton({removing=false;onAction("delete_content",JSONObject().put("id",item.id))},enabled=!busy){Text("删除")}},
-        dismissButton={SwissTextButton({removing=false},enabled=!busy){Text("取消")}})
-    if(reporting)AlertDialog(onDismissRequest={reporting=false},containerColor=RoomColors.Paper,shape=androidx.compose.ui.graphics.RectangleShape,title={Text("举报内容")},
-        text={Column{listOf("垃圾内容","不友善内容","色情 / 违法","版权问题","信息错误","其他").forEach{reason->SwissTextButton({reporting=false;onAction("report",JSONObject().put("id",item.id).put("reason",reason))},enabled=!busy){Text(reason)}}}},
-        confirmButton={},dismissButton={SwissTextButton({reporting=false}){Text("取消")}})
+    if(removing)AppCenterConfirmDialog(onDismissRequest={if(!busy)removing=false},dismissOnBackPress=!busy,dismissOnClickOutside=!busy) {
+        Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text(if(item.kind=="visit")"删除感想与照片？"else "删除这条内容？",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
+            Text(if(item.kind=="visit")"只移除感想和照片，到访日期与认证会保留。"else "删除后无法恢复。",fontSize=14.sp,color=RoomColors.Muted)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+                SwissTextButton({removing=false},enabled=!busy){Text("取消")}
+                SwissTextButton({removing=false;onAction("delete_content",JSONObject().put("id",item.id))},enabled=!busy){Text("删除")}
+            }
+        }
+    }
+    if(reporting)AppCenterConfirmDialog(onDismissRequest={reporting=false}) {
+        Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text("举报内容",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
+            listOf("垃圾内容","不友善内容","色情 / 违法","版权问题","信息错误","其他").forEach { reason ->
+                SwissTextButton({reporting=false;onAction("report",JSONObject().put("id",item.id).put("reason",reason))},enabled=!busy) {
+                    Text(reason)
+                }
+            }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+                SwissTextButton({reporting=false}){Text("取消")}
+            }
+        }
+    }
 }
 
 private val MessageMenuButtonPlate = 34.dp

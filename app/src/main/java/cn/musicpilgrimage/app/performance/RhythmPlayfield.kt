@@ -42,19 +42,21 @@ private val night=Color(0xFF273025)
 private val missColor=Color(0xFFFFA69B)
 
 /** A single translucent backdrop spans the scene, independent of the touch/judgment area. */
-@Composable internal fun MusicLaneBackdrop(modifier:Modifier) {
+@Composable internal fun MusicLaneBackdrop(modifier:Modifier,stageClarity:Float=1f) {
+    val clarity=stageClarity.coerceIn(0f,1f)
     Canvas(modifier) {
         val w=size.width/4
         for(lane in 0..3) {
-            drawRect(Brush.horizontalGradient(listOf(Color.White.copy(alpha=.025f),Color.Transparent)),Offset(lane*w,0f),Size(w,size.height))
-            drawLine(Color.White.copy(alpha=.13f),Offset(lane*w,0f),Offset(lane*w,size.height),.6.dp.toPx())
+            drawRect(Brush.horizontalGradient(listOf(Color.White.copy(alpha=.025f*clarity),Color.Transparent)),Offset(lane*w,0f),Size(w,size.height))
+            drawLine(Color.White.copy(alpha=.13f*clarity),Offset(lane*w,0f),Offset(lane*w,size.height),.6.dp.toPx())
         }
-        drawLine(Color.White.copy(alpha=.13f),Offset(size.width,0f),Offset(size.width,size.height),.6.dp.toPx())
+        drawLine(Color.White.copy(alpha=.13f*clarity),Offset(size.width,0f),Offset(size.width,size.height),.6.dp.toPx())
     }
 }
 
 /** Bright input cues stay on the lower playfield; the upper artwork remains unobstructed. */
-@Composable internal fun MusicLanes(controller:PerformanceController,ui:PerformanceUi,motion:Boolean,modifier:Modifier) {
+@Composable internal fun MusicLanes(controller:PerformanceController,ui:PerformanceUi,motion:Boolean,modifier:Modifier,stageClarity:Float=1f) {
+    val clarity=stageClarity.coerceIn(0f,1f)
     val listen=controller.options.mode==PlayMode.LISTEN
     val view=LocalView.current
     val navigationBottom=WindowInsets.navigationBars.getBottom(LocalDensity.current).toFloat()
@@ -69,10 +71,14 @@ private val missColor=Color(0xFFFFA69B)
             val travel=line/1_800_000f
             for(lane in 0..3) {
                 val x=(lane+.5f)*w
-                performanceReceptor(x,line,w,laneColors[lane],lane in pressed)
+                if(clarity>0.02f) {
+                    performanceReceptor(x,line,w*clarity,laneColors[lane],lane in pressed)
+                }
             }
-            drawLine(noteColor.copy(alpha=.09f),Offset(0f,line),Offset(size.width,line),6.dp.toPx())
-            drawLine(Color(0xFFF7E8C5).copy(alpha=.80f),Offset(0f,line),Offset(size.width,line),.9.dp.toPx())
+            val spanHalf=size.width*0.5f*(0.2f+0.8f*clarity)
+            val cx=size.width*0.5f
+            drawLine(noteColor.copy(alpha=.09f*clarity),Offset(cx-spanHalf,line),Offset(cx+spanHalf,line),6.dp.toPx())
+            drawLine(Color(0xFFF7E8C5).copy(alpha=.80f*clarity),Offset(cx-spanHalf,line),Offset(cx+spanHalf,line),.9.dp.toPx())
 
             clipRect {
                 if(!listen)controller.targets.forEach {t->

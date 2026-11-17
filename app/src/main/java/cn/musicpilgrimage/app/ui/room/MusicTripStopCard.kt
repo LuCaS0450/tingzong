@@ -13,36 +13,33 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.MusicTripStop
+import cn.musicpilgrimage.app.data.geographicParts
 
 @Composable internal fun RoomTripStopCard(
     stop:MusicTripStop,modifier:Modifier,enabled:Boolean,canUp:Boolean,canDown:Boolean,
     onPlace:()->Unit,onUp:()->Unit,onDown:()->Unit,onMoveDay:()->Unit,onRemove:()->Unit,
-    handleModifier:Modifier
+    handleModifier:Modifier,placeEnabled:Boolean=enabled
 ) {
-    RoomPaper(modifier.fillMaxWidth(),woodEdge=true) {
-        Column(Modifier.padding(13.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).then(if(enabled&&stop.placeId!=null)Modifier.clickable(role=Role.Button,onClick=onPlace)else Modifier)) {
-                    Text(stop.name,fontSize=17.sp,color=RoomColors.Ink)
-                    Text("${stop.city} · ${stop.country}",Modifier.padding(top=5.dp),fontSize=12.sp,color=RoomColors.Muted)
-                }
-                if(stop.placeId!=null)Icon(Icons.Outlined.ChevronRight,null,tint=RoomColors.Muted)
+    RoomPaper(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().heightIn(min=72.dp).padding(start=13.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).then(if(placeEnabled&&stop.placeId!=null)Modifier.clickable(role=Role.Button,onClick=onPlace)else Modifier)
+                .padding(vertical=10.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                Text(stop.name,fontSize=16.sp,color=RoomColors.Ink)
+                val location=geographicParts(stop.city,stop.country).joinToString(" · ")
+                val subtitle=listOf(location,stop.note).filter(String::isNotBlank).joinToString(" · ")
+                if(subtitle.isNotBlank())Text(subtitle,fontSize=12.sp,color=RoomColors.Muted)
             }
-            if(stop.note.isNotBlank())Text(stop.note,fontSize=13.sp,color=RoomColors.Muted)
-            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                IconButton(onMoveDay,handleModifier.size(48.dp).testTag("trip-drag-handle-${stop.id}"),enabled=enabled) {
-                    Icon(Icons.Outlined.DragIndicator,"拖动地点",tint=RoomColors.Navy)
-                }
-                Spacer(Modifier.weight(1f))
-                IconButton(onUp,enabled=enabled&&canUp){Icon(Icons.Outlined.ArrowUpward,"上移地点",tint=if(enabled&&canUp)RoomColors.Navy else RoomColors.Muted.copy(alpha=.4f))}
-                IconButton(onDown,enabled=enabled&&canDown){Icon(Icons.Outlined.ArrowDownward,"下移地点",tint=if(enabled&&canDown)RoomColors.Navy else RoomColors.Muted.copy(alpha=.4f))}
-                Box {
-                    var menu by remember{mutableStateOf(false)}
-                    IconButton({menu=true},enabled=enabled){Icon(Icons.Outlined.MoreHoriz,"地点安排操作",tint=RoomColors.Navy)}
-                    DropdownMenu(menu,{menu=false}) {
-                        DropdownMenuItem({Text("移到另一天")},{menu=false;onMoveDay()})
-                        DropdownMenuItem({Text("从行程移出")},{menu=false;onRemove()})
-                    }
+            IconButton(onMoveDay,handleModifier.size(48.dp).testTag("trip-drag-handle-${stop.id}"),enabled=enabled) {
+                Icon(Icons.Outlined.DragIndicator,"拖动地点",tint=RoomColors.Navy)
+            }
+            Box {
+                var menu by remember{mutableStateOf(false)}
+                IconButton({menu=true},enabled=enabled){Icon(Icons.Outlined.MoreHoriz,"地点安排操作",tint=RoomColors.Navy)}
+                DropdownMenu(menu,{menu=false}) {
+                    DropdownMenuItem({Text("上移地点")},{menu=false;onUp()},enabled=enabled&&canUp)
+                    DropdownMenuItem({Text("下移地点")},{menu=false;onDown()},enabled=enabled&&canDown)
+                    DropdownMenuItem({Text("移到另一天")},{menu=false;onMoveDay()},enabled=enabled)
+                    DropdownMenuItem({Text("从行程移出")},{menu=false;onRemove()},enabled=enabled)
                 }
             }
         }

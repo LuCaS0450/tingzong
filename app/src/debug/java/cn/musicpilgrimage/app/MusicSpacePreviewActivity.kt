@@ -16,6 +16,7 @@ class MusicSpacePreviewActivity:ComponentActivity() {
     override fun onCreate(savedInstanceState:Bundle?){
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(statusBarStyle=SystemBarStyle.light(android.graphics.Color.TRANSPARENT,android.graphics.Color.TRANSPARENT),navigationBarStyle=SystemBarStyle.light(AppArt.Base.toArgb(),AppArt.Base.toArgb()))
-        setContent{PilgrimageApp(session,requireAccount=false)}
+        val allowGuestTrips=intent?.getBooleanExtra("allowGuestTrips",false)==true
+        setContent{PilgrimageApp(session,requireAccount=false,allowGuestTrips=allowGuestTrips)}
     }
 }

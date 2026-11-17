@@ -17,12 +17,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import cn.musicpilgrimage.app.FormViewModel
 import cn.musicpilgrimage.app.data.*
+import cn.musicpilgrimage.app.ui.AppCenterConfirmDialog
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
@@ -34,7 +36,7 @@ internal fun roomRecordTitle(kind:String)=when(kind){"message"->"地点留言";"
 
 @Composable internal fun RoomRecordEditor(
     kind:String,target:String,editing:ContentItem?,vm:FormViewModel,onBack:()->Unit,onSaved:()->Unit,onCamera:(String)->Unit,
-    registerLeave:(((()->Unit)->Unit)?)->Unit,onBusy:(Boolean)->Unit
+    registerLeave:(((()->Unit)->Unit)?)->Unit,onBusy:(Boolean)->Unit,onDirty:(Boolean)->Unit={}
 ) {
     val fields by vm.fields.collectAsState()
     val busy by vm.busy.collectAsState()
@@ -47,8 +49,8 @@ internal fun roomRecordTitle(kind:String)=when(kind){"message"->"地点留言";"
     val currentRegister by rememberUpdatedState(registerLeave)
     val currentLeave by rememberUpdatedState<(()->Unit)->Unit>({action->if(!busy){if(vm.hasChanges())leave=action else action()}})
     LaunchedEffect(kind,target){vm.initialize(kind,target,editing)}
-    DisposableEffect(vm){currentRegister{action->currentLeave(action)};onDispose{currentRegister(null);onBusy(false)}}
-    SideEffect{onBusy(busy)}
+    DisposableEffect(vm){currentRegister{action->currentLeave(action)};onDispose{currentRegister(null);onBusy(false);onDirty(false)}}
+    SideEffect{onBusy(busy);onDirty(vm.hasChanges())}
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){result->
         if(result[Manifest.permission.ACCESS_FINE_LOCATION]==true)vm.submit(onSaved)
         else vm.error.value="需要精确位置权限才能进行现场认证。草稿已保留。"
@@ -84,13 +86,12 @@ internal fun roomRecordTitle(kind:String)=when(kind){"message"->"地点留言";"
         locating=true;locationStatus="正在查看当前位置…"
         try {
             val fix=vm.services.location.locate()
-            val distance=ArrivalRules.distanceMeters(fix.latitude,fix.longitude,place.latitude,place.longitude).roundToInt()
-            val problem=ArrivalRules.rejection(place,fix)
+            val arrival=ArrivalRules.assess(place,fix)
+            val distance=arrival.distanceMeters?.roundToInt()
             locationStatus=when {
-                place.arrivalLocationPendingSync->problem.orEmpty()
-                problem==null->"距离这里 ${distance} 米 · 已在打卡范围内"
-                distance>place.radiusMeters&&!fix.isMock&&fix.accuracy<=100&&fix.ageMillis<=120_000->"距离这里 ${distance} 米 · 还需靠近一些"
-                else->problem?:"暂时无法定位，请稍后再试"
+                distance==null->arrival.rejection?:"暂时无法定位，请稍后再试"
+                arrival.rejection==null->"距离这里 ${distance} 米 · 已在打卡范围内"
+                else->"距离这里约 ${distance} 米 · 还需靠近一些"
             }
         } catch(cancel:CancellationException){throw cancel}
         catch(error:Exception){locationStatus=error.message?:"暂时无法定位，请稍后再试"}
@@ -113,11 +114,17 @@ internal fun roomRecordTitle(kind:String)=when(kind){"message"->"地点留言";"
 }
 
 @Composable internal fun RoomRecordDiscardDialog(busy:Boolean,onContinue:()->Unit,onDiscard:()->Unit,error:String?=null) {
-    AlertDialog(onDismissRequest={if(!busy)onContinue()},containerColor=RoomColors.Paper,shape=androidx.compose.ui.graphics.RectangleShape,
-        title={Text("放弃未保存的修改？")},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text("当前改动不会保存，已保存的原记录会保留。")
+    AppCenterConfirmDialog(onDismissRequest={if(!busy)onContinue()},dismissOnBackPress=!busy,dismissOnClickOutside=!busy) {
+        Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Text("放弃未保存的修改？",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
+            Text("当前改动不会保存，已保存的原记录会保留。",fontSize=14.sp,color=RoomColors.Muted)
             if(error!=null)Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
-        }},confirmButton={SwissTextButton(onDiscard,enabled=!busy){Text(if(busy)"正在处理…"else "放弃修改")}},dismissButton={SwissTextButton(onContinue,enabled=!busy){Text("继续编辑")}})
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
+                SwissTextButton(onContinue,enabled=!busy){Text("继续编辑")}
+                SwissTextButton(onDiscard,enabled=!busy){Text(if(busy)"正在处理…"else "放弃修改")}
+            }
+        }
+    }
 }
 
 @Composable internal fun RoomRecordEditorContent(
@@ -146,9 +153,9 @@ internal fun roomRecordTitle(kind:String)=when(kind){"message"->"地点留言";"
                     OutlinedTextField(fields.optString("song"),{onSet("song",it.take(100))},Modifier.fillMaxWidth(),label={Text("关联歌曲（选填）")},singleLine=true,enabled=!busy)
                     OutlinedTextField(fields.optString("artist"),{onSet("artist",it.take(100))},Modifier.fillMaxWidth(),label={Text("歌手（选填）")},singleLine=true,enabled=!busy)
                 }
-                OutlinedTextField(fields.optString("body"),{onSet("body",it.take(1000))},Modifier.fillMaxWidth().testTag("room-record-body"),
+                OutlinedTextField(fields.optString("body"),{onSet("body",it.take(RECORD_BODY_LIMIT))},Modifier.fillMaxWidth().testTag("room-record-body"),
                     label={Text(if(kind=="message")"留言"else if(kind=="recreation")"这次复刻的感想"else "到访感想（选填）")},minLines=4,enabled=!busy,
-                    supportingText={Text("${fields.optString("body").length}/1000")})
+                    supportingText={Text("${fields.optString("body").length}/$RECORD_BODY_LIMIT")})
                 if(kind=="recreation"&&original!=null) {
                     Text("原作参考",fontSize=13.sp,color=RoomColors.Muted)
                     RoomCommunityPhoto(original,"原作参考图",maxWidth=200.dp,tag="room-record-original")

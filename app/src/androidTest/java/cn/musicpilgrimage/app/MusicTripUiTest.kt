@@ -2,14 +2,10 @@ package cn.musicpilgrimage.app
 
 import android.graphics.Bitmap
 import android.os.SystemClock
-import android.view.View
-import android.view.ViewGroup
-import android.webkit.WebView
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
@@ -18,7 +14,6 @@ import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.performance.LibraryDatabase
 import cn.musicpilgrimage.app.ui.PilgrimageTheme
 import cn.musicpilgrimage.app.ui.room.*
-import org.json.JSONArray
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -27,8 +22,6 @@ import org.junit.Test
 import java.io.File
 import java.time.LocalDate
 import java.util.UUID
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /** Exercises the real trip renderer and dialogs using isolated local guest plans. */
 class MusicTripUiTest {
@@ -46,7 +39,7 @@ class MusicTripUiTest {
     private fun capture(name:String) {
         compose.waitForIdle()
         instrumentation.waitForIdleSync()
-        SystemClock.sleep(300) // Wait for the WebView and dialog surfaces to reach the compositor.
+        SystemClock.sleep(300) // Wait for the dialog surfaces to reach the compositor.
         val folder=File(context.getExternalFilesDir(null),"trip-planning-review").apply{mkdirs()}
         instrumentation.uiAutomation.takeScreenshot().let{bitmap->
             File(folder,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}
@@ -54,36 +47,9 @@ class MusicTripUiTest {
         }
     }
 
-    private fun findWeb(view:View):WebView? {
-        if(view is WebView&&view.url?.endsWith("swiss-details/index.html")==true)return view
-        if(view is ViewGroup)for(i in 0 until view.childCount)findWeb(view.getChildAt(i))?.let{return it}
-        return null
-    }
-
-    private fun evaluate(script:String):String {
-        val done=CountDownLatch(1)
-        var result:String?=null
-        compose.runOnUiThread {
-            val web=findWeb(compose.activity.window.decorView)
-            if(web==null)done.countDown()
-            else web.evaluateJavascript(script){result=it;done.countDown()}
-        }
-        check(done.await(5,TimeUnit.SECONDS)){"Trip WebView did not respond"}
-        return result.orEmpty()
-    }
-
     private fun openDay(day:Int) {
-        val selector="[data-action=trip-edit-day][data-day='$day']"
-        compose.waitUntil(8_000){evaluate("!!document.querySelector(\"$selector\")")=="true"}
-        val point=JSONArray(evaluate("""
-            (()=>{const button=document.querySelector("$selector");
-            button.scrollIntoView({block:'center'});
-            const rect=button.getBoundingClientRect(),scale=devicePixelRatio;
-            return [(rect.left+rect.width/2)*scale,(rect.top+rect.height/2)*scale];})()
-        """.trimIndent()))
-        compose.onNodeWithTag("swiss-web-detail").performTouchInput {
-            click(Offset(point.getDouble(0).toFloat(),point.getDouble(1).toFloat()))
-        }
+        compose.onNodeWithTag("trip-archive-scroll").performScrollToNode(hasTestTag("trip-day-$day"))
+        compose.onNodeWithTag("trip-day-$day").performClick()
         compose.waitUntil(5_000){compose.onAllNodesWithTag("trip-day-search").fetchSemanticsNodes().isNotEmpty()}
     }
 
@@ -100,11 +66,13 @@ class MusicTripUiTest {
         services.library.trips.update(key){it+listOf(trip,other)}
         val vm=ViewModelProvider(compose.activity)[MusicTripViewModel::class.java]
         compose.waitUntil(8_000){!vm.state.value.busy&&vm.state.value.owner==key&&vm.state.value.trips.any{it.id==trip.id}}
-        var opened:String?=null
+        var opened by mutableStateOf<String?>(null)
         compose.runOnUiThread {compose.activity.setContent {
             val state by vm.state.collectAsState()
             PilgrimageTheme{RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)){
-                RoomTripList(state,key,listOf(city),vm){opened=it}
+                val detail=state.trips.find{it.id==opened}
+                if(detail==null)RoomTripList(state,key,listOf(city),vm){opened=it}
+                else RoomTripDetail(detail,state,key,vm,{},onBack={opened=null})
             }}
         }}
 
@@ -122,8 +90,28 @@ class MusicTripUiTest {
         compose.onNodeWithText("「$name」及每天的全部安排都会被删除。此操作无法撤销。").assertIsDisplayed()
         compose.onNodeWithText("取消").performClick()
         assertTrue(store.read(key).any{it.id==trip.id&&it.stops.size==1})
+
+        row.performClick()
+        compose.onNodeWithTag("trip-archive-settings").performClick()
+        compose.onNodeWithText("修改日期").assertIsDisplayed()
+        capture("shared-trip-settings")
+        compose.onNodeWithText("修改日期").performClick()
+        compose.onNodeWithText("修改出行日期").assertIsDisplayed()
+        compose.onNodeWithText("名称与目的地").assertDoesNotExist()
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithTag("trip-archive-scroll")
+            .performScrollToNode(hasTestTag("trip-stop-${trip.stops.single().id}"))
+        compose.onNodeWithContentDescription("地点安排操作").performClick()
+        compose.onNodeWithText("从行程移出").performClick()
+        compose.onNodeWithText("从行程移出这个活动？").assertIsDisplayed()
+        capture("shared-remove-activity")
+        compose.onNodeWithText("取消").performClick()
+        assertEquals(1,store.read(key).first{it.id==trip.id}.stops.size)
+        compose.runOnIdle{opened=null}
+
         reveal()
         delete.performClick()
+        capture("shared-delete-trip")
         compose.onNodeWithText("删除行程").performClick()
         compose.waitUntil(8_000){vm.state.value.trips.none{it.id==trip.id}}
         assertFalse(store.read(key).any{it.id==trip.id})
@@ -147,7 +135,7 @@ class MusicTripUiTest {
         search.performTextInput("中华民国")
         compose.onNodeWithText("中国台湾 · 国家或地区").performClick()
         search.performTextReplacement("中国香港")
-        compose.onNodeWithText("中国香港 · 国家或地区").performClick()
+        compose.onNode(hasText("中国香港") and !hasTestTag("trip-destination-search")).performClick()
         compose.runOnIdle { assertEquals(listOf("中国台湾", "中国香港"), selected.map { it.label }) }
         capture("region-selection")
     }
@@ -177,7 +165,7 @@ class MusicTripUiTest {
             PilgrimageTheme{RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)){
                 val trip=state.trips.find{it.id==tripId}
                 if(trip==null)RoomTripList(state,key,destinations,vm){tripId=it}
-                else RoomTripDetailWeb(trip,state,key,vm,{},catalog=catalog)
+                else RoomTripDetail(trip,state,key,vm,{},catalog=catalog)
                 if(adding)RoomAddToTripDialog(place,state,key,destinations,vm){adding=false}
             }}
         }}
@@ -207,7 +195,7 @@ class MusicTripUiTest {
         compose.waitUntil(8_000){current().stops.size==1}
         assertEquals(3,current().stops.single().day)
         assertTrue(current().cities.any{it.name==place.city&&it.country==place.country})
-        assertEquals("false",evaluate("document.body.innerText.includes('待安排')"))
+        compose.onNodeWithText("待安排",substring=true).assertDoesNotExist()
 
         openDay(1)
         val daySearch=compose.onNodeWithTag("trip-day-search")

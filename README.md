@@ -1,12 +1,12 @@
 # 听踪 · Tingzong
 
-从音乐作品探索真实地点，并连接演奏、到访记录与旅行计划的 Android 项目。采用 Kotlin、Jetpack Compose、Room、Supabase、MapLibre、CameraX 和原生音频实现，支持 Android 8.0（API 26）及以上版本。
+从音乐作品探索真实地点，并连接演奏、到访记录与旅行计划的 Android 项目。采用 Kotlin、Jetpack Compose、Room、Supabase、MapLibre GL JS、CameraX 和原生音频实现，支持 Android 8.0（API 26）及以上版本。
 
 本仓库用于个人持续开发和公开保存源码。初始基线建立于 2026-10-30，此前设计、研究及实施过程不作为已有 Git 提交历史导入。当前工程仍在持续开发，公开仓库不是发布版或完整素材包。
 
 ## 仓库范围
 
-- `app/`：Android 源码、测试、数据库 schema，以及许可明确的字体、地图字典和钢琴采样。
+- `app/`：Android 源码、测试、数据库 schema，以及许可明确的字体、地图资料和钢琴采样。
 - `supabase/`：后端函数、配置、迁移账本与测试。既有迁移记录不应直接对现有生产环境全部重放。
 - `scripts/`：当前预览入口、云端维护工具和版本管理检查。
 - `docs/`：[现行开发入口](docs/PROJECT_GUIDE.md)、[版本管理约定](docs/VERSION_CONTROL.md)、[公开资源与缺失素材说明](docs/PUBLIC_ASSETS.md)。

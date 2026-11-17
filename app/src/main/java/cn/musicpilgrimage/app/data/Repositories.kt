@@ -27,8 +27,10 @@ class ContentRepository(private val api:AppServices) {
  internal val likes=ContentLikes(api.scope,api.userId) { owner,id,enabled ->
   api.call("like",JSONObject().put("id",id).put("enabled",enabled),owner)
  }
- suspend fun list(location:String="",kind:String="",mine:Boolean=false,offset:Int=0):List<ContentItem> {
-  val owner=api.userId.value
+ internal val personalHistory=PersonalRecordHistory(api.scope,api.userId,api.changed,{owner,kind,offset->
+  list(kind=kind,mine=true,offset=offset,owner=owner)
+ })
+ suspend fun list(location:String="",kind:String="",mine:Boolean=false,offset:Int=0,owner:String?=api.userId.value):List<ContentItem> {
   val revision=likes.beginRead()
   val payload=JSONObject().put("mine",mine).put("offset",offset)
   if(location.isNotBlank())payload.put("location_id",location)

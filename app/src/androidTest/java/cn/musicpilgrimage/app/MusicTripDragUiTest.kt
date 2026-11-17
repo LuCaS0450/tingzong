@@ -3,9 +3,7 @@ package cn.musicpilgrimage.app
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -45,7 +43,7 @@ class MusicTripDragUiTest {
         owner?.let{key->saved().write(key,saved().read(key).filterNot{it.id==id})}
     }
     private fun open(days:Int=3,duplicate:Boolean=false) {
-        compose.waitUntil(12000){compose.onAllNodesWithTag("room-home").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(12000){compose.onAllNodesWithTag("wall-tab-0").fetchSemanticsNodes().isNotEmpty()}
         val services=(context.applicationContext as PilgrimageApplication).services
         assumeTrue("Do not alter a signed-in account",services.userId.value==null)
         val key=LibraryDatabase.guestOwner(context);owner=key
@@ -60,9 +58,9 @@ class MusicTripDragUiTest {
         compose.waitUntil(5000){!vm.state.value.busy&&vm.state.value.trips.any{it.id==id}}
         compose.runOnUiThread{compose.activity.setContent {
             val state by vm.state.collectAsState()
-            PilgrimageTheme{RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-                Column {RoomHeader("旅行安排",onBack={},onSpace={});Box(Modifier.weight(1f)){RoomTripDetail(state.trips.first{it.id==id},state,key,vm,{})}}
-            }}
+            PilgrimageTheme {
+                RoomTripDetail(state.trips.first{it.id==id},state,key,vm,{})
+            }
         }}
         compose.onNodeWithTag("room-trip-detail").assertIsDisplayed()
     }
@@ -108,18 +106,26 @@ class MusicTripDragUiTest {
     }
     @Test fun edgeScrollKeepsGestureAfterSourceLeavesViewportAndDropsIntoEmptyDay() {
         open(days=10)
+        val surface=compose.onNodeWithTag("room-trip-detail")
         val start=center("trip-drag-handle-$a")
-        val area=compose.onNodeWithTag("room-trip-detail").fetchSemanticsNode().boundsInRoot
+        val edge=Offset(start.x,surface.fetchSemanticsNode().boundsInRoot.height-24f)
+        surface.performTouchInput {
+            down(start)
+            advanceEventTime(650)
+            moveTo(start+Offset(0f,2f),delayMillis=16)
+        }
+        compose.onNodeWithTag("trip-drag-preview").assertExists()
+        // Freeze only after the long-press has taken ownership. Otherwise the
+        // test idler waits for the continuous edge scroll to end before releasing the pointer.
         compose.mainClock.autoAdvance=false
         try {
-            compose.onNodeWithTag("room-trip-detail").performTouchInput{down(start)}
-            compose.mainClock.advanceTimeBy(650)
-            compose.onNodeWithTag("room-trip-detail").performTouchInput{moveTo(Offset(start.x,area.height-12f),delayMillis=80)}
-            compose.mainClock.advanceTimeBy(1200)
-            compose.onNodeWithTag("trip-drag-preview").assertExists()
+            surface.performTouchInput { moveTo(edge,delayMillis=80) }
+            compose.mainClock.advanceTimeBy(1_450)
             capture("trip-drag-edge")
-            compose.onNodeWithTag("room-trip-detail").performTouchInput{up()}
-        } finally {compose.mainClock.autoAdvance=true}
+            surface.performTouchInput { up() }
+        } finally {
+            compose.mainClock.autoAdvance=true
+        }
         compose.waitUntil(5000){!vm.state.value.busy&&current().stops.first{it.id==a}.day!!>=3}
         compose.waitUntil(5000){compose.onAllNodesWithTag("trip-drag-preview").fetchSemanticsNodes().isEmpty()}
         assertEquals(setOf(a,b,c),current().stops.map{it.id}.toSet())

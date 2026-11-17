@@ -79,32 +79,6 @@ class SessionViewModel(app:Application):FeatureViewModel(app) {
  }
 }
 
-data class SearchHit(val place:Place,val matched:String="")
-class ExploreViewModel(app:Application):FeatureViewModel(app) {
- val query=MutableStateFlow("")
- val hits=MutableStateFlow<List<SearchHit>>(emptyList())
- val offline=MutableStateFlow(true)
- val fix=MutableStateFlow<LocationFix?>(null)
- init {
-  viewModelScope.launch { services.userId.drop(1).collect { error.value=null } }
-  viewModelScope.launch { combine(query,services.catalog){q,c->q to c}.collectLatest { (q,c) ->
-   hits.value=CatalogSearch.filter(c.places,c.artists,q).map { SearchHit(it) }
-   delay(350)
-   if(q.isNotBlank()) try {
-    val remote=repositories.catalog.search(q)
-    hits.value=remote.mapNotNull { r->c.places.find { it.id==r.optString("id") }?.let { SearchHit(it,r.optString("matched")) } }
-    offline.value=false
-   } catch(e:CancellationException){throw e} catch(_:Exception){offline.value=true}
-  } }
-  refresh()
- }
- fun refresh()=work { repositories.catalog.refresh();offline.value=false }
- fun nearby()=work {
-  val location=services.location.locate();fix.value=location
-  hits.value=hits.value.sortedBy { ArrivalRules.distanceMeters(location.latitude,location.longitude,it.place.latitude,it.place.longitude) }
- }
-}
-
 class PlaceViewModel(app:Application):FeatureViewModel(app) {
  val items=MutableStateFlow<List<ContentItem>>(emptyList())
  val ownItems=MutableStateFlow<List<ContentItem>>(emptyList())
@@ -121,18 +95,41 @@ class PlaceViewModel(app:Application):FeatureViewModel(app) {
  }
 }
 
+internal data class PersonalRecordLoad(
+ val owner:String,val kind:String,val page:PersonalRecordPage?,val loading:Boolean,val error:String?=null,
+)
+
 class PersonalViewModel(app:Application):FeatureViewModel(app) {
  private var contentKind=""
  private var profileId=""
  val items=MutableStateFlow<List<ContentItem>>(emptyList())
  val submissions=MutableStateFlow<List<JSONObject>>(emptyList())
  val publicProfile=MutableStateFlow<JSONObject?>(null)
+ internal val records=MutableStateFlow<PersonalRecordLoad?>(null)
+ private var recordJob:Job?=null
  init { viewModelScope.launch { services.userId.drop(1).collect { items.value=emptyList();submissions.value=emptyList();publicProfile.value=null;error.value=null } } }
  fun load(kind:String,more:Boolean=false)=work {
   if(contentKind!=kind){items.value=emptyList();contentKind=kind}
   val owner=services.userId.value ?: return@work
   val rows=repositories.content.list(kind=kind,mine=true,offset=if(more)items.value.size else 0)
   if(owner==services.userId.value)items.value=(if(more)items.value else emptyList())+rows
+ }
+ internal fun cachedRecords(owner:String,kind:String)=repositories.content.personalHistory.cached(owner,kind)
+ internal fun refreshRecords(kind:String,force:Boolean=false,more:Boolean=false) {
+  val owner=services.userId.value ?: return
+  if(more&&recordJob?.isActive==true)return
+  recordJob?.cancel()
+  val start=PersonalRecordLoad(owner,kind,cachedRecords(owner,kind),loading=true)
+  records.value=start
+  recordJob=viewModelScope.launch {
+   try {
+    val page=repositories.content.personalHistory.load(owner,kind,force,more)
+    if(services.userId.value==owner)records.value=start.copy(page=page?:cachedRecords(owner,kind),loading=false)
+   } catch(e:CancellationException){throw e}
+   catch(e:Exception){
+    if(services.userId.value==owner)records.value=start.copy(loading=false,error=friendlyError(e))
+   }
+  }
  }
  fun submissions()=work { submissions.value=emptyList();submissions.value=repositories.content.submissions() }
  fun profile(id:String)=work {

@@ -1,5 +1,7 @@
 package cn.musicpilgrimage.app.ui.room
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,48 +11,27 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.ReleaseArtwork
 import cn.musicpilgrimage.app.performance.*
+import cn.musicpilgrimage.app.ui.AppNavEasing
+import cn.musicpilgrimage.app.ui.LocalAppHaptics
+import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import coil.compose.AsyncImage
-
-@Composable internal fun RoomPerformanceHome(entries:List<PerformanceEntry>,artwork:(SongPackage)->ReleaseArtwork?,loading:Boolean=false,onSong:(String)->Unit) {
-    LazyColumn(Modifier.fillMaxSize().testTag("performance-list"),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-        item("piano") {Box(Modifier.fillMaxWidth().height(285.dp).clipToBounds()) {
-            AsyncImage(roomAsset("performance-piano"),"现代黑色立式钢琴与乐谱",Modifier.fillMaxSize().graphicsLayer{scaleX=1.22f;scaleY=1.22f},contentScale=ContentScale.Fit)
-        }}
-        item("title") {Text("可演奏曲目",fontSize=22.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)}
-        if(loading)item("loading"){CircularProgressIndicator(Modifier.size(24.dp),color=RoomColors.Navy)}
-        else if(entries.isEmpty())item("empty") {RoomPaper(Modifier.fillMaxWidth(),woodEdge=true) {
-            Text("曲目正在校对中，完成后会出现在这里。",Modifier.padding(20.dp),color=RoomColors.Muted)
-        }}
-        items(entries,key={it.song.id}) {entry->
-            val song=entry.song
-            RoomPaper(Modifier.fillMaxWidth().testTag("performance-song-${song.id}").clickable{onSong(song.id)},woodEdge=true) {
-                Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-                    RoomCover(artwork(song),song.title,Modifier.size(96.dp))
-                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                        Text(song.title,fontSize=19.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        Text(song.artist,fontSize=14.sp,color=RoomColors.Muted)
-                        Text("${musicTime(song.durationUs)}${if(entry.preview)" · 短样" else ""}",fontSize=13.sp,color=RoomColors.Muted)
-                        if(!entry.audioReady&&!entry.preview)Text("需导入音源",fontSize=13.sp,color=RoomColors.Muted)
-                    }
-                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight,null,tint=RoomColors.Ink,modifier=Modifier.size(21.dp))
-                }
-            }
-        }
-    }
-}
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable internal fun RoomPerformancePreparation(entry:PerformanceEntry,artwork:ReleaseArtwork?,onStart:()->Unit,onImport:(()->Unit)?=null,
     importing:Boolean=false,importProgress:Float=0f,importMessage:String?=null) {
@@ -95,25 +76,92 @@ import coil.compose.AsyncImage
     }
 }
 
-@Composable internal fun RoomPerformanceResult(song:SongPackage,ui:PerformanceUi,artwork:ReleaseArtwork?,preview:Boolean,onAgain:()->Unit,onExplore:(()->Unit)?,onRetrySave:()->Unit) {
+@Composable internal fun RoomPerformanceResult(
+    song:SongPackage,
+    ui:PerformanceUi,
+    artwork:ReleaseArtwork?,
+    preview:Boolean,
+    onAgain:()->Unit,
+    onExplore:(()->Unit)?,
+    onRetrySave:()->Unit,
+    attemptGeneration:Int=0,
+) {
+    val motion=LocalPhysicalMotion.current
+    val haptics=LocalAppHaptics.current
+    val density=LocalDensity.current
+    val accuracy=remember(ui.judgments){computeAccuracyPercent(ui.judgments)}
+    val metricsProgress=remember(attemptGeneration){Animatable(if(motion)0f else 1f)}
+    val recordProgress=remember(attemptGeneration){Animatable(if(motion)0f else 1f)}
+    LaunchedEffect(attemptGeneration,song.id,ui.newRecord,motion) {
+        if(!motion) {
+            metricsProgress.snapTo(1f)
+            recordProgress.snapTo(1f)
+            return@LaunchedEffect
+        }
+        metricsProgress.snapTo(0f)
+        recordProgress.snapTo(0f)
+        launch {
+            delay(95)
+            metricsProgress.animateTo(1f,tween(175,easing=AppNavEasing))
+        }
+        launch {
+            delay(165)
+            if(ui.newRecord&&!preview)haptics?.confirm("result-record-$attemptGeneration-${song.id}")
+            recordProgress.animateTo(1f,tween(190,easing=AppNavEasing))
+        }
+    }
     LazyColumn(Modifier.fillMaxSize().testTag("performance-result"),contentPadding=PaddingValues(26.dp,20.dp,26.dp,32.dp),verticalArrangement=Arrangement.spacedBy(22.dp)) {
         item("title") {Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            SwissEyebrow("PERFORMANCE / ${if(ui.newRecord&&!preview)"NEW RECORD"else "WELL PLAYED"}")
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                SwissEyebrow(if(ui.newRecord&&!preview)"PERFORMANCE / NEW RECORD" else "PERFORMANCE / WELL PLAYED")
+                if(ui.newRecord&&!preview) {
+                    Text(
+                        "新纪录",
+                        modifier=Modifier.graphicsLayer {
+                            val t=recordProgress.value
+                            alpha=t
+                            val s=0.90f+0.10f*t
+                            scaleX=s
+                            scaleY=s
+                        },
+                        fontSize=11.sp,
+                        fontWeight=FontWeight.SemiBold,
+                        color=RoomColors.Red,
+                    )
+                }
+            }
             Text(song.title,fontSize=29.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink,modifier=Modifier.testTag("performance-result-title"))
             Text("${song.artist} · 原速演奏",fontSize=13.sp,color=RoomColors.Muted)
         }}
         item("score") {Column(Modifier.fillMaxWidth().padding(top=10.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text("%,d".format(ui.score),fontSize=66.sp,fontWeight=FontWeight.Normal,letterSpacing=(-3).sp,color=RoomColors.Ink)
+            Text(
+                "%,d".format(ui.score),
+                style=TextStyle(fontSize=66.sp,fontWeight=FontWeight.Normal,letterSpacing=(-3).sp,fontFeatureSettings="tnum"),
+                color=RoomColors.Ink,
+                modifier=Modifier.testTag("performance-result-score"),
+            )
             SwissEyebrow("SCORE / 演奏成绩")
         }}
-        item("metrics") {Column {
-            HorizontalDivider(color=RoomColors.Line)
-            Row(Modifier.fillMaxWidth().padding(vertical=20.dp)) {
-                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("最高连击",fontSize=12.sp,color=RoomColors.Muted);Text(ui.bestCombo.toString(),fontSize=27.sp,color=RoomColors.Ink)}
-                Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("历史最高",fontSize=12.sp,color=RoomColors.Muted);Text(ui.highestScore?.let{"%,d".format(it)}?:"—",fontSize=27.sp,color=RoomColors.Ink)}
+        item("metrics") {
+            val slidePx=with(density){8.dp.toPx()}
+            Column(Modifier.graphicsLayer {
+                alpha=metricsProgress.value
+                translationY=(1f-metricsProgress.value)*slidePx
+            }) {
+                HorizontalDivider(color=RoomColors.Line)
+                Row(Modifier.fillMaxWidth().padding(vertical=20.dp)) {
+                    if(accuracy!=null) {
+                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Text("准确率",fontSize=12.sp,color=RoomColors.Muted)
+                            Text(formatAccuracy(accuracy),style=TextStyle(fontSize=27.sp,fontFeatureSettings="tnum"),color=RoomColors.Ink,modifier=Modifier.testTag("performance-result-accuracy"))
+                        }
+                    }
+                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("最高连击",fontSize=12.sp,color=RoomColors.Muted);Text(ui.bestCombo.toString(),style=TextStyle(fontSize=27.sp,fontFeatureSettings="tnum"),color=RoomColors.Ink)}
+                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){Text("历史最高",fontSize=12.sp,color=RoomColors.Muted);Text(ui.highestScore?.let{"%,d".format(it)}?:"—",style=TextStyle(fontSize=27.sp,fontFeatureSettings="tnum"),color=RoomColors.Ink)}
+                }
+                HorizontalDivider(color=RoomColors.Line)
             }
-            HorizontalDivider(color=RoomColors.Line)
-        }}
+        }
         item("save") {
             if(preview)Text("体验短样，不计入正式成绩",fontSize=13.sp,color=RoomColors.Muted)
             else if(!ui.saved)Text(ui.message?:"正在保存成绩…",fontSize=13.sp,color=RoomColors.Muted)

@@ -88,7 +88,7 @@ internal fun Place.archiveConnections(
                 val scene = records.firstOrNull { it.id in entryScenes } ?: records.first()
                 val target = targets[scene.id]
                 val image = when (type) {
-                    ArchiveConnection.MusicVideo, ArchiveConnection.ReleasePhoto ->
+                    ArchiveConnection.MusicVideo, ArchiveConnection.ReleasePhoto, ArchiveConnection.Soundtrack ->
                         connectionImage(scene) ?: records.firstNotNullOfOrNull(connectionImage)
                     else -> null
                 }

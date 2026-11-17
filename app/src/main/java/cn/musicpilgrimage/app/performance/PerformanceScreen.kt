@@ -2,14 +2,11 @@ package cn.musicpilgrimage.app.performance
 
 import android.app.Activity
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -36,11 +34,14 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.musicpilgrimage.app.data.ReleaseArtwork
+import cn.musicpilgrimage.app.ui.AppNavEasing
 import cn.musicpilgrimage.app.ui.AppRouteMotion
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.room.*
 import coil.compose.AsyncImage
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /** Existing frame-clock gameplay, with the approved flat controls and room result page. */
 @Composable internal fun PerformanceScreen(controller:PerformanceController,onPrepare:()->Unit,
@@ -50,11 +51,13 @@ import kotlinx.coroutines.isActive
     val song=controller.song
     val lifecycle=LocalLifecycleOwner.current
     val motion=LocalPhysicalMotion.current
+    val density=LocalDensity.current
     val view=LocalView.current
     var exitConfirm by rememberSaveable(controller.song.id){mutableStateOf(false)}
+    var attemptGeneration by rememberSaveable(controller.song.id){mutableIntStateOf(0)}
     val live=ui.state!=PlayState.FINISHED
     val reveal=remember(controller,revealStage){Animatable(if(revealStage&&motion)0f else 1f)}
-    LaunchedEffect(controller,motion,revealStage){if(revealStage&&motion)reveal.animateTo(1f,tween(110))else reveal.snapTo(1f)}
+    LaunchedEffect(controller,motion,revealStage){if(revealStage&&motion)reveal.animateTo(1f,tween(110,easing=AppNavEasing))else reveal.snapTo(1f)}
     DisposableEffect(view,live) {
         val bars=(view.context as? Activity)?.window?.let{WindowCompat.getInsetsController(it,view)}
         val oldStatus=bars?.isAppearanceLightStatusBars
@@ -74,24 +77,99 @@ import kotlinx.coroutines.isActive
         onDispose{controller.pause();lifecycle.lifecycle.removeObserver(observer)}
     }
     LaunchedEffect(controller){while(isActive){withFrameNanos{controller.frame()}}}
+
+    val stageReady=ui.state !in listOf(PlayState.LOADING,PlayState.FAILED)
+    val lightReveal=remember(controller,attemptGeneration){Animatable(if(motion)0.28f else 1f)}
+    val laneClarity=remember(controller,attemptGeneration){Animatable(if(motion)0f else 1f)}
+    LaunchedEffect(controller,attemptGeneration,stageReady,motion) {
+        if(!stageReady)return@LaunchedEffect
+        if(!motion) {
+            lightReveal.snapTo(1f)
+            laneClarity.snapTo(1f)
+            return@LaunchedEffect
+        }
+        launch { lightReveal.animateTo(1f,tween(210,easing=AppNavEasing)) }
+        delay(55)
+        laneClarity.animateTo(1f,tween(210,easing=AppNavEasing))
+    }
+
+    val pausedOrExiting=exitConfirm||ui.state in listOf(PlayState.PAUSED,PlayState.READY,PlayState.RECOVERING,PlayState.AUDIO_FAILED)
+    val pauseLight by animateFloatAsState(
+        targetValue=if(pausedOrExiting)0.44f else 1f,
+        animationSpec=tween(if(motion)175 else 0,easing=AppNavEasing),
+        label="stage-pause-light",
+    )
+    val ambientCues=rememberSectionAmbientCues(song,controller.targets,controller.startUs,controller.endUs)
+    val ambientGlow=if(motion&&!pausedOrExiting&&ui.state==PlayState.PLAYING&&ui.countIn==0) {
+        ambientIntensityAt(ambientCues,ui.positionUs)
+    } else 0f
+
     if(ui.state==PlayState.FINISHED) {
-        val visible=remember{MutableTransitionState(false).apply{targetState=true}}
-        AnimatedVisibility(visibleState=visible,enter=if(motion)AppRouteMotion.Live.enter()else EnterTransition.None) {
-            RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {Column {
-                RoomHeader("本次演奏",onBack=onPrepare,onSpace=onSpace,onSpaceOrigin=onSpaceOrigin)
-                RoomPerformanceResult(song,ui,artwork,controller.options.mode!=PlayMode.PLAY,
-                    {controller.restart();controller.start()},onExplore,controller::retrySave)
-            }}
+        val resultReveal=remember(attemptGeneration,song.id){Animatable(if(motion)0f else 1f)}
+        val residualGlow=remember(attemptGeneration,song.id){Animatable(if(motion)1f else 0f)}
+        LaunchedEffect(attemptGeneration,song.id,motion) {
+            if(!motion) {
+                residualGlow.snapTo(0f)
+                resultReveal.snapTo(1f)
+                return@LaunchedEffect
+            }
+            residualGlow.snapTo(1f)
+            resultReveal.snapTo(0f)
+            launch { residualGlow.animateTo(0.14f,tween(160,easing=AppNavEasing)) }
+            delay(85)
+            resultReveal.animateTo(1f,tween(200,easing=AppNavEasing))
+        }
+        val slidePx=with(density){12.dp.toPx()}
+        Box(Modifier.fillMaxSize()) {
+            SwissPerformanceStage(
+                song=song,
+                ui=ui,
+                motion=motion,
+                modifier=Modifier.matchParentSize(),
+                stageLightIntensity=residualGlow.value,
+                residualGlow=residualGlow.value,
+            )
+            Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    alpha=resultReveal.value
+                    translationY=(1f-resultReveal.value)*slidePx
+                },
+            ) {
+                RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {Column {
+                    RoomHeader("本次演奏",onBack=onPrepare,onSpace=onSpace,onSpaceOrigin=onSpaceOrigin)
+                    RoomPerformanceResult(
+                        song=song,
+                        ui=ui,
+                        artwork=artwork,
+                        preview=controller.options.mode!=PlayMode.PLAY,
+                        onAgain={
+                            attemptGeneration++
+                            controller.restart()
+                            controller.start()
+                        },
+                        onExplore=onExplore,
+                        onRetrySave=controller::retrySave,
+                        attemptGeneration=attemptGeneration,
+                    )
+                }}
+            }
         }
         return
     }
     val drawLanes=ui.state in listOf(PlayState.PLAYING,PlayState.PAUSED,PlayState.STARTING,PlayState.RECOVERING,PlayState.AUDIO_FAILED)
     BoxWithConstraints(Modifier.fillMaxSize().background(RoomColors.Wall).testTag("performance-screen").graphicsLayer{alpha=reveal.value}) {
-        SwissPerformanceStage(song,ui,motion,Modifier.matchParentSize())
+        SwissPerformanceStage(
+            song=song,
+            ui=ui,
+            motion=motion,
+            modifier=Modifier.matchParentSize(),
+            stageLightIntensity=if(stageReady)lightReveal.value*pauseLight else 0.38f,
+            ambientGlow=ambientGlow,
+        )
         val laneArea=Modifier.align(Alignment.TopCenter).offset(y=maxHeight*.52f).fillMaxWidth().padding(horizontal=27.dp).height(maxHeight*.41f)
         if(drawLanes) {
-            MusicLaneBackdrop(laneArea)
-            MusicLanes(controller,ui,motion,laneArea)
+            MusicLaneBackdrop(laneArea,stageClarity=laneClarity.value)
+            MusicLanes(controller,ui,motion,laneArea,stageClarity=laneClarity.value)
         }
         if(ui.state==PlayState.PLAYING&&ui.countIn==0&&controller.options.mode!=PlayMode.LISTEN) {
             Box(Modifier.align(Alignment.TopCenter).offset(y=maxHeight*.455f).fillMaxWidth().padding(horizontal=37.dp).height(48.dp)){PerformanceFeedback(ui)}
@@ -111,7 +189,17 @@ import kotlinx.coroutines.isActive
             LinearProgressIndicator(progress={(ui.positionUs.toDouble()/song.durationUs.coerceAtLeast(1)).toFloat().coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth().height(2.dp),color=RoomColors.Red,trackColor=RoomColors.Line)
             Row(Modifier.fillMaxWidth().padding(top=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                 Text("${musicTime(ui.positionUs)} / ${musicTime(song.durationUs)}",fontSize=12.sp,color=RoomColors.Muted)
-                Text("%,d".format(ui.score),fontSize=22.sp,fontWeight=FontWeight.Normal,color=RoomColors.Ink,modifier=Modifier.testTag("performance-score"))
+                Text(
+                    text="%,d".format(ui.score),
+                    color=RoomColors.Ink,
+                    style=androidx.compose.ui.text.TextStyle(
+                        fontSize=22.sp,
+                        fontFeatureSettings="tnum",
+                    ),
+                    maxLines=1,
+                    softWrap=false,
+                    modifier=Modifier.testTag("performance-score"),
+                )
             }
         }
         Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start=26.dp,end=22.dp,bottom=15.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("听踪 / TINGZONG",fontSize=10.sp,color=RoomColors.Muted);Text("原速 · 四轨",fontSize=10.sp,color=RoomColors.Muted)}
@@ -128,8 +216,17 @@ import kotlinx.coroutines.isActive
                 shape=androidx.compose.ui.graphics.RectangleShape,color=RoomColors.Paper,shadowElevation=0.dp) {
                 Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
                     Text("准备",fontSize=14.sp,color=RoomColors.Muted)
-                    Crossfade(if(ui.state==PlayState.STARTING)3 else ui.countIn,animationSpec=tween(if(motion)100 else 0),label="count-in") {count->
-                        Box(Modifier.size(64.dp,65.dp),contentAlignment=Alignment.Center){Text(count.toString(),fontSize=46.sp,fontWeight=FontWeight.Medium,color=RoomColors.Navy)}
+                    val displayCount=if(ui.state==PlayState.STARTING)3 else ui.countIn
+                    Box(Modifier.size(64.dp,65.dp),contentAlignment=Alignment.Center) {
+                        RollingTabularDigits(
+                            valueText=displayCount.toString(),
+                            fontSize=46.sp,
+                            color=RoomColors.Navy,
+                            motion=motion,
+                            fontWeight=FontWeight.Medium,
+                            durationMillis=120,
+                            horizontalArrangement=Arrangement.Center,
+                        )
                     }
                 }
             }
@@ -142,7 +239,7 @@ import kotlinx.coroutines.isActive
                 if(ui.state==PlayState.RECOVERING)CircularProgressIndicator(Modifier.size(24.dp),color=RoomColors.Navy,strokeWidth=2.dp)
                 if(ui.state !in listOf(PlayState.FAILED,PlayState.RECOVERING)) {
                     PerformancePanelButton(when(ui.state){PlayState.PAUSED->"继续演奏";PlayState.AUDIO_FAILED->"重试恢复声音";else->"开始演奏"},"performance-start",controller::start)
-                    if(ui.state==PlayState.PAUSED)TextButton({controller.restart();controller.start()},Modifier.fillMaxWidth().heightIn(min=44.dp).testTag("performance-restart")){Text("从头开始")}
+                    if(ui.state==PlayState.PAUSED)TextButton({attemptGeneration++;controller.restart();controller.start()},Modifier.fillMaxWidth().heightIn(min=44.dp).testTag("performance-restart")){Text("从头开始")}
                 }
                 TextButton(onPrepare,Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("performance-back")){Text("返回曲目")}
             }
@@ -154,11 +251,34 @@ import kotlinx.coroutines.isActive
 
 @Composable private fun PerformancePanel(modifier:Modifier,content:@Composable ColumnScope.()->Unit) {
     val motion=LocalPhysicalMotion.current
+    val density=LocalDensity.current
     var visible by remember{mutableStateOf(false)}
     LaunchedEffect(Unit){visible=true}
-    val reveal by animateFloatAsState(if(visible||!motion)1f else 0f,tween(if(motion)110 else 0),label="pause-panel")
-    Surface(modifier.fillMaxSize().graphicsLayer{alpha=reveal},shape=androidx.compose.ui.graphics.RectangleShape,color=RoomColors.Paper.copy(alpha=.97f),shadowElevation=0.dp) {
-        Column(Modifier.fillMaxSize().padding(34.dp),verticalArrangement=Arrangement.spacedBy(10.dp,Alignment.CenterVertically),content=content)
+    val reveal by animateFloatAsState(if(visible||!motion)1f else 0f,tween(if(motion)145 else 0,easing=AppNavEasing),label="pause-panel")
+    val slidePx=with(density){8.dp.toPx()}
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color(0xFF141816).copy(alpha = .24f * reveal)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .widthIn(max = 352.dp)
+                .border(1.dp, RoomColors.Line)
+                .graphicsLayer { alpha = reveal; translationY = (1f - reveal) * slidePx },
+            shape = androidx.compose.ui.graphics.RectangleShape,
+            color = RoomColors.Paper,
+            shadowElevation = 10.dp,
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(28.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                content = content,
+            )
+        }
     }
 }
 @Composable private fun PerformancePanelButton(label:String,tag:String,onClick:()->Unit) {

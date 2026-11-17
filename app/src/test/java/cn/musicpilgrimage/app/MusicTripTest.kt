@@ -1,12 +1,45 @@
 package cn.musicpilgrimage.app
 
 import cn.musicpilgrimage.app.data.*
+import cn.musicpilgrimage.app.ui.room.searchTripDestinations
+import cn.musicpilgrimage.app.ui.room.tripDestinationOptions
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import java.time.LocalDate
 
 class MusicTripTest {
+    @Test fun hongKongSearchOffersOneDestinationAndKeepsOtherCityAndCountryChoices() {
+        val hongKong=MusicTripCity("香港","中国香港")
+        val lantau=MusicTripCity("香港 · 大屿山","中国香港")
+        val region=MusicTripCity.country("中国香港")
+        val paris=MusicTripCity("巴黎","法国")
+        val inputs=listOf(region,hongKong,lantau,paris)
+        val options=tripDestinationOptions(inputs)
+        for(query in listOf("香港","中国香港","中國香港","Hong Kong")) {
+            assertEquals(listOf(region),searchTripDestinations(options,query,inputs))
+        }
+        assertEquals(listOf(region),searchTripDestinations(options,"大屿山",inputs))
+        assertEquals(setOf(paris,MusicTripCity.country("法国")),searchTripDestinations(options,"法国").toSet())
+    }
+
+    @Test fun hongKongStopsUseTheExistingDestinationEvenWithALegacyCityName() {
+        val lantern=Place("lantau","昂坪","香港 · 大屿山","中国香港",22.25,113.91)
+        for(destination in listOf(MusicTripCity("香港","中国香港"),MusicTripCity.country("中国香港"))) {
+            val trip=plan().copy(cities=listOf(destination)).add(lantern,1)
+            assertEquals(listOf(destination),trip.cities)
+            assertEquals(destination.name,trip.stops.single().city)
+            assertEquals("中国香港",trip.stops.single().country)
+            assertEquals(trip,MusicTripCodec.decode(MusicTripCodec.encode(listOf(trip))).single())
+        }
+        assertEquals(listOf("中国香港"),geographicParts("香港","中国香港"))
+        assertEquals(listOf("中国香港"),geographicParts("中国香港（全境）","中国香港"))
+        assertEquals(listOf("中国香港","大屿山"),geographicParts(lantern.city,lantern.country))
+        assertEquals(musicMapCityKey("香港","中国香港"),musicMapCityKey(lantern.city,lantern.country))
+        assertEquals("中国香港",lantern.regionalTitle("香港（中环公共区域城市参考）"))
+        assertEquals("香港大会堂",lantern.regionalTitle("香港大会堂"))
+    }
+
     private val start=LocalDate.of(2026,11,1)
     private val paris=MusicTripCity("巴黎","法国")
     private fun plan()=MusicTrip("trip","出发",start,start.plusDays(2),listOf(paris))

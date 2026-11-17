@@ -2,6 +2,8 @@ package cn.musicpilgrimage.app
 
 import androidx.test.platform.app.InstrumentationRegistry
 import cn.musicpilgrimage.app.data.*
+import cn.musicpilgrimage.app.ui.room.SwissDetailMedia
+import cn.musicpilgrimage.app.ui.room.placeArchiveTargets
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -10,6 +12,31 @@ import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
 
 class PublishedCatalogMediaTest {
+    @Test fun archiveReusesTheReviewedSoundtrackImagesFromWorld() {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val raw=context.assets.open("catalog.json").bufferedReader().use{catalogFromJson(JSONObject(it.readText()))}
+        val catalog=BundledCatalogMedia(context).apply(BundledCatalogCorrections(context).apply(raw)).publicOnly()
+        val music=MusicCatalogue.from(catalog)
+        val media=SwissDetailMedia(context)
+        val referenceKinds=setOf("film_preview","film_frame","soundtrack_mv_frame")
+        val reviewed=catalog.places.flatMap{place->
+            place.scenes.filter{it.kind=="movie_soundtrack"&&it.imageApproved&&it.referenceKind in referenceKinds}
+                .map{scene->place to scene}
+        }
+        assertTrue(reviewed.any{(_,scene)->scene.work=="Stay Alive"&&scene.referenceKind=="film_preview"})
+        for((place,scene) in reviewed) {
+            val world=media.place(place,scene)
+            val archive=media.placeArchive(place,null,setOf(scene.id),music.placeArchiveTargets(place.id))
+            val soundtrack=archive.getJSONArray("connections").objects().single{it.getString("label")=="电影原声关联"}
+            val row=soundtrack.getJSONArray("rows").objects().first{it.optString("actionId")==scene.id||it.getString("work")==scene.work}
+            val thumbnail=row.getJSONObject("media")
+            assertEquals(world.getString("image"),thumbnail.getString("image"))
+            assertEquals(world.getString("mediaLabel"),thumbnail.getString("label"))
+            assertFalse(thumbnail.getBoolean("isMv"))
+            assertTrue(thumbnail.isNull("timestamp"))
+        }
+    }
+
     @Test fun publishedMediaPreservesSavedIdentitiesAndReviewedEvidence() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val encoded = InstrumentationRegistry.getArguments().getString("catalogGzipBase64")

@@ -4,10 +4,10 @@
   const icon=name=>`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[name]||icons.chevron}"/></svg>`;
   const image=(src,alt,cls='')=>`<img class="${cls}" src="${esc(src)}" alt="${esc(alt)}" draggable="false">`;
   const fmt=t=>`${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;
-  function subHeader(title,action=''){return `<header class="sub-header"><button class="icon-button" type="button" data-action="back" aria-label="返回">${icon('back')}</button><h2>${esc(title)}</h2>${action}</header>`;}
+  function subHeader(title,action='',largeTitle=''){return `<header class="sub-header"><button class="icon-button" type="button" data-action="back" aria-label="返回">${icon('back')}</button><h2 class="sub-header-title"><span class="title-base">${esc(title)}</span>${largeTitle?`<span class="title-collapsed" aria-hidden="true">${esc(largeTitle)}</span>`:''}</h2>${action}</header>`;}
   function row(title,detail,action,attrs='',img='',number=''){return `<button class="list-row" type="button" data-action="${action}" ${attrs}>${number?`<span class="row-number">${esc(number)}</span>`:''}${img?image(img,title):''}<span class="row-copy"><strong>${esc(title)}</strong>${detail?`<small>${esc(detail)}</small>`:''}</span>${icon('chevron')}</button>`;}
   function placeRow(p,showRelation=false){
-    const detail=showRelation?(p.relations||[]).join(' · '):[p.city===p.name?'':p.city,p.country].filter(Boolean).join(' · ');
+    const detail=showRelation?(p.relations||[]).join(' · '):p.listLocation??[p.city===p.name?'':p.city,p.country].filter(Boolean).join(' · ');
     return row(p.name,detail,'place',`data-id="${esc(p.id)}"`,p.image);
   }
   function archiveHero(photo,label,alt,placePhoto=false){
@@ -47,7 +47,7 @@
       data-credit="${esc(media.credit)}" aria-label="${esc(`查看${label}${timestamp?' · '+timestamp:''}`)}">
       <img src="${esc(media.image)}" alt="${esc(label)}" loading="lazy" decoding="async" draggable="false">
       ${timestamp?`<span aria-hidden="true">${esc(timestamp)}</span>`:''}</button>`:'';
-    const copy=`<span class="connection-copy"><strong>${esc(link.work)}</strong><small>${esc(link.artist)}</small></span>`;
+    const copy=`<span class="connection-copy"><strong>${esc(link.work)}</strong><small>${esc(link.artist)}</small>${media?.showLabel?`<small>${esc(media.label)}</small>`:''}</span>`;
     const title=link.actionId?`<button class="connection-link" type="button" data-action="connection" data-id="${esc(link.actionId)}">
       ${copy}${icon('chevron')}</button>`:copy;
     return `<li>${thumb}${title}</li>`;
@@ -61,7 +61,7 @@
   function favoriteButton(id,label='收藏'){const saved=state.favorites.has(id);return `<button type="button" class="${saved?'saved':''}" data-action="favorite" data-id="${esc(id)}" aria-pressed="${saved}">${icon('heart')}<span>${saved?'已收藏':label}</span></button>`;}
   function albumPage(){
     const r=release(state.payload.id);
-    return subHeader('发行档案')+`<div class="scroll-content">
+    return subHeader('发行档案','',r.title)+`<div class="scroll-content">
       ${releaseHero(r,'查看完整发行封面')}
       <div class="pad">
         <p class="sub-eyebrow">RELEASE / ${esc(r.year)}</p>
@@ -77,7 +77,7 @@
   }
   function workPage(){
     const r=release(state.payload.release),w=r.works[state.payload.index||0]||{title:r.title,places:r.places};
-    return subHeader('作品档案')+`<div class="scroll-content">
+    return subHeader('作品档案','',w.title)+`<div class="scroll-content">
       ${releaseHero(r,'查看作品发行封面')}
       <div class="pad">
         <p class="sub-eyebrow">WORK / MUSIC &amp; PLACES</p>
@@ -92,10 +92,11 @@
   }
   function placePage(){
     const p=place(state.payload.id);
+    const location=p.headerLocation??[p.country,p.city].filter(Boolean).join(' / ');
     return `<div class="scroll-content">
       ${placeVisual(p)}
       <div class="pad">
-        <p class="sub-eyebrow">${[p.country,p.city].filter(Boolean).map(esc).join(' / ')}</p>
+        ${location?`<p class="sub-eyebrow">${esc(location)}</p>`:''}
         <h2 class="detail-title">${esc(p.name)}</h2>
         ${p.scope?`<div class="detail-subtitle">${esc(p.scope)}关联</div>`:''}
         <div class="action-strip">${favoriteButton(p.id)}<button type="button" data-action="add-trip" data-id="${esc(p.id)}">${icon('plus')}加入行程</button><button type="button" data-action="map-place" data-id="${esc(p.id)}">${icon('pin')}地图</button></div>
@@ -103,6 +104,9 @@
         ${placeConnections(p)}
         <p class="credit-line"><a class="source-link" href="#" data-action="sources">资料来源 ↗</a></p>
       </div></div>`;
+  }
+  function tripDays(){
+    return Number(state.trip?.days)||Math.max(1,Math.round((Date.parse(state.trip?.end)-Date.parse(state.trip?.start))/86400000)+1);
   }
   function tripPage(){
     const trip=state.trip,days=tripDays();
@@ -136,7 +140,8 @@
     const label=`<h4>${esc(detail.name)}</h4>`;
     const title=stop.place.startsWith('custom:')?label:
       `<button class="text-button left" style="min-height:0;padding:0" type="button" data-action="place" data-id="${esc(detail.id)}">${label}</button>`;
-    const description=[detail.city,detail.work].filter(Boolean).map(esc).join(' · ');
+    const location=detail.cityGroup===detail.country?(detail.location??detail.city):detail.city;
+    const description=[location,detail.work].filter(Boolean).map(esc).join(' · ');
     return `<div class="trip-stop">
       <span class="stop-index">${String(displayIndex).padStart(2,'0')}</span>
       <div class="stop-copy">${title}<p>${description}</p></div>

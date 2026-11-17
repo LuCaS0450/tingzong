@@ -121,6 +121,7 @@ window.TingzongWorldGestures = function(map, options) {
   el.addEventListener('touchstart',e=>{
     if(e.touches.length===1&&(e.touches[0].clientX<24||e.touches[0].clientX>innerWidth-24)){cancel();return;}
     consume(e);measure();
+    options.onManualInput?.(e.touches.length>=2?'pinch':'pan');
     const p=touchPoint(e.touches),g=begin(e.touches.length>=2?'pinch':'pan',p,e.timeStamp);
     if(e.touches.length>=2)g.distance=distance(e.touches);
     sample(p,g.zoom,e.timeStamp);
@@ -130,9 +131,10 @@ window.TingzongWorldGestures = function(map, options) {
     const p=touchPoint(e.touches);
     if(gesture.kind==='remainder'){
       if(Math.hypot(p.x-gesture.remainderPoint.x,p.y-gesture.remainderPoint.y)<4)return;
+      options.onManualInput?.('pan');
       begin('pan',gesture.remainderPoint,e.timeStamp);
     }
-    if(e.touches.length>=2&&gesture.kind!=='pinch'){const g=begin('pinch',p,e.timeStamp);g.distance=distance(e.touches);}
+    if(e.touches.length>=2&&gesture.kind!=='pinch'){options.onManualInput?.('pinch');const g=begin('pinch',p,e.timeStamp);g.distance=distance(e.touches);}
     const g=gesture;g.point=p;g.moved=Math.max(g.moved,Math.hypot(p.x-g.origin.x,p.y-g.origin.y));
     options.onFocus?.(p);
     g.zoom=g.kind==='pinch'?g.startZoom+Math.log2(Math.max(1,distance(e.touches))/Math.max(1,g.distance)):g.startZoom;
@@ -148,13 +150,13 @@ window.TingzongWorldGestures = function(map, options) {
   },{capture:true,passive:false});
   el.addEventListener('touchcancel',e=>{if(gesture){consume(e);cancel();}},{capture:true,passive:false});
 
-  el.addEventListener('mousedown',e=>{if(e.button!==0)return;consume(e);measure();const p=local(e.clientX,e.clientY);const g=begin('mouse',p,e.timeStamp);sample(p,g.zoom,e.timeStamp);},{capture:true});
+  el.addEventListener('mousedown',e=>{if(e.button!==0)return;consume(e);measure();options.onManualInput?.('mouse');const p=local(e.clientX,e.clientY);const g=begin('mouse',p,e.timeStamp);sample(p,g.zoom,e.timeStamp);},{capture:true});
   document.addEventListener('mousemove',e=>{if(gesture?.kind!=='mouse')return;consume(e);const p=local(e.clientX,e.clientY);gesture.point=p;gesture.moved=Math.max(gesture.moved,Math.hypot(p.x-gesture.origin.x,p.y-gesture.origin.y));sample(p,gesture.zoom,e.timeStamp);schedule();},{capture:true});
   document.addEventListener('mouseup',e=>{if(gesture?.kind==='mouse'){consume(e);release(e);}},{capture:true});
   el.addEventListener('click',consume,{capture:true});el.addEventListener('dblclick',consume,{capture:true});
   el.addEventListener('wheel',e=>{
     consume(e);measure();const p=local(e.clientX,e.clientY);
-    if(gesture?.kind!=='wheel'||Math.hypot(p.x-gesture.point.x,p.y-gesture.point.y)>2)begin('wheel',p);
+    if(gesture?.kind!=='wheel'||Math.hypot(p.x-gesture.point.x,p.y-gesture.point.y)>2){options.onManualInput?.('wheel');begin('wheel',p);}
     const g=gesture,delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?240:1);
     g.zoom=clamp(g.zoom-delta*(e.ctrlKey?.01:.002),options.minimumZoom(map.getCenter().lat),18);g.point=p;schedule();
     clearTimeout(wheelTimer);wheelTimer=setTimeout(()=>{if(raf){cancelAnimationFrame(raf);apply();}finish();},140);

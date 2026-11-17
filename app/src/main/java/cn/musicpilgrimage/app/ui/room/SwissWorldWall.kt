@@ -17,14 +17,24 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -34,7 +44,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import cn.musicpilgrimage.app.BuildConfig
 import cn.musicpilgrimage.app.PilgrimageApplication
 import cn.musicpilgrimage.app.data.*
-import cn.musicpilgrimage.app.design.MapNetworking
+import cn.musicpilgrimage.app.design.AppArt
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.WallTabFadeMillis
 import cn.musicpilgrimage.app.ui.LocalRouteIsCurrent
@@ -51,41 +61,130 @@ import java.io.File
 import java.io.FilterInputStream
 import kotlin.math.*
 
-/** The operative Opus prototype is also the Android scene; business actions remain native. */
+private suspend fun awaitWorldWebView(context: Context) =
+    (context.applicationContext as PilgrimageApplication).awaitWebViewStartup()
+
+private const val InitialWorldLongitude = 35.0
+private const val InitialWorldLatitude = 24.0
+
+private fun Color.cssHex() = "#" + (toArgb() and 0xffffff).toString(16).padStart(6, '0')
+
+private val worldPalette = JSONObject(mapOf(
+    "paper" to AppArt.Paper.cssHex(),
+    "ink" to AppArt.Ink.cssHex(),
+    "muted" to AppArt.WallMuted.cssHex(),
+    "line" to AppArt.Line.cssHex(),
+    "red" to AppArt.Red.cssHex(),
+))
+
+/** MapLibre owns the map surface. Place browsing and actions are available before it starts. */
 @Composable internal fun SwissWorldWall(
     catalog: Catalog, browse: RoomBrowseState, favorites: Set<String>, favoriteBusy: Boolean,
     onPlace: (String) -> Unit, onFavorite: (String) -> Unit, onTrips: () -> Unit,
     onFootprints: () -> Unit, onAdd: (Place) -> Unit, onSearch: () -> Unit,
     onBack: () -> Unit, visits: Set<String>, active: Boolean,
+    awaitMapStartup: suspend (Context) -> Unit = ::awaitWorldWebView,
 ) {
     val context = LocalContext.current
     val motion = LocalPhysicalMotion.current
+    val isCurrent by rememberUpdatedState(LocalRouteIsCurrent.current)
+    val cities = remember(catalog) { musicMapCities(catalog, null) }
+    val entries = remember(context, cities) {
+        cities.flatMap { city -> city.places.map { worldPlaceEntry(context, it) } }.distinctBy { it.place.id }
+    }
+    val byId = remember(entries) { entries.associateBy { it.place.id } }
+    val selection = browse.worldSelection?.takeIf { it.placeId in byId }
+    val summary = selection?.takeIf { it.summaryOpen }?.let { byId[it.placeId] }
+    var chooser by remember(browse) { mutableStateOf<List<String>?>(null) }
+    var chooserSequence by remember(browse) { mutableIntStateOf(0) }
+    var measurement by remember(browse) { mutableStateOf<Pair<String, Int>?>(null) }
+    var viewportWidth by remember { mutableIntStateOf(0) }
+    val summaryHeight = measurement?.takeIf { it.first == summary?.place?.id }?.second
+    val heightRatio = summaryHeight?.takeIf { viewportWidth > 0 }?.let { it.toFloat() / viewportWidth } ?: 0f
+    val focus = browse.worldFocus?.takeIf { it.placeId in byId && (summary == null || heightRatio > 0f) }
     var scene by remember(browse) { mutableStateOf(browse.worldScene) }
-    BackHandler(enabled = active && scene == null, onBack = onBack)
+    fun showChooser(ids: List<String>) {
+        chooserSequence++
+        chooser = ids
+    }
+    BackHandler(enabled = active) {
+        when {
+            chooser != null -> chooser = null
+            summary != null -> browse.closeWorldSummary()
+            else -> {
+                val map = scene
+                if (map?.hasVisual == true) map.back { handled ->
+                    if (isCurrent() && !handled) onBack()
+                } else onBack()
+            }
+        }
+    }
+    LaunchedEffect(active) { if (!active) chooser = null }
     LaunchedEffect(browse, active) {
         if (active && scene == null) {
             // Give the native preview a frame before creating the WebView.
             withFrameNanos { }
-            (context.applicationContext as PilgrimageApplication).awaitWebViewStartup()
+            awaitMapStartup(context)
             scene = browse.worldScene ?: WorldScene(context, browse).also { browse.worldScene = it }
         }
     }
-    Box(Modifier.fillMaxSize().testTag("world-wall")) {
+    BoxWithConstraints(Modifier.fillMaxSize().clipToBounds().onSizeChanged { viewportWidth = it.width }.testTag("world-wall")) {
+        val unit = maxWidth / 360
         scene?.let {
-            WorldWebContent(it, catalog, browse, favorites, favoriteBusy, onPlace, onFavorite, onTrips,
-                onFootprints, onAdd, onSearch, onBack, visits, active)
+            WorldWebContent(it, entries, selection, focus, heightRatio, visits, active) { message ->
+                if (isCurrent()) when (message.optString("action")) {
+                    "select-place" -> message.optString("id").takeIf { it in byId }?.let { id -> browse.focusWorld(id, WorldFocusKind.Pin) }
+                    "close-place" -> if (browse.worldSelection?.placeId == message.optString("id")) browse.closeWorldSummary()
+                    "choose-places" -> message.optJSONArray("ids")?.let { ids ->
+                        showChooser((0 until ids.length()).map(ids::optString).filter { id -> id in byId })
+                    }
+                    "trips" -> onTrips()
+                    "footprints" -> onFootprints()
+                }
+            }
         }
         AnimatedVisibility(visible = scene?.hasVisual != true, enter = EnterTransition.None,
             exit = if (motion) fadeOut(tween(WallTabFadeMillis,easing=appMotionEasing)) else ExitTransition.None) {
-            WorldLoadingPreview(browse, onSearch)
+            WorldLoadingPreview(browse, "${cities.size} 座城市 / ${entries.size} 个地点")
+        }
+        val compact = scene?.compactHeader == true
+        SwissTextButton(
+            { showChooser(emptyList()) },
+            Modifier.align(Alignment.TopEnd).offset(y = unit * if (compact) 5 else 83)
+                .padding(end = unit * if (compact) 57 else 22).heightIn(min = 48.dp).testTag("world-place-list"),
+            enabled = active, contentPadding = PaddingValues(horizontal = 4.dp),
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.FormatListBulleted, null, Modifier.size(18.dp), tint = RoomColors.Ink)
+            Spacer(Modifier.width(5.dp))
+            Text("地点", color = RoomColors.Ink, fontWeight = FontWeight.Medium)
+        }
+        IconButton(onSearch, Modifier.align(Alignment.TopEnd).offset(y = unit * if (compact) 5 else 10)
+            .padding(end = unit * 10).testTag("world-search"), enabled = active) {
+            Icon(Icons.Outlined.Search, "搜索歌曲与地点", tint = RoomColors.Ink)
+        }
+        WorldPlaceSummary(
+            summary, Modifier.align(Alignment.BottomCenter), favorites, favoriteBusy, interactive = active,
+            onDismiss = browse::closeWorldSummary, onReopen = browse::reopenWorldSummary,
+            onMeasure = { id, height -> measurement = id to height },
+            onFavorite = onFavorite, onAround = { browse.focusWorld(it, WorldFocusKind.Street) },
+            onAdd = onAdd, onDetail = onPlace,
+        )
+        chooser?.takeIf { active }?.let { ids ->
+            val options = remember(entries, ids) { if (ids.isEmpty()) entries else ids.mapNotNull(byId::get) }
+            key(chooserSequence) {
+                WorldPlaceChooser(if (ids.isEmpty()) "音乐地点" else "此处 ${options.size} 个地点", options, { chooser = null }) { id ->
+                    chooser = null
+                    browse.focusWorld(id, WorldFocusKind.List)
+                }
+            }
         }
     }
 }
 
-@Composable private fun WorldLoadingPreview(browse: RoomBrowseState, onSearch: () -> Unit) {
+@Composable private fun WorldLoadingPreview(browse: RoomBrowseState, countLabel: String) {
     val context = LocalContext.current
-    val longitude = remember(browse) { browse.worldState?.longitude ?: browse.globe.longitude.toDouble() }
-    val latitude = remember(browse) { browse.worldState?.latitude ?: browse.globe.latitude.toDouble() }
+    val longitude = remember(browse) { browse.worldState?.longitude ?: InitialWorldLongitude }
+    val latitude = remember(browse) { browse.worldState?.latitude ?: InitialWorldLatitude }
     val preview by produceState<ImageBitmap?>(null, longitude, latitude) {
         value = withContext(Dispatchers.Default) { drawStartupGlobe(context, longitude, latitude) }
     }
@@ -97,7 +196,12 @@ import kotlin.math.*
             Image(it, contentDescription = null,
                 modifier = Modifier.align(Alignment.TopCenter).offset(y = center - diameter / 2).size(diameter))
         }
-        SwissWallHeader(1, onSearch)
+        val unit = maxWidth / 360
+        Column(Modifier.offset(x = unit * 22, y = unit * 22), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            SwissEyebrow("02 / WORLD")
+            Text("地图与旅行", fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold, color = RoomColors.Ink)
+            Text(countLabel, Modifier.padding(top = 6.dp), fontSize = 12.sp, color = RoomColors.Muted)
+        }
         Text(
             "正在打开世界…",
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
@@ -146,48 +250,18 @@ private fun drawStartupGlobe(context: Context, longitude: Double, latitude: Doub
     return Bitmap.createBitmap(globe, size, size, Bitmap.Config.ARGB_8888).asImageBitmap()
 }
 
-internal data class WorldPlaceData(val byId: Map<String, Place>, val json: JSONArray)
-
 @Composable private fun WorldWebContent(
-    scene: WorldScene, catalog: Catalog, browse: RoomBrowseState, favorites: Set<String>, favoriteBusy: Boolean,
-    onPlace: (String) -> Unit, onFavorite: (String) -> Unit, onTrips: () -> Unit,
-    onFootprints: () -> Unit, onAdd: (Place) -> Unit, onSearch: () -> Unit,
-    onBack: () -> Unit, visits: Set<String>, active: Boolean,
+    scene: WorldScene, entries: List<WorldPlaceEntry>, selection: WorldSelection?, focus: WorldFocus?,
+    heightRatio: Float, visits: Set<String>, active: Boolean, onMapAction: (JSONObject) -> Unit,
 ) {
     val owner = LocalLifecycleOwner.current
     val motion = LocalPhysicalMotion.current
-    val pendingFocus = remember(scene) { browse.takeWorldFocus()?.let { it to android.os.SystemClock.elapsedRealtimeNanos().toString() } }
-    val placeData by produceState(scene.cachedPlaces(catalog), scene, catalog, active) {
-        if (active) value = scene.preparePlaces(catalog)
+    val markers by produceState(scene.cachedMarkers(entries), scene, entries, active) {
+        if (active) value = scene.prepareMarkers(entries)
     }
-    val byId = placeData?.byId.orEmpty()
-    val json = remember(placeData, favorites, favoriteBusy, visits, pendingFocus, motion) {
-        placeData?.let { prepared -> JSONObject().put("places", prepared.json).put("favorites", JSONArray(favorites.toList()))
-            .put("visits", JSONArray(visits.toList())).put("favoriteBusy", favoriteBusy)
-            .put("state", scene.initialCamera).put("motion", motion)
-            .apply { pendingFocus?.let { put("focus", it.first); put("focusToken", it.second) } }.toString()
-        }
-    }
-    val isCurrent by rememberUpdatedState(LocalRouteIsCurrent.current)
-    val latestAction by rememberUpdatedState<(String, String) -> Unit> { action, id ->
-        if (!isCurrent()) return@rememberUpdatedState
-        when (action) {
-            "detail" -> if (id in byId) onPlace(id)
-            "favorite" -> if (!favoriteBusy && id in byId) onFavorite(id)
-            "add" -> byId[id]?.let(onAdd)
-            "trips" -> onTrips()
-            "footprints" -> onFootprints()
-            "search" -> onSearch()
-        }
-    }
-    BackHandler(enabled = active) {
-        val source = scene.onAction
-        scene.web.evaluateJavascript("window.worldBack ? worldBack() : false") { handled ->
-            if (isCurrent() && source != null && scene.onAction === source && handled != "true") onBack()
-        }
-    }
+    val latestAction by rememberUpdatedState(onMapAction)
     if (active) DisposableEffect(scene, owner) {
-        val handle: (String, String) -> Unit = { action, id -> latestAction(action, id) }
+        val handle: (JSONObject) -> Unit = { message -> latestAction(message) }
         scene.onAction = handle
         scene.resume()
         val observer = LifecycleEventObserver { _, event ->
@@ -213,7 +287,7 @@ internal data class WorldPlaceData(val byId: Map<String, Place>, val json: JSONA
                     (scene.web.parent as? ViewGroup)?.removeView(scene.web)
                     host.addView(scene.web)
                 }
-                json?.let(scene::update)
+                markers?.let { scene.update(it, selection, focus, heightRatio, visits, motion) }
             }
         })
 }
@@ -222,22 +296,25 @@ internal data class WorldPlaceData(val byId: Map<String, Place>, val json: JSONA
 @SuppressLint("SetJavaScriptEnabled")
 internal class WorldScene(private val context: Context, private val browse: RoomBrowseState) {
     companion object { const val ORIGIN = "https://world.tingzong.local/world/" }
-    val media = java.util.concurrent.ConcurrentHashMap<String, String>()
     // Camera updates are already live in this WebView. Only send its seed on boot.
     val initialCamera: JSONObject = browse.worldState?.json() ?: JSONObject()
-        .put("longitude", browse.globe.longitude.toDouble()).put("latitude", browse.globe.latitude.toDouble())
-    var onAction: ((String, String) -> Unit)? = null
+        .put("longitude", InitialWorldLongitude).put("latitude", InitialWorldLatitude)
+    var onAction: ((JSONObject) -> Unit)? = null
     var hasVisual by mutableStateOf(false)
+        private set
+    var compactHeader by mutableStateOf((browse.worldState?.zoom ?: 0.0) >= 3)
         private set
     private var ready = false
     private var alive = true
     private var latest = "{}"
     private var rendered: String? = null
-    private var focusSent: String? = null
+    private var latestMarkers: JSONArray? = null
+    private var engineBooted = false
     private var visibilityGeneration = 0
-    private var preparedCatalog: Catalog? = null
-    private var preparedPlaces: WorldPlaceData? = null
-    private val mapResources = WorldResources(context.applicationContext, media)
+    private var preparedEntries: List<WorldPlaceEntry>? = null
+    private var preparedMarkers: JSONArray? = null
+    private var sentMarkers: JSONArray? = null
+    private val mapResources = WorldResources(context.applicationContext)
     val web = WebView(context).apply {
         layoutParams = android.view.ViewGroup.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
         // The CSS world covers the whole view; an opaque surface avoids an extra alpha composition.
@@ -265,8 +342,10 @@ internal class WorldScene(private val context: Context, private val browse: Room
                         val action = message.optString("action")
                         when (action) {
                             "visual-ready" -> revealAfterDraw()
-                            "state", "ready" -> Unit
-                            else -> onAction?.invoke(action, message.optString("id"))
+                            "header-layout" -> compactHeader = message.optBoolean("compact")
+                            "ready" -> engineBooted = true
+                            "state" -> Unit
+                            else -> onAction?.invoke(message)
                         }
                     }
                 }
@@ -289,26 +368,21 @@ internal class WorldScene(private val context: Context, private val browse: Room
         }
         loadUrl(ORIGIN + "index.html")
     }
-    fun cachedPlaces(catalog: Catalog) = preparedPlaces.takeIf { preparedCatalog === catalog }
-    suspend fun preparePlaces(catalog: Catalog): WorldPlaceData {
-        cachedPlaces(catalog)?.let { return it }
+    fun cachedMarkers(entries: List<WorldPlaceEntry>) = preparedMarkers.takeIf { preparedEntries === entries }
+    suspend fun prepareMarkers(entries: List<WorldPlaceEntry>): JSONArray {
+        cachedMarkers(entries)?.let { return it }
         val data = withContext(Dispatchers.Default) {
-            val places = musicMapCities(catalog, null).flatMap { it.places }.distinctBy { it.id }
-            val detail = SwissDetailMedia(context)
-            val array = JSONArray()
-            places.forEach { place ->
-                val item = detail.place(place).put("lat", place.latitude).put("lon", place.longitude)
-                val image = item.optString("image")
-                if (image.isNotBlank()) {
-                    media[place.id] = image
-                    item.put("image", ORIGIN + "media/" + Uri.encode(place.id))
-                }
-                array.put(item)
-            }
-            WorldPlaceData(places.associateBy { it.id }, array)
+            JSONArray(entries.map { entry ->
+                val place = entry.place
+                val country = canonicalRegionName(place.country)
+                JSONObject().put("id", place.id).put("name", entry.name)
+                    .put("lat", place.latitude).put("lon", place.longitude)
+                    .put("country", country).put("city", place.city)
+                    .put("cityGroup", unifiedDestinationRegion(country) ?: place.city)
+            })
         }
-        preparedCatalog = catalog
-        preparedPlaces = data
+        preparedEntries = entries
+        preparedMarkers = data
         return data
     }
     private fun revealAfterDraw() {
@@ -316,14 +390,34 @@ internal class WorldScene(private val context: Context, private val browse: Room
             override fun onComplete(requestId: Long) { if (alive) hasVisual = true }
         })
     }
-    fun update(json: String) { latest = json; if (ready) render() }
+    fun update(markers: JSONArray, selection: WorldSelection?, focus: WorldFocus?, heightRatio: Float, visits: Set<String>, motion: Boolean) {
+        latestMarkers = markers
+        latest = JSONObject().put("nativePlacePanels", true).put("motion", motion)
+            .put("selectionId", selection?.placeId.orEmpty()).put("summaryOpen", selection?.summaryOpen == true)
+            .put("summaryHeightRatio", heightRatio).put("visits", JSONArray(visits.toList()))
+            .put("state", initialCamera)
+            .apply {
+                focus?.let { request -> put("mapFocus", JSONObject().put("id", request.placeId)
+                    .put("kind", request.kind.name).put("token", request.token)) }
+            }.toString()
+        if (ready) render()
+    }
     private fun render() {
-        if (rendered == latest) return
+        val markers = latestMarkers ?: return
+        if (rendered == latest && sentMarkers === markers) return
         rendered = latest
         val data = JSONObject(latest)
-        if (focusSent == data.optString("focusToken")) data.remove("focus")
-        if (data.has("focus")) focusSent = data.optString("focusToken")
+        if (!engineBooted) data.put("palette", worldPalette).put("providerHost", WorldTileProvider.host)
+        // Keep full marker data in the boot payload. Later panel updates do not rebuild sources.
+        if (!engineBooted || sentMarkers !== markers) data.put("places", markers)
+        sentMarkers = markers
         web.evaluateJavascript("window.updateNativeWorld && updateNativeWorld($data)", null)
+    }
+    fun back(onResult: (Boolean) -> Unit) {
+        val source = onAction
+        web.evaluateJavascript("window.worldBack ? worldBack() : false") { value ->
+            if (alive && source != null && source === onAction) onResult(value == "true")
+        }
     }
     fun resume() { visibilityGeneration++; web.onResume() }
     fun pause() {
@@ -343,12 +437,24 @@ internal class WorldScene(private val context: Context, private val browse: Room
 
 private object WorldMapClient {
     @Volatile private var cached: OkHttpClient? = null
-    @Synchronized fun get(context: Context): OkHttpClient = cached ?: MapNetworking.client.newBuilder()
+    @Synchronized fun get(context: Context): OkHttpClient = cached ?: OkHttpClient.Builder()
         .cache(Cache(File(context.cacheDir, "world-map-tiles"), 32L * 1024 * 1024)).build().also { cached = it }
 }
 
+private object WorldTileProvider {
+    const val host = "api.maptiler.com"
+    private const val root = "https://$host/"
+    private val encodedKey get() = Uri.encode(BuildConfig.MAPTILER_KEY.trim())
+    private val userAgent = "cn.musicpilgrimage.app/${BuildConfig.VERSION_NAME} (${BuildConfig.APPLICATION_ID}; MapLibre Android)"
+
+    fun streetStyle() = "${root}maps/streets-v2/style.json?key=$encodedKey"
+    fun tile(path: String) = "${root}tiles/$path?key=$encodedKey"
+    fun resource(path: String, query: String?) = root + path + query?.let { "?$it" }.orEmpty()
+    fun request(url: String) = Request.Builder().url(url).header("User-Agent", userAgent).build()
+}
+
 /** Local trusted origin only. Map traffic uses the existing provider and native identification. */
-private class WorldResources(private val context: Context, private val media: Map<String, String>) {
+private class WorldResources(private val context: Context) {
     private val client = WorldMapClient.get(context)
     fun read(uri: Uri): WebResourceResponse {
         if (uri.scheme != "https" || uri.host != "world.tingzong.local") return unavailable()
@@ -356,26 +462,14 @@ private class WorldResources(private val context: Context, private val media: Ma
         if (path.contains("..") || path.startsWith('/')) return unavailable()
         return runCatching {
             when {
-                path == "map-style.json" -> remote("https://api.maptiler.com/maps/streets-v2/style.json?key=" + Uri.encode(BuildConfig.MAPTILER_KEY.trim()))
+                path == "map-style.json" -> remote(WorldTileProvider.streetStyle())
                 path.startsWith("earth-hd/") || path.startsWith("earth-coast/") -> earthTile(path)
-                path.startsWith("provider/") -> remote("https://api.maptiler.com/" + path.removePrefix("provider/") + (uri.encodedQuery?.let { "?$it" } ?: ""))
-                path.startsWith("media/") -> image(media[path.removePrefix("media/")] ?: return unavailable())
+                path.startsWith("provider/") -> remote(WorldTileProvider.resource(path.removePrefix("provider/"), uri.encodedQuery))
                 path == "font.woff2" -> asset("design/swiss-details/fonts/swiss-sans.woff2", "font/woff2")
                 path == "inter-variable.woff2" -> asset("design/swiss-details/fonts/inter-variable.woff2", "font/woff2")
                 else -> asset("design/swiss-world/$path", mime(path))
             }
         }.getOrElse { unavailable() }
-    }
-    private fun image(source: String): WebResourceResponse = when {
-        source.startsWith("media/") && !source.contains("..") -> asset("design/swiss-details/$source", mime(source))
-        source.startsWith("file:///android_asset/") && !source.contains("..") -> asset(source.removePrefix("file:///android_asset/"), mime(source))
-        source.startsWith("https://") -> remote(source)
-        source.startsWith("file://") -> {
-            val file = File(Uri.parse(source).path.orEmpty()).canonicalFile
-            if (!file.toPath().startsWith(context.filesDir.canonicalFile.toPath()) && !file.toPath().startsWith(context.cacheDir.canonicalFile.toPath())) unavailable()
-            else response(mime(source), file.inputStream())
-        }
-        else -> unavailable()
     }
     private fun asset(path: String, type: String) = response(type, context.assets.open(path))
     private fun earthTile(path: String): WebResourceResponse {
@@ -390,10 +484,10 @@ private class WorldResources(private val context: Context, private val media: Ma
             parts[1] == "earth-coast" && parts[5] == "pbf" && z >= 5 -> "v3/$z/$x/$y"
             else -> return unavailable()
         }
-        return remote("https://api.maptiler.com/tiles/$endpoint?key=" + Uri.encode(BuildConfig.MAPTILER_KEY.trim()), preferCached = true)
+        return remote(WorldTileProvider.tile(endpoint), preferCached = true)
     }
     private fun remote(url: String, preferCached: Boolean = false): WebResourceResponse {
-        val request = Request.Builder().url(url).header("User-Agent", "cn.musicpilgrimage.app/${BuildConfig.VERSION_NAME} (${BuildConfig.APPLICATION_ID}; MapLibre Android)").build()
+        val request = WorldTileProvider.request(url)
         // Satellite imagery is not live data. Retain the existing bounded cache for offline revisits.
         val cached = if (preferCached) client.newCall(request.newBuilder().cacheControl(okhttp3.CacheControl.FORCE_CACHE).build()).execute() else null
         val result = if (cached?.isSuccessful == true) cached else { cached?.close(); client.newCall(request).execute() }

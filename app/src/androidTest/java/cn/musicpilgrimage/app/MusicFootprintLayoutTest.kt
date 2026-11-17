@@ -30,11 +30,13 @@ class MusicFootprintLayoutTest {
             .put("created_at","2026-10-19T10:00:00Z").put("verified_at","2026-10-19T10:00:00Z")
             .put("visibility","private").put("body","测试用文字，用于检查时间线与管理操作。"))
         var edited=false;var deleted=false
+        var attempts=0
+        var finishDelete:((String?)->Unit)?=null
         compose.setContent {PilgrimageTheme {RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),baseColor=RoomColors.ArchiveWall) {
             Column {
                 RoomHeader("资料册",onSpace={})
                 RoomFootprints(MusicArchiveState(owner="isolated-layout-owner",visits=listOf(record)),places,"visits",
-                    {},{},{},{edited=true},{deleted=true},services){kind->Text(if(kind=="message")"留言测试记录" else "复刻测试记录")}
+                    {},{},{},{edited=true},{_,done->attempts++;finishDelete=done},services){kind->Text(if(kind=="message")"留言测试记录" else "复刻测试记录")}
             }
         }}}
         compose.onNodeWithTag("archive-expand-${place.id}").performClick()
@@ -55,6 +57,17 @@ class MusicFootprintLayoutTest {
         compose.onNodeWithContentDescription("删除感想与照片").performClick()
         compose.onNodeWithText("到访日期与已经获得的认证会保留。").assertIsDisplayed()
         compose.onNodeWithText("取消").performClick()
-        compose.runOnIdle {assertFalse(deleted)}
+        compose.runOnIdle {assertEquals(0,attempts)}
+
+        compose.onNodeWithContentDescription("删除感想与照片").performClick()
+        compose.onNodeWithText("删除").performClick()
+        compose.onNodeWithText("正在删除…").assertIsNotEnabled()
+        compose.onNodeWithText("取消").assertIsNotEnabled()
+        compose.runOnIdle {requireNotNull(finishDelete)("暂时无法删除，请重试")}
+        compose.onNodeWithText("暂时无法删除，请重试").assertIsDisplayed()
+        compose.onNodeWithText("删除").performClick()
+        compose.runOnIdle {assertEquals(2,attempts);deleted=true;requireNotNull(finishDelete)(null)}
+        compose.onNodeWithText("删除感想与照片？").assertDoesNotExist()
+        compose.onNodeWithText("2026-10-19").assertIsDisplayed()
     }
 }

@@ -15,10 +15,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -27,7 +29,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import cn.musicpilgrimage.app.data.AppServices
+import cn.musicpilgrimage.app.ui.InPlacePhotoViewerStandalone
+import cn.musicpilgrimage.app.ui.LocalPhotoViewerCoordinator
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
+import cn.musicpilgrimage.app.ui.PhotoViewerRequest
 import cn.musicpilgrimage.app.ui.appMotionEasing
 import coil.compose.AsyncImage
 import coil.request.CachePolicy
@@ -79,35 +84,42 @@ import coil.request.ImageRequest
 }
 
 @Composable internal fun RoomCommunityPhotoViewer(
-    model:Any?,description:String,credit:String?=null,onSources:(()->Unit)?=null,onClosed:()->Unit
+    model:Any?,
+    description:String,
+    credit:String?=null,
+    sourceBoundsInRoot:Rect?=null,
+    sourceAspectRatio:Float?=null,
+    sourceIsCroppedCover:Boolean=true,
+    sourceId:String?=null,
+    restoreSource:(suspend ()->Unit)?=null,
+    onSources:(()->Unit)?=null,
+    showOriginalLoadStatus:Boolean=false,
+    onClosed:()->Unit
 ) {
-    val motion=LocalPhysicalMotion.current
-    var closing by remember{mutableStateOf(false)}
+    val portal=LocalPhotoViewerCoordinator.current
+    val configuration=LocalConfiguration.current
     val close by rememberUpdatedState(onClosed)
-    val alpha=remember{Animatable(if(motion).55f else 1f)}
-    LaunchedEffect(closing,motion){
-        alpha.animateTo(if(closing)0f else 1f,tween(if(motion)if(closing)120 else 170 else 0,easing=appMotionEasing))
-        if(closing)close()
+    val sources by rememberUpdatedState(onSources)
+    val request=remember(model,description,credit,sourceBoundsInRoot,sourceAspectRatio,sourceIsCroppedCover,sourceId,restoreSource,showOriginalLoadStatus) {
+        PhotoViewerRequest(
+            id=sourceId?:model?.toString().orEmpty(),
+            model=model,
+            description=description,
+            credit=credit,
+            sourceBoundsInRoot=sourceBoundsInRoot,
+            sourceAspectRatio=sourceAspectRatio,
+            sourceIsCroppedCover=sourceIsCroppedCover,
+            sourceOrientation=configuration.orientation,
+            restoreSource=restoreSource,
+            onSources=sources,
+            showOriginalLoadStatus=showOriginalLoadStatus,
+            onClosed=close,
+        )
     }
-    Dialog(onDismissRequest={closing=true},properties=DialogProperties(usePlatformDefaultWidth=false)) {
-        val view=LocalView.current
-        SideEffect{(view.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)}
-        Box(Modifier.fillMaxSize().background(Color(0xFF1C2B38).copy(alpha=.35f*alpha.value)).clickable{closing=true}.padding(20.dp),contentAlignment=Alignment.Center) {
-            RoomPaper(Modifier.fillMaxWidth().widthIn(max=480.dp).graphicsLayer{
-                this.alpha=alpha.value
-                scaleX=.985f+.015f*alpha.value
-                scaleY=scaleX
-            }.testTag("room-community-photo-viewer").pointerInput(Unit){detectTapGestures{}},woodEdge=false) {
-                Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment=Alignment.CenterVertically) {
-                        Text(description,Modifier.weight(1f),color=RoomColors.Ink,fontSize=14.sp)
-                        IconButton({closing=true}){Icon(Icons.Outlined.Close,"关闭大图",tint=RoomColors.Ink)}
-                    }
-                    AsyncImage(model,description,Modifier.fillMaxWidth().heightIn(min=120.dp,max=480.dp),contentScale=ContentScale.Fit)
-                    if(credit!=null)Text(credit,fontSize=12.sp,color=RoomColors.Muted)
-                    if(onSources!=null)SwissTextButton(onSources){Text("资料来源")}
-                }
-            }
-        }
+    if(portal!=null) {
+        LaunchedEffect(request) { portal.open(request) }
+        DisposableEffect(Unit) { onDispose { portal.clearIfMatches(request) } }
+    } else {
+        InPlacePhotoViewerStandalone(request)
     }
 }

@@ -16,13 +16,13 @@ internal fun DrawScope.performanceReceptor(x:Float,line:Float,w:Float,color:Colo
 internal fun DrawScope.performanceRibbon(x:Float,top:Float,bottom:Float,w:Float,color:Color,holding:Boolean) {
     val width=w*.72f
     drawRect(Brush.horizontalGradient(listOf(Color(0xFF862D23),Color(0xFFC84A37),Color(0xFF9F362A))),Offset(x-width/2,top),Size(width,(bottom-top).coerceAtLeast(0f)),alpha=if(holding)1f else .88f)
-    drawLine(ivory.copy(alpha=.4f),Offset(x,top+5.dp.toPx()),Offset(x,bottom),.7.dp.toPx())
+    val start=top+5.dp.toPx()
+    if(bottom>start)drawLine(ivory.copy(alpha=if(holding).8f else .4f),Offset(x,start),Offset(x,bottom),.7.dp.toPx())
     drawLine(Color(0xFFFFBE95).copy(alpha=.35f),Offset(x-width/2,top),Offset(x-width/2,bottom),.7.dp.toPx())
 }
 internal fun DrawScope.performanceSustain(x:Float,line:Float,w:Float,color:Color,fraction:Float,timeUs:Long,motion:Boolean) {
     val height=138.dp.toPx()
     drawRect(Brush.verticalGradient(listOf(Color.Transparent,ivory.copy(alpha=.23f)),line-height,line),Offset(x-w/2,line-height),Size(w,height))
-    drawLine(ivory.copy(alpha=.8f),Offset(x,line-height*.78f),Offset(x,line),.85.dp.toPx())
     if(motion)repeat(5){i->
         val t=((timeUs/1000f+i*179f)%1200)/1200f
         val point=Offset(x+sin(i*2.1f)*w*.22f,line-t*height)

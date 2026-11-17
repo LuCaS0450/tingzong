@@ -14,6 +14,10 @@ PUBLIC_FILES = {
     'gradlew', 'gradlew.bat', 'services.example.properties',
 }
 PUBLIC_DOCS = {'VERSION_CONTROL.md', 'PUBLIC_ASSETS.md', 'DISK_IO_FIX_20261029.md', 'PROJECT_GUIDE.md'}
+DEBUG_DETAIL_SOURCE = {
+    'app/src/debug/assets/design/swiss-details/' + name
+    for name in ('index.html', 'approved-renderers.js', 'approved-styles.css', 'native-adapter.js')
+}
 PUBLIC_SCRIPTS = {
     'start-standalone-preview.ps1', 'cloud_credentials.py', 'cloud_http.py',
     'cloud_backup.py', 'cloud_sql_runtime.py', 'cloud_sql_check.py',
@@ -93,7 +97,7 @@ def path_problem(path):
             return 'historical/unreviewed script'
         if top == '.githooks' and parts[-1] not in {'pre-commit', 'pre-push'}:
             return 'unreviewed hook'
-    if path.startswith('app/src/debug/assets/'):
+    if path.startswith('app/src/debug/assets/') and path not in DEBUG_DETAIL_SOURCE:
         return 'private preview asset'
     assets = 'app/src/main/assets/'
     if path.startswith(assets) and not path.startswith((

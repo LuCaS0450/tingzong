@@ -123,13 +123,19 @@ class MusicArchiveViewModel(app: Application) : AndroidViewModel(app) {
     }
     private fun enqueue(change:Change){pending[change.id]=change;changes.trySend(change)}
     fun dismissUndo(token:Long){if(undoMutable.value?.token==token)undoMutable.value=null}
-    fun deleteVisitContent(item:ContentItem) {
-        val owner=services.userId.value ?: return
-        if(item.owner!=owner)return
+    fun deleteVisitContent(item:ContentItem,done:(String?)->Unit) {
+        val owner=services.userId.value
+        if(owner==null||item.owner!=owner) {
+            done("请登录原账号后再试。")
+            return
+        }
         viewModelScope.launch {lock.withLock {
-            try {services.repositories.content.save("delete_content",JSONObject().put("id",item.id),owner)}
+            try {
+                services.repositories.content.save("delete_content",JSONObject().put("id",item.id),owner)
+                if(services.userId.value==owner)done(null)
+            }
             catch(e:CancellationException){throw e}
-            catch(e:Exception){if(services.userId.value==owner)mutable.value=mutable.value.copy(error=FeatureViewModel.friendlyError(e))}
+            catch(e:Exception){if(services.userId.value==owner)done(FeatureViewModel.friendlyError(e))}
         }}
     }
 }

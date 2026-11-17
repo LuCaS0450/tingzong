@@ -27,8 +27,8 @@ internal class MusicTripViewModel(app:Application):AndroidViewModel(app) {
         val rows=withContext(Dispatchers.IO){store.read(key)}
         if(owner()==key)mutable.value=MusicTripState(key,rows,error=mutable.value.error)
     }}}}
-    private fun change(expected:String,block:(List<MusicTrip>)->List<MusicTrip>,done:()->Unit={}) {
-        if(expected!=owner()||mutable.value.owner!=expected||mutable.value.busy)return
+    private fun change(expected:String,block:(List<MusicTrip>)->List<MusicTrip>,done:()->Unit={},settled:()->Unit={}) {
+        if(expected!=owner()||mutable.value.owner!=expected||mutable.value.busy){settled();return}
         mutable.value=mutable.value.copy(busy=true,error=null)
         viewModelScope.launch {lock.withLock {
             try {
@@ -37,6 +37,7 @@ internal class MusicTripViewModel(app:Application):AndroidViewModel(app) {
                 if(owner()==expected){mutable.value=MusicTripState(expected,next.sortedBy{it.start});done()}
             } catch(cancel:CancellationException){throw cancel}
             catch(e:Exception){if(owner()==expected)mutable.value=mutable.value.copy(busy=false,error=e.message?:"行程尚未保存，请重试")}
+            finally { settled() }
         }}
     }
     fun create(owner:String,name:String,start:LocalDate,end:LocalDate,cities:List<MusicTripCity>,done:(String)->Unit) {
@@ -51,7 +52,8 @@ internal class MusicTripViewModel(app:Application):AndroidViewModel(app) {
         val updated=plan.add(place,day)
         rows.map { if(it.id==trip) updated else it }
     },done)
-    fun move(owner:String,trip:String,stop:String,day:Int,index:Int,done:()->Unit={})=change(owner,{rows->rows.map{if(it.id==trip)it.move(stop,day,index)else it}},done)
+    fun move(owner:String,trip:String,stop:String,day:Int,index:Int,settled:()->Unit={},done:()->Unit={})=
+        change(owner,{rows->rows.map{if(it.id==trip)it.move(stop,day,index)else it}},done,settled)
     fun remove(owner:String,trip:String,stop:String,done:()->Unit={})=change(owner,{rows->rows.map{if(it.id==trip)it.copy(stops=it.stops.filterNot{s->s.id==stop})else it}},done)
     fun deleteTrip(owner:String,tripId:String,done:()->Unit)=change(owner,{trips->trips.filterNot{it.id==tripId}},done)
     fun dates(owner:String,trip:String,start:LocalDate,end:LocalDate,beforeStart:LocalDate,beforeEnd:LocalDate,done:()->Unit)=change(owner,{rows->rows.map{if(it.id==trip)it.editDates(start,end,beforeStart,beforeEnd)else it}},done)

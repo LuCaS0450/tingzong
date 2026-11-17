@@ -1,8 +1,6 @@
 package cn.musicpilgrimage.app
 
 import android.graphics.Bitmap
-import android.view.View
-import android.view.ViewGroup
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Surface
@@ -12,18 +10,17 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.ui.*
+import cn.musicpilgrimage.app.ui.room.RoomBrowseState
+import cn.musicpilgrimage.app.ui.room.RoomPlaceDetail
+import cn.musicpilgrimage.app.ui.room.SwissWorldWall
+import cn.musicpilgrimage.app.ui.room.WorldFocusKind
+import androidx.compose.runtime.DisposableEffect
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
-import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.MapLibreMap
-import org.maplibre.android.camera.CameraUpdateFactory
-import org.maplibre.android.geometry.LatLng
 import java.io.File
-import java.util.concurrent.atomic.AtomicReference
-import java.util.concurrent.atomic.AtomicBoolean
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -35,10 +32,18 @@ import androidx.lifecycle.ViewModelProvider
 /** Opt-in read-only check against the actual imported catalog, never quiz fixtures. */
 class MaterialsCloudTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
-    private fun findMap(view:View):MapView? {
-        if(view is MapView)return view
-        if(view is ViewGroup)for(i in 0 until view.childCount)findMap(view.getChildAt(i))?.let{return it}
-        return null
+    private fun showWorld(catalog:Catalog, place:Place) {
+        compose.activityRule.scenario.onActivity { activity ->
+            val browse=RoomBrowseState(activity).apply { focusWorld(place.id, WorldFocusKind.List) }
+            activity.setContent {
+                PilgrimageTheme {
+                    DisposableEffect(browse) { onDispose { browse.worldScene?.destroy() } }
+                    SwissWorldWall(catalog,browse,emptySet(),false,{},{},{},{},{},{},{},emptySet(),true)
+                }
+            }
+        }
+        compose.onNodeWithTag("world-summary-title").assertIsDisplayed()
+        compose.onNodeWithTag("world-summary-detail").assertIsDisplayed()
     }
     @Test fun committedCatalogRendersCoverMapPinAndNewTypes() {
         val ins=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
@@ -56,29 +61,9 @@ class MaterialsCloudTest {
         val greenwich=catalog.places.first{it.id=="greenwich"}
         assertEquals("release_cover",havana.primaryScene()!!.referenceKind)
         assertTrue(havana.scenes.any{it.kind=="mv"})
-        compose.activityRule.scenario.onActivity{activity->activity.setContent{PilgrimageTheme{Surface(Modifier.fillMaxSize()){
-            Column(Modifier.systemBarsPadding().padding(20.dp)){
-                PageTitle("云端原作地点","真实导入目录 · 哈瓦那城市参考点")
-                MapPanel(listOf(havana),BuildConfig.MAPTILER_KEY,{},Modifier.fillMaxWidth().weight(1f))
-                PlaceRow(kay,onClick={});PlaceRow(greenwich,onClick={})
-            }
-        }}}}
-        compose.onNodeWithText("歌名关联").assertIsDisplayed()
-        compose.onNodeWithText("歌词提及").assertIsDisplayed()
-        val mapView=AtomicReference<MapView?>();val nativeMap=AtomicReference<MapLibreMap?>();val rendered=AtomicBoolean(false)
-        compose.waitUntil(30000){
-            compose.activityRule.scenario.onActivity{
-                if(mapView.get()==null){mapView.set(findMap(it.window.decorView));mapView.get()?.addOnDidFinishRenderingFrameListener{fully,_,_->if(fully)rendered.set(true)}}
-                mapView.get()?.getMapAsync{map->nativeMap.set(map)}
-            }
-            mapView.get()!=null && nativeMap.get()!=null
-        }
-        compose.waitUntil(90000){
-            rendered.get() && compose.onAllNodesWithTag("map-reference-${havana.id}").fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.waitUntil(30000){compose.onAllNodesWithText("图片加载中…").fetchSemanticsNodes().isEmpty()}
-        compose.onAllNodesWithText("图片加载失败").assertCountEquals(0)
-        ins.waitForIdleSync();Thread.sleep(700)
+        assertTrue(kay.associationLabels().contains("歌名关联"))
+        assertTrue(greenwich.associationLabels().contains("歌词提及"))
+        showWorld(catalog,havana)
         val folder=File(ins.targetContext.getExternalFilesDir(null),"screenshots").apply{mkdirs()}
         val bitmap=requireNotNull(ins.uiAutomation.takeScreenshot())
         File(folder,"10-material-live-map.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()
@@ -127,31 +112,8 @@ class MaterialsCloudTest {
                     assertEquals(if(index==0)1280 else 320,drawable.intrinsicHeight)
                 }
             }
-            compose.activityRule.scenario.onActivity{activity->activity.setContent{PilgrimageTheme{Surface(Modifier.fillMaxSize()){
-                Column(Modifier.systemBarsPadding().padding(20.dp)){
-                    PageTitle("《她说》云端原作","全家三富店 · 建筑级画面对照")
-                    MapPanel(listOf(place),BuildConfig.MAPTILER_KEY,{},Modifier.fillMaxWidth().weight(1f))
-                    PlaceRow(place,onClick={})
-                }
-            }}}}
-            // Synchronize the new composition before looking through the native
-            // view tree; the activity's preceding map may still be attached.
-            compose.onNodeWithText("《她说》云端原作").assertIsDisplayed()
-            val mapView=AtomicReference<MapView?>();val rendered=AtomicBoolean(false)
-            compose.waitUntil(30000){
-                compose.activityRule.scenario.onActivity{
-                    if(mapView.get()==null){
-                        mapView.set(findMap(it.window.decorView))
-                        mapView.get()?.addOnDidFinishRenderingFrameListener{fully,_,_->if(fully)rendered.set(true)}
-                        mapView.get()?.getMapAsync{map->map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(place.latitude,place.longitude),13.0))}
-                    }
-                }
-                mapView.get()!=null
-            }
-            compose.waitUntil(90000){compose.onAllNodesWithTag("map-reference-${place.id}").fetchSemanticsNodes().isNotEmpty()}
-            compose.waitUntil(90000){rendered.get()}
-            compose.waitUntil(30000){compose.onAllNodesWithText("图片加载中…").fetchSemanticsNodes().isEmpty()}
-            compose.onAllNodesWithText("图片加载失败").assertCountEquals(0)
+            val sourceCatalog=services.catalog.value
+            showWorld(sourceCatalog,place)
             val folder=File(ins.targetContext.getExternalFilesDir(null),"screenshots").apply{mkdirs()}
             fun screenshot(name:String) {
                 ins.waitForIdleSync()
@@ -159,21 +121,18 @@ class MaterialsCloudTest {
                 File(folder,name).outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}
                 bitmap.recycle()
             }
-            compose.onNodeWithContentDescription("${place.name}发行封面").assertIsDisplayed()
             screenshot("18-she-says-release-cover-map.png")
             compose.activityRule.scenario.onActivity{activity->
                 val session=ViewModelProvider(activity)[SessionViewModel::class.java]
                 val placeVm=ViewModelProvider(activity)[PlaceViewModel::class.java]
                 activity.setContent{PilgrimageTheme{Surface(Modifier.fillMaxSize().systemBarsPadding()){
-                    PlaceScreen(place.id,placeVm,session,{},{},{_,_,_->},{})
+                    RoomPlaceDetail(place,setOf(scene.id),placeVm,session,false,false,{},{},
+                        {_,_,_->},{},{},MusicCatalogue.from(sourceCatalog),{},{})
                 }}}
             }
-            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("她说原作参考图"))
-            compose.waitUntil(30000){compose.onAllNodesWithText("图片加载中…").fetchSemanticsNodes().isEmpty()}
-            compose.onNodeWithContentDescription("她说原作参考图").assertIsDisplayed()
-            compose.onAllNodesWithText("图片加载失败").assertCountEquals(0)
+            compose.onNodeWithTag("native-place-archive").assertIsDisplayed()
+            assertFalse(place.scenes.any(Scene::canRecreate))
             screenshot("19-she-says-release-cover-detail.png")
-            compose.onNodeWithText("此关联不开放原机位叠图复刻").performScrollTo().assertIsDisplayed()
             compose.onAllNodesWithText("复刻这个镜头").assertCountEquals(0)
             screenshot("20-she-says-release-cover-overlay-closed.png")
         } finally {loader.shutdown()}

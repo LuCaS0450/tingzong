@@ -37,15 +37,15 @@ import cn.musicpilgrimage.app.ui.room.LocalRoomSpaceOrigin
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 
-internal val Ink=Color(0xFF242B27)
-internal val Muted=Color(0xFF686E67)
+internal val Ink=AppArt.Ink
+internal val Muted=AppArt.Muted
 internal val Acid=Ink
-internal val Panel=Color(0xFFF7F6F2)
-internal val Line=Color(0xFFD8D8D0)
+internal val Panel=AppArt.Paper
+internal val Line=AppArt.Line
 @Composable fun PilgrimageTheme(content:@Composable ()->Unit) {
  PhysicalMotionProvider {
  MaterialTheme(colorScheme=lightColorScheme(primary=Acid,onPrimary=Color.White,primaryContainer=Panel,onPrimaryContainer=Ink,
-  secondary=Color(0xFFBD382B),secondaryContainer=Panel,onSecondaryContainer=Ink,tertiary=Ink,tertiaryContainer=Panel,onTertiaryContainer=Ink,
+  secondary=AppArt.Red,secondaryContainer=Panel,onSecondaryContainer=Ink,tertiary=Ink,tertiaryContainer=Panel,onTertiaryContainer=Ink,
   background=Panel,surface=Panel,onSurface=Ink,onBackground=Ink,surfaceVariant=Panel,
   surfaceContainer=Panel,surfaceContainerHigh=Panel,surfaceContainerHighest=Panel,surfaceContainerLow=Panel,surfaceContainerLowest=Panel,
   onSurfaceVariant=Muted,outline=Line,outlineVariant=Line,error=Color(0xFF932119),surfaceTint=Color.Transparent),
@@ -129,8 +129,9 @@ internal val Line=Color(0xFFD8D8D0)
  Row(Modifier.fillMaxWidth().clickable(onClick=onClick).padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
   ReleaseCover(place,Modifier.size(72.dp),compact=true)
   Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-   Text(place.name,fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
-   Text("${place.city} · ${place.scenes.firstOrNull()?.artistName.orEmpty()}",color=Muted,style=MaterialTheme.typography.bodySmall)
+   Text(place.regionalTitle(place.name),fontWeight=FontWeight.Bold,maxLines=2,overflow=TextOverflow.Ellipsis)
+   Text(listOf(unifiedDestinationRegion(place.country)?:place.city,place.scenes.firstOrNull()?.artistName.orEmpty())
+    .filter(String::isNotBlank).joinToString(" · "),color=Muted,style=MaterialTheme.typography.bodySmall)
    Text(if(matched.isNotBlank())"匹配：$matched" else place.scenes.joinToString(" / "){formatWorkTitle(it.work)},color=Muted,style=MaterialTheme.typography.bodySmall,maxLines=2,overflow=TextOverflow.Ellipsis)
    Text(place.associationLabels(),color=Acid,style=MaterialTheme.typography.bodySmall)
   }

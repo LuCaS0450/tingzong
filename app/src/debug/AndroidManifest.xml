@@ -5,6 +5,7 @@
             android:theme="@style/Theme.MusicPilgrimage" />
         <activity android:name="cn.musicpilgrimage.app.MusicSpacePreviewActivity"
             android:exported="true" android:label="听踪 · 音乐空间预览"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
             android:windowSoftInputMode="adjustResize|stateAlwaysHidden"
             android:theme="@style/Theme.MusicPilgrimage" />
         <activity android:name="cn.musicpilgrimage.app.piano.PianoPilotActivity"

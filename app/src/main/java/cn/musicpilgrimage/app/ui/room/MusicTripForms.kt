@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,7 +30,8 @@ import cn.musicpilgrimage.app.data.MusicTripCity
 import cn.musicpilgrimage.app.data.MusicTripStop
 import cn.musicpilgrimage.app.data.Place
 import cn.musicpilgrimage.app.data.canonicalRegionName
-import cn.musicpilgrimage.app.ui.AppMotionDialog
+import cn.musicpilgrimage.app.data.locationLabel
+import cn.musicpilgrimage.app.ui.AppBottomSheet
 
 @Composable internal fun TripPanel(
     title:String,
@@ -39,21 +41,20 @@ import cn.musicpilgrimage.app.ui.AppMotionDialog
     content:@Composable ColumnScope.()->Unit
 ) {
     val dismiss={if(!busy)onClose()}
-    val properties=DialogProperties(decorFitsSystemWindows=false)
-    val panel:@Composable ()->Unit={
-        Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing).imePadding().padding(vertical=12.dp)) {
-            RoomPaper(Modifier.fillMaxWidth()) {
-                Column(
-                    Modifier.heightIn(max=570.dp).padding(20.dp),
-                    verticalArrangement=Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(title,fontSize=22.sp,color=RoomColors.Ink)
-                    content()
-                }
-            }
+    AppBottomSheet(
+        visible=true,
+        busy=busy,
+        onDismissRequest=dismiss,
+        allowExpandDetent=animated,
+    ) { _, _ ->
+        Column(
+            Modifier.fillMaxWidth().padding(start=20.dp,end=20.dp,bottom=18.dp,top=2.dp),
+            verticalArrangement=Arrangement.spacedBy(12.dp)
+        ) {
+            Text(title,fontSize=22.sp,color=RoomColors.Ink)
+            content()
         }
     }
-    AppMotionDialog(dismiss,properties,animated=animated,content=panel)
 }
 
 @Composable internal fun TripError(error:String?) {
@@ -87,6 +88,27 @@ import cn.musicpilgrimage.app.ui.AppMotionDialog
 internal fun List<MusicTripCity>.destinationFields()=flatMap{listOf(it.name,it.country)}
 internal fun List<String>.tripDestinations()=chunked(2).map{MusicTripCity(it[0],it[1])}
 
+private val MusicTripCity.destinationPickerLabel:String
+    get()=when {
+        region!=null->label
+        isCountry->"$label · 国家或地区"
+        else->"$name · $country"
+    }
+
+internal fun tripDestinationOptions(catalogCities:List<MusicTripCity>):List<MusicTripCity> {
+    val countries=catalogCities.map{canonicalRegionName(it.country)}.distinct().map{MusicTripCity.country(it)}
+    return (countries+catalogCities).distinctBy{it.pickerKey}
+}
+
+internal fun searchTripDestinations(options:List<MusicTripCity>,query:String,catalogCities:List<MusicTripCity> = options):List<MusicTripCity> {
+    val term=canonicalRegionName(query.trim())
+    if(term.isEmpty())return emptyList()
+    val matchedRegions=catalogCities.filter{it.region!=null&&it.name.contains(term,true)}.mapTo(mutableSetOf()){it.pickerKey}
+    return options.filter {
+        it.label.contains(term,true)||it.country.contains(term,true)||it.pickerKey in matchedRegions
+    }.sortedBy{!it.label.equals(term,true)}
+}
+
 @Composable internal fun TripDestinationFields(
     name:String,
     onName:(String)->Unit,
@@ -101,18 +123,17 @@ internal fun List<String>.tripDestinations()=chunked(2).map{MusicTripCity(it[0],
     var countryOnly by rememberSaveable{mutableStateOf(false)}
     var cityName by rememberSaveable{mutableStateOf("")}
     var countryName by rememberSaveable{mutableStateOf("")}
-    val options=remember(catalogCities) {
-        val countries=catalogCities.map{it.country}.distinct().map{MusicTripCity.country(it)}
-        (countries+catalogCities).distinctBy{it.key}
+    val options=remember(catalogCities){tripDestinationOptions(catalogCities)}
+    val term=query.trim()
+    val matches=remember(options,term,catalogCities){searchTripDestinations(options,term,catalogCities)}
+    val selectedKeys=selected.mapTo(mutableSetOf()){it.pickerKey}
+    val visibleSelection=selected.distinctBy{it.pickerKey}
+    val listState=rememberLazyListState()
+    val manualItemIndex=2+(if(term.isNotEmpty()) matches.size.coerceAtLeast(1) else 0)
+    LaunchedEffect(manual) {
+        if(manual)listState.animateScrollToItem(manualItemIndex)
     }
-    val term=canonicalRegionName(query.trim())
-    val matches=remember(options,term) {
-        if(term.isEmpty()) emptyList()
-        else options.filter{it.label.contains(term,true)||it.country.contains(term,true)}
-            .sortedBy{!it.label.equals(term,true)}
-    }
-    val selectedKeys=selected.mapTo(mutableSetOf()){it.key}
-    LazyColumn(modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    LazyColumn(modifier.fillMaxWidth(),state=listState,verticalArrangement=Arrangement.spacedBy(8.dp)) {
         item {
             OutlinedTextField(name,{onName(it.take(60))},label={Text("行程名称")},singleLine=true,
                 enabled=!busy,modifier=Modifier.fillMaxWidth().testTag("trip-name-input"))
@@ -121,56 +142,58 @@ internal fun List<String>.tripDestinations()=chunked(2).map{MusicTripCity(it[0],
         if(term.isNotEmpty()) {
             if(matches.isEmpty()) item { Text("没有找到匹配的目的地，可以手动填写。",color=RoomColors.Muted,fontSize=13.sp) }
             items(matches,key={"result-${it.key}"}) { destination ->
-                val checked=destination.key in selectedKeys
+                val checked=destination.pickerKey in selectedKeys
                 val enabled=!busy&&(checked||selected.size<MusicTrip.MAX_DESTINATIONS)
                 Row(
                     Modifier.fillMaxWidth().toggleable(checked,enabled=enabled,role=Role.Checkbox) {
-                        onSelection(if(it) selected+destination else selected.filterNot{row->row.key==destination.key})
+                        onSelection(if(it) selected+destination else selected.filterNot{row->row.pickerKey==destination.pickerKey})
                     },
                     verticalAlignment=Alignment.CenterVertically
                 ) {
                     Checkbox(checked,onCheckedChange=null,enabled=enabled,modifier=Modifier.size(48.dp))
-                    Text(if(destination.isCountry)"${destination.label} · 国家或地区" else "${destination.name} · ${destination.country}",
+                    Text(destination.destinationPickerLabel,
                         fontSize=14.sp,color=RoomColors.Ink)
                 }
             }
         }
-        item {
-            SwissTextButton({manual=!manual},enabled=!busy&&(manual||selected.size<MusicTrip.MAX_DESTINATIONS)) {
-                Text(if(manual)"收起手动填写" else "手动填写目的地")
-            }
-        }
-        if(manual) item {
+        item(key="manual-entry") {
             Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    FilterChip(!countryOnly,{countryOnly=false},{Text("城市")},enabled=!busy)
-                    FilterChip(countryOnly,{countryOnly=true},{Text("国家或地区")},enabled=!busy)
+                SwissTextButton({manual=!manual},enabled=!busy&&(manual||selected.size<MusicTrip.MAX_DESTINATIONS)) {
+                    Text(if(manual)"收起手动填写" else "手动填写目的地")
                 }
-                if(!countryOnly) OutlinedTextField(cityName,{cityName=it.take(60)},label={Text("城市名称")},
-                    singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
-                OutlinedTextField(countryName,{countryName=it.take(60)},label={Text("国家或地区名称")},
-                    singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
-                val country=canonicalRegionName(countryName.trim())
-                val destination=if(countryOnly) MusicTripCity.country(country) else MusicTripCity(cityName.trim(),country)
-                SwissOutlinedButton({
-                    onSelection(selected+destination)
-                    manual=false
-                    query=""
-                    cityName=""
-                    countryName=""
-                },enabled=!busy&&selected.size<MusicTrip.MAX_DESTINATIONS&&country.isNotEmpty()&&
-                    (countryOnly||cityName.isNotBlank()&&!destination.isCountry)&&destination.key !in selectedKeys) {
-                    Text("加入目的地")
+                if(manual) {
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        FilterChip(!countryOnly,{countryOnly=false},{Text("城市")},enabled=!busy)
+                        FilterChip(countryOnly,{countryOnly=true},{Text("国家或地区")},enabled=!busy)
+                    }
+                    if(!countryOnly) OutlinedTextField(cityName,{cityName=it.take(60)},label={Text("城市名称")},
+                        singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(countryName,{countryName=it.take(60)},label={Text("国家或地区名称")},
+                        singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
+                    val country=canonicalRegionName(countryName.trim())
+                    val destination=MusicTripCity(cityName.trim(),country).let {
+                        if(countryOnly||it.region!=null)MusicTripCity.country(it.region?:country) else it
+                    }
+                    SwissOutlinedButton({
+                        onSelection(selected+destination)
+                        manual=false
+                        query=""
+                        cityName=""
+                        countryName=""
+                    },enabled=!busy&&selected.size<MusicTrip.MAX_DESTINATIONS&&country.isNotEmpty()&&
+                        (countryOnly||destination.region!=null||cityName.isNotBlank()&&!destination.isCountry)&&destination.pickerKey !in selectedKeys) {
+                        Text("加入目的地")
+                    }
                 }
             }
         }
         if(selected.isNotEmpty()) {
-            item { Text("已选目的地 · ${selected.size}",fontSize=13.sp,color=RoomColors.Muted) }
-            items(selected,key={"selected-${it.key}"}) { destination ->
+            item { Text("已选目的地 · ${visibleSelection.size}",fontSize=13.sp,color=RoomColors.Muted) }
+            items(visibleSelection,key={"selected-${it.pickerKey}"}) { destination ->
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                    Text(if(destination.isCountry)destination.label else "${destination.label} · ${destination.country}",
+                    Text(if(destination.isCountry||destination.region!=null)destination.label else "${destination.label} · ${destination.country}",
                         Modifier.weight(1f),fontSize=14.sp,color=RoomColors.Ink)
-                    SwissTextButton({onSelection(selected.filterNot{it.key==destination.key})},enabled=!busy) {Text("移除")}
+                    SwissTextButton({onSelection(selected.filterNot{it.pickerKey==destination.pickerKey})},enabled=!busy) {Text("移除")}
                 }
             }
         }
@@ -217,7 +240,7 @@ internal fun List<String>.tripDestinations()=chunked(2).map{MusicTripCity(it[0],
                     ) {
                         Column(Modifier.fillMaxWidth()) {
                             Text(titles[place.id]?:place.name)
-                            Text("${place.city} · ${place.country}"+if(added)" · 已安排" else "",fontSize=12.sp)
+                            Text(place.locationLabel()+if(added)" · 已安排" else "",fontSize=12.sp)
                         }
                     }
                 }
@@ -267,7 +290,7 @@ internal fun List<String>.tripDestinations()=chunked(2).map{MusicTripCity(it[0],
                         Text("目的地 · ${selected?.label?:"请选择"}")
                     }
                     DropdownMenu(expanded=choosingDestination,onDismissRequest={choosingDestination=false}) {
-                        trip.cities.forEach { destination ->
+                        trip.cities.distinctBy{it.pickerKey}.forEach { destination ->
                             DropdownMenuItem(text={Text(destination.label)},onClick={
                                 city=destination.key
                                 choosingDestination=false

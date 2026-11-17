@@ -5,8 +5,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.espresso.Espresso
 import cn.musicpilgrimage.app.design.AppPreferencesState
 import cn.musicpilgrimage.app.ui.PilgrimageTheme
+import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.room.*
 import org.junit.Assert.*
 import org.junit.Rule
@@ -21,7 +23,9 @@ class MusicAccountLayoutTest {
         var nickname by mutableStateOf("音乐旅人")
         var signedOut=false
         var discard by mutableStateOf(false)
-        compose.setContent {PilgrimageTheme {RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+        var motion by mutableStateOf(true)
+        compose.setContent {PilgrimageTheme {CompositionLocalProvider(LocalPhysicalMotion provides motion) {
+        RoomWall(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             Column {
                 RoomHeader(if(page=="my")"我的" else if(page=="edit")"个人资料" else "设置",onBack=if(page=="edit")({discard=true})else null,onSpace={})
                 when(page) {
@@ -33,10 +37,16 @@ class MusicAccountLayoutTest {
                 }
             }
             if(discard)RoomDiscardProfileDialog({discard=false},{discard=false;page="my"})
-        }}}
+        }}}}
         captureAccountScreen("my-signed-in-layout-fixture",compose)
         compose.onNodeWithText("公开到访").assertIsDisplayed()
         compose.onNodeWithText("layout@example.invalid").assertDoesNotExist()
+        compose.onNodeWithText("本人管理").performTouchInput{click()}
+        compose.onNodeWithTag("account-management-sheet").assertIsDisplayed()
+        captureAccountScreen("account-management-sheet",compose)
+        Espresso.pressBack()
+        compose.onNodeWithTag("account-management-sheet").assertDoesNotExist()
+        compose.runOnIdle { motion=false }
         compose.onNodeWithText("本人管理").performClick()
         compose.onNodeWithText("layout@example.invalid").assertIsDisplayed()
         compose.onNodeWithText("演奏").assertDoesNotExist()
@@ -61,4 +71,5 @@ class MusicAccountLayoutTest {
         assertFalse(signedOut)
         compose.onNodeWithTag("room-settings").assertIsDisplayed()
     }
+
 }
