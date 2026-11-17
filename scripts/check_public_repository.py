@@ -13,7 +13,7 @@ PUBLIC_FILES = {
     'build.gradle.kts', 'settings.gradle.kts', 'gradle.properties',
     'gradlew', 'gradlew.bat', 'services.example.properties',
 }
-PUBLIC_DOCS = {'VERSION_CONTROL.md', 'PUBLIC_ASSETS.md', 'DISK_IO_FIX_20261029.md'}
+PUBLIC_DOCS = {'VERSION_CONTROL.md', 'PUBLIC_ASSETS.md', 'DISK_IO_FIX_20261029.md', 'PROJECT_GUIDE.md'}
 PUBLIC_SCRIPTS = {
     'start-standalone-preview.ps1', 'cloud_credentials.py', 'cloud_http.py',
     'cloud_backup.py', 'cloud_sql_runtime.py', 'cloud_sql_check.py',

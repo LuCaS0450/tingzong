@@ -9,7 +9,7 @@
 - `app/`：Android 源码、测试、数据库 schema，以及许可明确的字体、地图字典和钢琴采样。
 - `supabase/`：后端函数、配置、迁移账本与测试。既有迁移记录不应直接对现有生产环境全部重放。
 - `scripts/`：当前预览入口、云端维护工具和版本管理检查。
-- `docs/`：[版本管理约定](docs/VERSION_CONTROL.md)、[公开资源与缺失素材说明](docs/PUBLIC_ASSETS.md)、当前云端维护修复说明。
+- `docs/`：[现行开发入口](docs/PROJECT_GUIDE.md)、[版本管理约定](docs/VERSION_CONTROL.md)、[公开资源与缺失素材说明](docs/PUBLIC_ASSETS.md)。
 
 封面、MV 截图、商业歌曲录音、歌曲谱面、授权未明确的美术，以及历史研究和设计资料不随公开仓库上传。源码仍可能引用这些本机路径或外部资源地址；新克隆的工程不能完整还原当前本机的画面和曲库。详见 [PUBLIC_ASSETS.md](docs/PUBLIC_ASSETS.md)。
 

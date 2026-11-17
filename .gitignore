@@ -22,6 +22,7 @@
 !/docs/VERSION_CONTROL.md
 !/docs/PUBLIC_ASSETS.md
 !/docs/DISK_IO_FIX_20261029.md
+!/docs/PROJECT_GUIDE.md
 
 /scripts/*
 !/scripts/start-standalone-preview.ps1
