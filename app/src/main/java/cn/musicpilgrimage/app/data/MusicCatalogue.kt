@@ -18,12 +18,12 @@ data class MusicRelease(
 }
 data class MusicCatalogue(val releases: List<MusicRelease>, val works: List<MusicWork>) {
     fun search(query: String): List<MusicWork> {
-        val words = musicTerm(query).split(Regex("\\s+")).filter(String::isNotEmpty)
+        val words = musicQueryWords(query)
         if (words.isEmpty()) return emptyList()
         val releaseNames = releases.associate { it.id to it.title }
         return works.filter { work ->
             val terms = (listOf(work.title, work.artist, releaseNames[work.releaseId].orEmpty()) + work.aliases).map(::musicTerm)
-            words.all { word -> terms.any { word in it } }
+            matchesMusicQuery(words, terms)
         }
     }
 
@@ -57,3 +57,11 @@ data class MusicCatalogue(val releases: List<MusicRelease>, val works: List<Musi
 
 internal fun musicTerm(value: String) = Normalizer.normalize(value, Normalizer.Form.NFKC)
     .lowercase(Locale.ROOT).replace("《", "").replace("》", "").trim()
+
+private val queryWhitespace = Regex("\\s+")
+
+internal fun musicQueryWords(query: String): List<String> =
+    musicTerm(query).split(queryWhitespace).filter(String::isNotBlank)
+
+internal fun matchesMusicQuery(words: List<String>, normalizedTerms: List<String>): Boolean =
+    words.all { word -> normalizedTerms.any { word in it } }

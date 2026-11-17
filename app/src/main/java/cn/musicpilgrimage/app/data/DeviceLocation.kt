@@ -23,13 +23,15 @@ class DeviceLocation(private val context: Context) {
         val manager = context.getSystemService(LocationManager::class.java)
         val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).filter { manager.isProviderEnabled(it) }
         require(providers.isNotEmpty()) { "请先打开手机定位服务" }
-        providers.mapNotNull { manager.getLastKnownLocation(it)?.fix() }.filter { !it.isMock && it.ageMillis <= 30_000 && it.accuracy > 0 && it.accuracy <= 100 }.minByOrNull { it.accuracy }?.let { return it }
+        providers.mapNotNull { manager.getLastKnownLocation(it)?.fix() }
+            .filter { ArrivalRules.fixRejection(it, maxAgeMillis = 30_000) == null }
+            .minByOrNull { it.accuracy }?.let { return it }
         return withTimeoutOrNull(35_000) {
             suspendCancellableCoroutine { continuation ->
                 val listener = object : LocationListener {
                     override fun onLocationChanged(location: Location) {
                         val fix = location.fix()
-                        if (continuation.isActive && !fix.isMock && fix.accuracy > 0 && fix.accuracy <= 100 && fix.ageMillis <= 120_000) {
+                        if (continuation.isActive && ArrivalRules.fixRejection(fix) == null) {
                             manager.removeUpdates(this); continuation.resume(fix)
                         }
                     }

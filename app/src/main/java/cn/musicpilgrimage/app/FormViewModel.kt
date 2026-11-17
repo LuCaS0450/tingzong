@@ -119,7 +119,7 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
   }
   val payload=RecordDraftRules.normalize(kind,fields.value,editing?.mediaId).put("location_id",target).put("scene_id",target)
   val body=payload.optString("body").trim()
-  require(body.length<=1000){"文字最多1000字"}
+  require(body.length<=RECORD_BODY_LIMIT){"文字最多${RECORD_BODY_LIMIT}字"}
   if(kind=="message")require(body.isNotBlank()){"请填写内容"}
   if(kind in listOf("new_location","correction")){
    require(payload.optString("association_type") in setOf("mv","album","song_title","lyric")){"请选择作品与地点的关联类型"}

@@ -33,6 +33,15 @@ class ArrivalAndSearchTest {
         assertNull(ArrivalRules.rejection(place, fix))
         assertNotNull(ArrivalRules.rejection(place.copy(radiusMeters = 100), fix))
     }
+    @Test fun roundedDisplayKeepsFractionalDistanceOutsideRadius() {
+        val spot = place.copy(latitude = 0.0, longitude = 0.0, radiusMeters = 200)
+        val fix = LocationFix(Math.toDegrees(200.4 / 6371008.8), 0.0, 15f, 1000, 0)
+        val assessment = ArrivalRules.assess(spot, fix)
+        assertEquals(200.4, requireNotNull(assessment.distanceMeters), .001)
+        assertNotNull(assessment.rejection)
+        assertEquals(assessment.rejection, ArrivalRules.rejection(spot, fix))
+        assertNull(ArrivalRules.assess(spot, fix.copy(ageMillis = 120001)).distanceMeters)
+    }
     @Test fun pendingPlacesCannotBeFoundOrCertified() {
         val pending=place.copy(verified=false)
         assertTrue(CatalogSearch.filter(listOf(pending),emptyList(),"").isEmpty())

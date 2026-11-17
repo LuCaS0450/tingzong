@@ -2,6 +2,8 @@ package cn.musicpilgrimage.app.data
 
 import org.json.JSONObject
 
+internal const val RECORD_BODY_LIMIT = 1000
+
 /** Only editable content participates in dirty checking. Certification dates are never edited. */
 internal object RecordDraftRules {
     fun requiresLocation(kind:String,editing:Boolean,localPhoto:Boolean)=

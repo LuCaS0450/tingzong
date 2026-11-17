@@ -35,6 +35,9 @@ class MusicCatalogueTest {
         val catalog=MusicCatalogue.from(Catalog(listOf(place("somewhere",scene("1","曲名"))),listOf(Artist("artist","歌手",listOf("Singer")))))
         assertEquals(1,catalog.search("ＳＩＮＧＥＲ").size)
         assertEquals(1,catalog.search("共同专辑").size)
+        assertEquals(1,catalog.search("ＳＩＮＧＥＲ　《曲名》").size)
+        assertTrue(catalog.search("歌手 不存在").isEmpty())
+        assertTrue(catalog.search("   ").isEmpty())
         assertTrue(catalog.search("somewhere").isEmpty())
     }
 }

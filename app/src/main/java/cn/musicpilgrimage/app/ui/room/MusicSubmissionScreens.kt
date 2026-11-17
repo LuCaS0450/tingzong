@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.FormViewModel
 import cn.musicpilgrimage.app.PersonalViewModel
 import cn.musicpilgrimage.app.data.ContentItem
+import cn.musicpilgrimage.app.data.RECORD_BODY_LIMIT
 import cn.musicpilgrimage.app.data.associationLabel
 import cn.musicpilgrimage.app.data.stringOrNull
 import cn.musicpilgrimage.app.ui.PrivatePhoto
@@ -124,9 +125,9 @@ import org.json.JSONObject
                 SubmissionField("source_url","可核实的来源链接",fields,vm,!busy)
                 SubmissionField("association_excerpt",if(fields.optString("association_type")=="lyric")"提到地点的短歌词" else "歌名或地点关联说明",fields,vm,!busy)
                 SubmissionField("canonical_work_url","原作或正式发行封面链接（可选）",fields,vm,!busy)
-                OutlinedTextField(fields.optString("body"),{vm.set("body",it.take(1000))},Modifier.fillMaxWidth(),
+                OutlinedTextField(fields.optString("body"),{vm.set("body",it.take(RECORD_BODY_LIMIT))},Modifier.fillMaxWidth(),
                     label={Text("投稿说明与核实依据")},minLines=4,enabled=!busy,shape=RectangleShape,
-                    supportingText={Text("${fields.optString("body").length}/1000")})
+                    supportingText={Text("${fields.optString("body").length}/$RECORD_BODY_LIMIT")})
             }
             Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 SwissNumberedHeading("03","图片")
