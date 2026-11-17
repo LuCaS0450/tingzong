@@ -2,6 +2,7 @@ package cn.musicpilgrimage.app.ui
 
 import android.net.Uri
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
@@ -316,6 +317,11 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
     if(savedNotice===notice)savedNotice=null
    }
    val music:MusicSpaceViewModel=viewModel()
+   LaunchedEffect(music,context) {
+    music.favoriteFailures.collect {
+     Toast.makeText(context,"收藏没有更新，请再试一次",Toast.LENGTH_SHORT).show()
+    }
+   }
    val archive:MusicArchiveViewModel=viewModel()
    val trips:MusicTripViewModel=viewModel()
    val storedTrips by trips.state.collectAsStateWithLifecycle()
@@ -649,7 +655,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
             Spacer(Modifier.height(24.dp));Text(song.title,color=SwissInk,style=MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(12.dp))
             val status=performanceLibraryUi.downloads[song.id]
-            Text(status?.label?:"正在后台准备音乐",color=RoomColors.Muted)
+            Text(status?.label?:"音乐准备中",color=RoomColors.Muted)
             Spacer(Modifier.height(16.dp));Text("准备好后直接进入演奏",color=RoomColors.Muted,style=MaterialTheme.typography.bodySmall)
             if(status?.failed==true)TextButton({performanceLibrary.prepareAll(retry=true)}){Text("重试",color=SwissRed)}
             else LinearProgressIndicator(progress={status?.progress?:0f},modifier=Modifier.fillMaxWidth().padding(top=24.dp),color=SwissRed)
@@ -672,7 +678,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
       RoomArchive(initialKind,music={selection->
        RoomMusicFavorites(musicCatalog,musicFavorites,selection,{navigate("song/${Uri.encode(it.id)}")},openRelease,
         {id,release->placeUndo?.let{archive.dismissUndo(it.token)};music.removeFavorite(id,release)},
-        {chooseModule("catalogue")},music.librarySync.collectAsStateWithLifecycle().value,music::syncLibrary)
+        {chooseModule("catalogue")})
       },places={
        RoomPlaceFavorites(archiveState,places,openPlace,{id->musicUndo?.let{music.dismissUndo(it.token)};archive.removePlace(id)},login,archive::reload)
       },footprints={

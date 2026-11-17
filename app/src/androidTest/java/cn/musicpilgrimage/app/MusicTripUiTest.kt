@@ -84,7 +84,11 @@ class MusicTripUiTest {
             delete.assertIsDisplayed()
         }
         delete.assertDoesNotExist()
+        compose.onNodeWithText("左滑行程可删除").assertDoesNotExist()
+        compose.onNodeWithText("同步", substring = false).assertDoesNotExist()
+        capture("trip-cards")
         reveal()
+        capture("trip-card-swiped")
         assertNull(opened)
         delete.performClick()
         compose.onNodeWithText("删除行程？").assertIsDisplayed()

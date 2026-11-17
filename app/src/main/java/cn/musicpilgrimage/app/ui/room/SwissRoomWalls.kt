@@ -281,7 +281,7 @@ internal val SwissWallTabsHeight=69.dp
                             letterSpacing=(-.2).sp,maxLines=2,overflow=TextOverflow.Ellipsis)
                         Text(entry.song.artist,color=SwissWallMuted,fontSize=12.sp)
                         val duration="${entry.song.durationUs/60_000_000}:${(entry.song.durationUs/1_000_000%60).toString().padStart(2,'0')}"
-                        Text(if(entry.audioReady)"$duration · 离线就绪" else status?.label?:"$duration · 等待自动准备",color=if(status?.failed==true)SwissRed else SwissWallMuted,fontSize=11.sp,letterSpacing=.15.sp,maxLines=1)
+                        Text(if(entry.audioReady)"$duration · 可离线演奏" else status?.label?:"$duration · 音乐准备中",color=if(status?.failed==true)SwissRed else SwissWallMuted,fontSize=11.sp,letterSpacing=.15.sp,maxLines=1)
                     }
                     Icon(Icons.Outlined.PlayArrow,"演奏${entry.song.title}",Modifier.size(22.dp),tint=SwissInk)
                 }

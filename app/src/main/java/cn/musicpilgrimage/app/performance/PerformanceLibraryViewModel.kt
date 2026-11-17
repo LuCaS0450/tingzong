@@ -53,9 +53,8 @@ internal class PerformanceLibraryViewModel(application:Application):AndroidViewM
                     val work=matching.firstOrNull{!it.state.isFinished}?:matching.lastOrNull()
                     val status=when(work?.state) {
                         WorkInfo.State.RUNNING->AudioDownloadState("正在准备 ${(work.progress.getFloat("fraction",0f)*100).toInt()}%",work.progress.getFloat("fraction",0f))
-                        WorkInfo.State.FAILED->AudioDownloadState(work.outputData.getString("message")?:"准备失败，点此重试",failed=true)
-                        WorkInfo.State.ENQUEUED,WorkInfo.State.BLOCKED->AudioDownloadState(if(work.runAttemptCount>0)"等待网络，连接后自动继续"else "等待后台准备")
-                        else->AudioDownloadState("等待自动准备")
+                        WorkInfo.State.FAILED->AudioDownloadState("这首歌还没准备好",failed=true)
+                        else->AudioDownloadState("音乐准备中")
                     }
                     entry.song.id to status
                 }
@@ -105,7 +104,10 @@ internal class PerformanceLibraryViewModel(application:Application):AndroidViewM
                 load()
                 mutable.value=mutable.value.copy(notice="音源已就绪",importing=null)
             } catch(cancel:CancellationException){throw cancel}
-            catch(error:Exception){mutable.value=mutable.value.copy(importing=null,error=error.message ?: "音源导入失败，请重试")}
+            catch (error: Exception) {
+                android.util.Log.w("PerformanceLibrary", "Unable to import the music", error)
+                mutable.value = mutable.value.copy(importing = null, error = "这份音乐无法导入，请重新选择文件")
+            }
         }
     }
     fun dismissNotice(){mutable.value=mutable.value.copy(notice=null,error=null)}

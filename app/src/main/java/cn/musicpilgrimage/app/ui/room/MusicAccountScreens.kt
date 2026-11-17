@@ -348,7 +348,7 @@ import org.json.JSONObject
                     AccountParagraph("草稿按账号保存在本机。断网不会自动发布，现场提交会重新获取定位。卸载应用会删除本机草稿。")
                 }
                 AccountSection("02","图片上传") {
-                    AccountParagraph("上传前会优化图片并清除位置元数据。")
+                    AccountParagraph("上传前会调整照片大小，并移除照片里的拍摄地点信息。")
                 }
             }
             "about"->{

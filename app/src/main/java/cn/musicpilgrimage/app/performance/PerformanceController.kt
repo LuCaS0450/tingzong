@@ -101,7 +101,8 @@ internal class PerformanceController(application:Application,val song:SongPackag
             } catch(cancel:CancellationException) {throw cancel}
             catch(error:Exception) {
                 piano?.close();piano=null
-                mutableUi.value=PerformanceUi(PlayState.FAILED,message=error.message ?: "音乐暂时无法载入")
+                android.util.Log.w("PerformancePlayback", "Unable to load the song", error)
+                mutableUi.value=PerformanceUi(PlayState.FAILED,message="这首歌暂时无法播放，请再试一次")
             } finally {loaded?.close()}
         }
     }

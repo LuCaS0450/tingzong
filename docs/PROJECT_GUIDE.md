@@ -17,7 +17,7 @@
 - 页面层级、纸面和配色使用 `RoomHeader`、`RoomPaper`、`RoomColors`。主次操作已有 `SwissButton`、`SwissOutlinedButton`、`SwissTextButton`。点击目标可以大于可见底板，单独的图标按钮提供读屏名称。[应用主题](../app/src/main/java/cn/musicpilgrimage/app/ui/Design.kt) · [页面与配色](../app/src/main/java/cn/musicpilgrimage/app/ui/room/MusicRoomDesign.kt) · [按钮](../app/src/main/java/cn/musicpilgrimage/app/ui/room/SwissButtons.kt)
 - 下滑面板使用 `AppBottomSheet`，双操作确认使用 `AppConfirmation`。需要输入时通过 `details` 放入输入框，使用 `confirmEnabled` 控制提交。允许重试的异步确认传入 `busy`、等待文案和就地错误。自定义选择列表使用 `AppCenterConfirmDialog`。[面板和确认框](../app/src/main/java/cn/musicpilgrimage/app/ui/AppBottomSheet.kt)
 - 社区删除确认后立即关框。确定请求尚未发送的连接失败由数据层自动重试一次，最终仍无法确认时由当前页提示。[删除请求](../app/src/main/java/cn/musicpilgrimage/app/data/ContentDeletionRetry.kt)
-- 保存成功、收藏撤销和同步失败沿用对应通知。反馈用能让用户理解或重试的文案，省略缺失的选填信息。动效随减少动态设置调整。[保存反馈](../app/src/main/java/cn/musicpilgrimage/app/ui/AppBottomSheet.kt) · [撤销提示](../app/src/main/java/cn/musicpilgrimage/app/ui/room/MusicArchiveScreens.kt) · [同步状态](../app/src/main/java/cn/musicpilgrimage/app/ui/room/MusicLibrarySyncStatus.kt)
+- 收藏与行程自动同步。后台状态和排查信息由数据层处理。主动操作的反馈说明结果及必要的下一步，省略缺失的选填信息。动效随减少动态设置调整。[保存反馈](../app/src/main/java/cn/musicpilgrimage/app/ui/AppBottomSheet.kt) · [撤销提示](../app/src/main/java/cn/musicpilgrimage/app/ui/room/MusicArchiveScreens.kt) · [后台资料同步](../app/src/main/java/cn/musicpilgrimage/app/data/PersonalLibrarySync.kt)
 - 档案大图统一使用 `AppPhotoViewer`，页面返回时恢复原浏览位置。世界的图钉保留可访问名称，地点名称在选择后的摘要或档案显示。[大图查看器](../app/src/main/java/cn/musicpilgrimage/app/ui/AppPhotoViewer.kt) · [世界地图约定](../AGENTS.md)
 
 ## 按改动选验证

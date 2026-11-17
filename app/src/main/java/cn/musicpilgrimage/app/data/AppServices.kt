@@ -88,7 +88,7 @@ class AppServices(context:Context) {
  ): Any = withContext(Dispatchers.IO) {
   check(client!=null) { "尚未配置在线服务，仍可浏览官方目录" }
   client.auth.awaitInitialization()
-  require(userId.value==expectedOwner) { "账号已切换，请重新打开页面" }
+  requireUserAction(userId.value==expectedOwner) { "账号已切换，请重新打开页面" }
   val session=client.auth.currentSessionOrNull()
   val requestToken=AuthRequestScope(session?.user?.id,session?.accessToken).authorization(expectedOwner,userId.value)
   val libraryRpc=when(action){"library_state"->"personal_library_state";"library_sync"->"personal_library_sync";else->null}
@@ -112,7 +112,7 @@ class AppServices(context:Context) {
   }
   response.use {
     val body=runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrElse { throw ApiException(response.code,"在线服务暂不可用") }
-    require(userId.value==expectedOwner) { "账号已切换，请重新打开页面" }
+    requireUserAction(userId.value==expectedOwner) { "账号已切换，请重新打开页面" }
     if(!response.isSuccessful) {
      if(libraryRpc!=null)throw ApiException(if(body.optString("code")=="PGRST202")503 else response.code,
       if(body.optString("code")=="P0001")body.optString("message","同步尚未完成，本机更改已保留。")else "同步服务暂不可用，本机更改已保留。",body.optString("code","unknown"))
@@ -131,13 +131,13 @@ class AppServices(context:Context) {
  }
  suspend fun signIn(email:String,password:String) {
   authMutation.withLock {
-  require(email.contains('@')) { "请输入正确的邮箱" };require(password.length>=10) { "密码至少10位" }
+  requireUserAction(email.contains('@')) { "请输入正确的邮箱" };requireUserAction(password.length>=10) { "密码至少10位" }
   requireNotNull(client) { "在线服务尚未配置" }.auth.signInWith(Email) { this.email=email.trim();this.password=password };changed.update { it+1 }
   }
  }
  suspend fun sendEmailCode(email:String,register:Boolean) {
   authMutation.withLock {
-  require(EmailOtpController.validEmail(email)){"请输入完整邮箱"}
+  requireUserAction(EmailOtpController.validEmail(email)){"请输入完整邮箱"}
   val auth=requireNotNull(client){"在线服务尚未配置"}.auth
   if(register) {
    val cfg=call("config") as JSONObject
@@ -152,7 +152,7 @@ class AppServices(context:Context) {
  }
  suspend fun verifyEmailCode(email:String,code:String) {
   authMutation.withLock {
-  require(EmailOtpController.validEmail(email)&&EmailOtpController.validCode(code)){"请输入邮箱和完整验证码"}
+  requireUserAction(EmailOtpController.validEmail(email)&&EmailOtpController.validCode(code)){"请输入邮箱和完整验证码"}
   try {requireNotNull(client).auth.verifyEmailOtp(type=OtpType.Email.EMAIL,email=EmailOtpController.normalized(email),token=code)}
   catch(e:AuthRestException){throw emailOtpError(e,true)}
   changed.update{it+1}
@@ -170,33 +170,33 @@ class AppServices(context:Context) {
  fun accountAvatar(owner:String?=userId.value)=(client?.auth?.currentUserOrNull()?.takeIf{it.id==owner}?.userMetadata?.get("music_space_avatar") as? JsonPrimitive)?.contentOrNull
  suspend fun updateAccountAvatar(value:String?,owner:String) {
   authMutation.withLock {
-  require(userId.value==owner&&client?.auth?.currentUserOrNull()?.id==owner){"账号已切换，请重新打开页面"}
-  require(value==null || value.startsWith("data:image/jpeg;base64,")&&value.length<=32_000){"头像无法保存，请重新选择"}
+  requireUserAction(userId.value==owner&&client?.auth?.currentUserOrNull()?.id==owner){"账号已切换，请重新打开页面"}
+  requireUserAction(value==null || value.startsWith("data:image/jpeg;base64,")&&value.length<=32_000){"头像无法保存，请重新选择"}
   requireNotNull(client).auth.updateUser {data=buildJsonObject{put("music_space_avatar",value?.let(::JsonPrimitive)?:JsonNull)}}
-  require(userId.value==owner&&client.auth.currentUserOrNull()?.id==owner){"账号已切换，请重新打开页面"}
+  requireUserAction(userId.value==owner&&client.auth.currentUserOrNull()?.id==owner){"账号已切换，请重新打开页面"}
   }
  }
  suspend fun signUp(email:String,password:String) {
   authMutation.withLock {
   val cfg=call("config") as JSONObject
-  require(cfg.optBoolean("registration_enabled")) { "新用户注册暂时关闭" }
-  require(email.contains('@') && password.length in 10..128) { "请输入正确邮箱，密码需10–128位" }
+  requireUserAction(cfg.optBoolean("registration_enabled")) { "新用户注册暂时关闭" }
+  requireUserAction(email.contains('@') && password.length in 10..128) { "请输入正确邮箱，密码需10–128位" }
   client!!.auth.signUpWith(Email,redirectUrl="musicpilgrimage://auth/callback") { this.email=email.trim();this.password=password }
   }
  }
  suspend fun resend(email:String) { requireNotNull(client).auth.resendEmail(OtpType.Email.SIGNUP,email.trim()) }
- suspend fun reset(email:String) { require(email.contains('@')) { "请输入邮箱" };requireNotNull(client).auth.resetPasswordForEmail(email.trim(),redirectUrl="musicpilgrimage://auth/callback?mode=recovery") }
+ suspend fun reset(email:String) { requireUserAction(email.contains('@')) { "请输入邮箱" };requireNotNull(client).auth.resetPasswordForEmail(email.trim(),redirectUrl="musicpilgrimage://auth/callback?mode=recovery") }
  suspend fun newPassword(password:String) {
   authMutation.withLock {
-  require(password.length in 10..128) { "密码需10–128位" }
+  requireUserAction(password.length in 10..128) { "密码需10–128位" }
   requireNotNull(client).auth.updateUser { this.password=password };recovery.value=false
   }
  }
  suspend fun callback(uri:Uri) {
   authMutation.withLock {
-  require(uri.scheme=="musicpilgrimage" && uri.host=="auth" && uri.path=="/callback") { "无效认证链接" }
-  uri.getQueryParameter("error_description")?.let { throw IllegalArgumentException("验证链接已失效，请重新发送") }
-  val code=uri.getQueryParameter("code") ?: error("验证链接不完整，请重新发送")
+  requireUserAction(uri.scheme=="musicpilgrimage" && uri.host=="auth" && uri.path=="/callback") { "无效认证链接" }
+  uri.getQueryParameter("error_description")?.let { throw UserActionException("验证链接已失效，请重新发送") }
+  val code=uri.getQueryParameter("code") ?: throw UserActionException("验证链接不完整，请重新发送")
   requireNotNull(client).auth.exchangeCodeForSession(code)
   recovery.value=uri.getQueryParameter("mode")=="recovery";changed.update { it+1 }
   }
@@ -216,7 +216,7 @@ class AppServices(context:Context) {
  }
  suspend fun upload(path:String,requestId:String,expectedOwner:String?=userId.value):String {
   val file=File(path).canonicalFile
-  require(file.parentFile==File(app.filesDir,"photos").canonicalFile && file.length() in 4..409600) { "草稿照片不存在或过大，请重新选择" }
+  requireUserAction(file.parentFile==File(app.filesDir,"photos").canonicalFile && file.length() in 4..409600) { "草稿照片不存在或过大，请重新选择" }
   val data=withContext(Dispatchers.IO) { Base64.encodeToString(file.readBytes(),Base64.NO_WRAP) }
   return (call("upload",JSONObject().put("request_id",requestId).put("base64",data),expectedOwner) as JSONObject).getString("id")
  }

@@ -73,7 +73,7 @@ internal fun NativeTripArchive(
                         item("itinerary") {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 SwissEyebrow("JOURNEY / MUSIC & PLACES")
-                                Text(trip.name, Modifier.testTag("trip-archive-title"), color = RoomColors.Ink,
+                                Text(trip.displayName, Modifier.testTag("trip-archive-title"), color = RoomColors.Ink,
                                     fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.Medium)
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text("${trip.start} — ${trip.end}", color = RoomColors.Muted, fontSize = 13.sp)

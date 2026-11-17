@@ -27,13 +27,29 @@ open class FeatureViewModel(app:Application):AndroidViewModel(app) {
  fun clearError() { error.value=null }
  fun mutation(action:String,p:JSONObject=JSONObject(),done:()->Unit={}) = work { repositories.content.save(action,p);done() }
  companion object {
-  fun friendlyError(e:Exception):String = when {
-   e is ApiException || e is IllegalArgumentException || e is IllegalStateException -> e.message ?: "操作未完成，请重试"
-   e is java.io.IOException -> "网络连接失败，请检查网络后手动重试"
-   e.message.orEmpty().contains("Email not confirmed",true) -> "邮箱尚未验证，请打开验证邮件后登录"
-   e.message.orEmpty().contains("Invalid login credentials",true) -> "邮箱或密码不正确"
-   e.message.orEmpty().contains("rate",true) -> "请求较频繁，请稍后重试"
-   else -> "操作未完成，请检查网络、账号状态后重试"
+  fun friendlyError(e: Exception): String {
+   if (e is UserActionException) return e.message ?: "操作未完成，请再试一次"
+   if (BuildConfig.DEBUG) android.util.Log.w("PilgrimageAction", "Action failed", e)
+   val message = e.message.orEmpty()
+   return when {
+    e is ApiException -> when {
+     e.code == 401 -> "登录已失效，请重新登录"
+     e.code == 429 -> "操作太频繁，请稍后再试"
+     e.reason == "duplicate_content" -> "这条内容已经发布，可在记录里编辑"
+     e.reason == "image_limit" -> "照片数量已达上限，请先删除不需要的照片"
+     e.reason == "storage_limit" -> "照片空间已用完，请先删除不需要的照片"
+     e.reason == "media_retry" -> "照片还没保存，请再试一次"
+     e.reason == "account_disabled" -> "这个账号暂时无法使用"
+     e.reason == "content_hidden" -> "这条内容已隐藏"
+     e.reason == "deletion_retry" -> "注销还没完成，请稍后再试"
+     else -> "操作未完成，请稍后再试"
+    }
+    e is java.io.IOException -> "网络连接不稳，请稍后再试"
+    message.contains("Email not confirmed", true) -> "邮箱尚未验证，请打开验证邮件后登录"
+    message.contains("Invalid login credentials", true) -> "邮箱或密码不正确"
+    message.contains("rate limit", true) -> "操作太频繁，请稍后再试"
+    else -> "操作未完成，请再试一次"
+   }
   }
  }
 }

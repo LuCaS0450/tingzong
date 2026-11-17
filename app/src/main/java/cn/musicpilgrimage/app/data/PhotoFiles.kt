@@ -32,12 +32,12 @@ class PhotoFiles(private val context: Context) {
                 requireNotNull(input) { "无法读取这张照片，请重新选择" }
                 temporary.outputStream().use { output ->
                     val buffer = ByteArray(8192); var size = 0L
-                    while (true) { val n = input.read(buffer); if (n < 0) break; size += n; require(size <= 25L * 1024 * 1024) { "照片过大，请选择小于 25 MB 的图片" }; output.write(buffer, 0, n) }
+                    while (true) { val n = input.read(buffer); if (n < 0) break; size += n; requireUserAction(size <= 25L * 1024 * 1024) { "照片过大，请选择小于 25 MB 的图片" }; output.write(buffer, 0, n) }
                 }
             }
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(temporary.path, bounds)
-            require(bounds.outWidth > 0 && bounds.outHeight > 0) { "无法识别图片格式" }
+            requireUserAction(bounds.outWidth > 0 && bounds.outHeight > 0) { "无法识别图片格式" }
             val options = BitmapFactory.Options().apply { inSampleSize = 1 }
             while (maxOf(bounds.outWidth, bounds.outHeight) / options.inSampleSize > 3200) options.inSampleSize *= 2
             var bitmap = requireNotNull(BitmapFactory.decodeFile(temporary.path, options)) { "无法打开照片" }

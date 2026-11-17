@@ -76,13 +76,15 @@ import kotlinx.coroutines.delay
     }
 }
 
-@Composable internal fun RoomMusicFavorites(catalog:MusicCatalogue,favorites:MusicFavorites,kind:String,onWork:(MusicWork)->Unit,onRelease:(MusicRelease)->Unit,onRemove:(String,Boolean)->Unit,onDiscover:()->Unit,sync:PersonalLibrarySyncState,onSync:()->Unit) {
+@Composable internal fun RoomMusicFavorites(catalog:MusicCatalogue,favorites:MusicFavorites,kind:String,onWork:(MusicWork)->Unit,onRelease:(MusicRelease)->Unit,onRemove:(String,Boolean)->Unit,onDiscover:()->Unit) {
     val release=kind=="releases"
     val ids=if(release)favorites.releases else favorites.songs
     val motion=LocalPhysicalMotion.current
     Column(Modifier.fillMaxSize().testTag("room-music-favorites")) {
-        RoomLibrarySyncStatus(sync.takeIf{it.owner==favorites.owner}?:PersonalLibrarySyncState(),onSync,
-            Modifier.padding(horizontal=31.dp),caption="${ids.size} 项收藏".takeIf{ids.isNotEmpty()})
+        if (ids.isNotEmpty()) Text(
+            "${ids.size} 项收藏", Modifier.padding(start = 31.dp, end = 31.dp, bottom = 6.dp),
+            fontSize = 13.sp, color = RoomColors.Muted,
+        )
         RoomDrawerFrame(Modifier.weight(1f)) {
             LazyColumn(Modifier.fillMaxSize().testTag("archive-music-list"),contentPadding=PaddingValues(7.dp,12.dp,7.dp,88.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                 if(ids.isEmpty())item(key="empty"){Column(Modifier.padding(vertical=18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){Text(if(release)"还没有收藏专辑"else "还没有收藏歌曲",color=RoomColors.Ink);SwissOutlinedButton(onDiscover,shape=androidx.compose.ui.graphics.RectangleShape){Text("浏览唱片架")}}}

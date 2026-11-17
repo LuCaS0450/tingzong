@@ -7,8 +7,18 @@ import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import java.time.LocalDate
+import java.util.UUID
 
 class MusicTripTest {
+    @Test fun generatedCopyUsesPlainTitleWhileKeepingItsStoredName() {
+        val name = "巴黎周末（同步副本）"
+        val id = UUID.nameUUIDFromBytes("trip-copy".toByteArray()).toString()
+        val trip = plan().copy(id = id, name = name)
+        assertEquals("巴黎周末（副本）", trip.displayName)
+        assertEquals(trip, MusicTripCodec.decode(MusicTripCodec.encode(listOf(trip))).single())
+        assertEquals(name, trip.copy(id = UUID.randomUUID().toString()).displayName)
+    }
+
     @Test fun hongKongSearchOffersOneDestinationAndKeepsOtherCityAndCountryChoices() {
         val hongKong=MusicTripCity("香港","中国香港")
         val lantau=MusicTripCity("香港 · 大屿山","中国香港")

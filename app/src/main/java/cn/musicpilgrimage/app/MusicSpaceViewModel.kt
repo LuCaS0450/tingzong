@@ -2,6 +2,7 @@ package cn.musicpilgrimage.app
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import cn.musicpilgrimage.app.data.MusicCatalogue
@@ -17,8 +18,8 @@ data class MusicFavoriteUndo(val token: Long, val label: String)
 class MusicSpaceViewModel(private val app: Application) : AndroidViewModel(app) {
     private val services = (app as PilgrimageApplication).services
     private val store = services.library.favorites
-    internal val librarySync=services.library.state
-    fun syncLibrary()=services.library.retry()
+    private val favoriteFailureEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    internal val favoriteFailures = favoriteFailureEvents.asSharedFlow()
     private fun ownerKey() = services.userId.value?.let { "user:$it" } ?: LibraryDatabase.guestOwner(app)
     private fun readFavorites() = store.read(ownerKey())
     private val contextPreferences=app.getSharedPreferences("music-space-context",Context.MODE_PRIVATE)
@@ -48,24 +49,29 @@ class MusicSpaceViewModel(private val app: Application) : AndroidViewModel(app) 
         val owner=ownerKey()
         val current = readFavorites()
         val selected = if (release) current.releases else current.songs
-        try {if(id in selected)store.remove(owner,id,release) else store.add(owner,id,release)}catch(e:Exception){services.library.localFailure(e.message?:"收藏尚未保存，请重试");return}
+        try {if(id in selected)store.remove(owner,id,release) else store.add(owner,id,release)}catch(e:Exception){reportFavoriteFailure(e);return}
         removed=null;undoState.value=null
         favoriteState.value=readFavorites()
     }
     fun removeFavorite(id:String,release:Boolean) {
         val owner=ownerKey()
-        val removal=try{store.remove(owner,id,release)}catch(e:Exception){services.library.localFailure(e.message?:"收藏尚未保存，请重试");return} ?: return
+        val removal=try{store.remove(owner,id,release)}catch(e:Exception){reportFavoriteFailure(e);return} ?: return
         removed=removal
         favoriteState.value=readFavorites()
         undoState.value=MusicFavoriteUndo(++sequence,if(release)"已取消专辑收藏" else "已取消歌曲收藏")
     }
     fun undoRemoval(token:Long) {
         if(undoState.value?.token!=token)return
-        try{removed?.let{store.undo(ownerKey(),it)}}catch(e:Exception){services.library.localFailure(e.message?:"收藏尚未保存，请重试");return}
+        try{removed?.let{store.undo(ownerKey(),it)}}catch(e:Exception){reportFavoriteFailure(e);return}
         favoriteState.value=readFavorites()
         dismissUndo(token)
     }
     fun dismissUndo(token:Long) {
         if(undoState.value?.token==token){undoState.value=null;removed=null}
+    }
+
+    private fun reportFavoriteFailure(error: Exception) {
+        Log.w("MusicFavorites", "Unable to save the change", error)
+        favoriteFailureEvents.tryEmit(Unit)
     }
 }

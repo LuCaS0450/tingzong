@@ -19,10 +19,10 @@ class DeviceLocation(private val context: Context) {
     private fun Location.fix() = LocationFix(latitude, longitude, accuracy, time, ((SystemClock.elapsedRealtimeNanos() - elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0), isFromMockProvider)
     @SuppressLint("MissingPermission")
     suspend fun locate(): LocationFix {
-        require(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) { "请允许精确位置权限，才能验证到场" }
+        requireUserAction(ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) { "请允许精确位置权限，才能验证到场" }
         val manager = context.getSystemService(LocationManager::class.java)
         val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).filter { manager.isProviderEnabled(it) }
-        require(providers.isNotEmpty()) { "请先打开手机定位服务" }
+        requireUserAction(providers.isNotEmpty()) { "请先打开手机定位服务" }
         providers.mapNotNull { manager.getLastKnownLocation(it)?.fix() }
             .filter { ArrivalRules.fixRejection(it, maxAgeMillis = 30_000) == null }
             .minByOrNull { it.accuracy }?.let { return it }
@@ -43,6 +43,6 @@ class DeviceLocation(private val context: Context) {
                 continuation.invokeOnCancellation { manager.removeUpdates(listener) }
                 providers.forEach { manager.requestLocationUpdates(it, 1000, 0f, listener, Looper.getMainLooper()) }
             }
-        } ?: throw IllegalStateException("暂时无法取得足够精确的位置，请到开阔处重试")
+        } ?: throw UserActionException("暂时无法确定你的位置，请到开阔处再试一次")
     }
 }

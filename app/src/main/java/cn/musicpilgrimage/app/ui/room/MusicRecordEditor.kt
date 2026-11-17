@@ -94,7 +94,10 @@ internal fun roomRecordTitle(kind:String)=when(kind){"message"->"地点留言";"
                 else->"距离这里约 ${distance} 米 · 还需靠近一些"
             }
         } catch(cancel:CancellationException){throw cancel}
-        catch(error:Exception){locationStatus=error.message?:"暂时无法定位，请稍后再试"}
+        catch (error: Exception) {
+            if (error !is UserActionException) android.util.Log.w("RecordLocation", "Unable to find the location", error)
+            locationStatus = (error as? UserActionException)?.message ?: "暂时无法确定你的位置，请再试一次"
+        }
         finally {locating=false}
     }}}
     val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){result->

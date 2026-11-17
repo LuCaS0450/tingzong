@@ -15,7 +15,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 internal enum class LibrarySyncStatus { LOCAL, WAITING, SYNCING, SYNCED, ERROR }
-internal data class PersonalLibrarySyncState(val owner:String="",val status:LibrarySyncStatus=LibrarySyncStatus.LOCAL,val notice:String?=null,val error:String?=null)
+internal data class PersonalLibrarySyncState(val owner:String="",val status:LibrarySyncStatus=LibrarySyncStatus.LOCAL,val error:String?=null)
 
 /** One durable network-constrained worker per signed-in account. Guest caches never enter it. */
 internal class PersonalLibrarySync(private val context:Context,private val services:AppServices) {
@@ -67,7 +67,7 @@ internal class PersonalLibrarySync(private val context:Context,private val servi
         services.scope.launch {
             val id=services.userId.value?:return@launch
             if(!services.authReady.value||id in deleting||expected!=null&&expected!="user:$id")return@launch
-            mutableState.update{PersonalLibrarySyncState("user:$id",LibrarySyncStatus.WAITING,it.takeIf{row->row.owner=="user:$id"}?.notice)}
+            mutableState.value = PersonalLibrarySyncState("user:$id", LibrarySyncStatus.WAITING)
             val task=OneTimeWorkRequestBuilder<PersonalLibraryWorker>()
                 .setInputData(workDataOf("owner" to id))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
@@ -81,11 +81,12 @@ internal class PersonalLibrarySync(private val context:Context,private val servi
     suspend fun synchronize(id:String):LibrarySyncResult=mutex.withLock {
         fun current()=services.authReady.value&&services.userId.value==id&&id !in deleting
         if(!current())throw LibraryOwnerChanged()
-        mutableState.update{PersonalLibrarySyncState("user:$id",LibrarySyncStatus.SYNCING,it.notice)}
+        mutableState.value = PersonalLibrarySyncState("user:$id", LibrarySyncStatus.SYNCING)
         try {
             val result=withContext(Dispatchers.IO){engine.synchronize(id,::current)}
-            if(current())mutableState.update{PersonalLibrarySyncState("user:$id",if(result.pending)LibrarySyncStatus.WAITING else LibrarySyncStatus.SYNCED,
-                if(result.copies>0)"另一设备也修改了行程，两个版本已分别保留。"else it.notice)}
+            if(current())mutableState.value = PersonalLibrarySyncState(
+                "user:$id", if(result.pending) LibrarySyncStatus.WAITING else LibrarySyncStatus.SYNCED,
+            )
             result
         } catch(e:CancellationException) {
             if(current())mutableState.update{it.copy(status=LibrarySyncStatus.WAITING,error=null)}
@@ -100,7 +101,6 @@ internal class PersonalLibrarySync(private val context:Context,private val servi
             throw e
         }
     }
-    fun localFailure(message:String){mutableState.update{it.copy(owner=services.userId.value?.let{id->"user:$id"}?:cn.musicpilgrimage.app.performance.LibraryDatabase.guestOwner(context),status=LibrarySyncStatus.ERROR,error=message)}}
     fun clearAccount(id:String) {
         deleting+=id;manager.cancelUniqueWork(workName(id))
         favorites.clear("user:$id");trips.clear("user:$id")

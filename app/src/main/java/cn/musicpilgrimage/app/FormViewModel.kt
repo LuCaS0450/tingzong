@@ -24,8 +24,8 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
   if(initialized.value || key.isNotEmpty())return
   owner=services.userId.value.orEmpty();kind=type;target=id;editing=item;key="$type:$id:${item?.id.orEmpty()}"
   work {
-   require(type in setOf("message","visit","recreation","new_location","correction")){"此记录类型已下线"}
-   require(owner.isNotBlank()){"请先登录"}
+   requireUserAction(type in setOf("message","visit","recreation","new_location","correction")){"暂时无法打开这条记录"}
+   requireUserAction(owner.isNotBlank()){"请先登录"}
    val saved=services.drafts.read(owner,key)
    cleanSignature=RecordDraftRules.signature(type,item?.raw?:JSONObject(),item?.mediaId)
    fields.value=if(saved.length()>0)saved else JSONObject(item?.raw?.toString()?:"{}").apply{
@@ -61,7 +61,7 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
  }
  fun hasChanges()=initialized.value&&RecordDraftRules.signature(kind,fields.value,editing?.mediaId)!=cleanSignature
  fun discard(done:()->Unit)=work {
-  require(services.userId.value==owner&&owner.isNotBlank()){"账号已切换，请重新打开草稿"}
+  requireUserAction(services.userId.value==owner&&owner.isNotBlank()){"账号已切换，请重新打开草稿"}
   saveJob?.join()
   val draft=fields.value
   val pending=buildSet {
@@ -77,11 +77,11 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
  }
  fun photo(uri:Uri,finished:()->Unit={})=work {
   try {
-  require(services.userId.value==owner && owner.isNotBlank()){"账号已切换，请重新打开草稿"}
+  requireUserAction(services.userId.value==owner && owner.isNotBlank()){"账号已切换，请重新打开草稿"}
   val paths=withContext(Dispatchers.IO){services.photos.import(uri,services.photos.draftId(owner))}
   if(services.userId.value!=owner) {
    services.photos.delete(paths.first);services.photos.delete(paths.second)
-   error("账号已切换，请重新打开草稿")
+   throw UserActionException("账号已切换，请重新打开草稿")
   }
   val previousPhoto=fields.value.stringOrNull("local_photo")
   val previousThumbnail=fields.value.stringOrNull("thumbnail")
@@ -101,7 +101,7 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
   draft.remove("uploaded_media");return draft
  }
  fun removePhoto()=work {
-  require(services.userId.value==owner && owner.isNotBlank()){"账号已切换，请重新打开草稿"}
+  requireUserAction(services.userId.value==owner && owner.isNotBlank()){"账号已切换，请重新打开草稿"}
   val previousPhoto=fields.value.stringOrNull("local_photo")
   val previousThumbnail=fields.value.stringOrNull("thumbnail")
   val next=RecordDraftRules.normalize(kind,retireUploadedPhoto(fields.value).apply{remove("local_photo");remove("thumbnail");put("clear_media",true)},editing?.mediaId)
@@ -109,7 +109,7 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
   services.photos.delete(previousPhoto);services.photos.delete(previousThumbnail)
  }
  fun submit(done:()->Unit)=work {
-  require(services.userId.value==owner && owner.isNotBlank()){"账号已切换，请重新打开草稿"}
+  requireUserAction(services.userId.value==owner && owner.isNotBlank()){"账号已切换，请重新打开草稿"}
   // Only an explicit submit retries cleanup. There is no background publication queue.
   val cancel=fields.value.optJSONArray("cancel_media")
   if(cancel!=null) {
@@ -119,22 +119,23 @@ class FormViewModel(app:Application):FeatureViewModel(app) {
   }
   val payload=RecordDraftRules.normalize(kind,fields.value,editing?.mediaId).put("location_id",target).put("scene_id",target)
   val body=payload.optString("body").trim()
-  require(body.length<=RECORD_BODY_LIMIT){"文字最多${RECORD_BODY_LIMIT}字"}
-  if(kind=="message")require(body.isNotBlank()){"请填写内容"}
+  requireUserAction(body.length<=RECORD_BODY_LIMIT){"文字最多${RECORD_BODY_LIMIT}字"}
+  if(kind=="message")requireUserAction(body.isNotBlank()){"请填写内容"}
   if(kind in listOf("new_location","correction")){
-   require(payload.optString("association_type") in setOf("mv","album","song_title","lyric")){"请选择作品与地点的关联类型"}
-   require(payload.optString("association_excerpt").length<=200){"关联文字最多200字"}
-   if(payload.optString("association_type") in setOf("song_title","lyric"))require(payload.optString("association_excerpt").isNotBlank()){"请填写歌名或提到地点的短歌词"}
+   requireUserAction(payload.optString("association_type") in setOf("mv","album","song_title","lyric")){"请选择作品与地点的关联类型"}
+   requireUserAction(payload.optString("association_excerpt").length<=200){"关联文字最多200字"}
+   if(payload.optString("association_type") in setOf("song_title","lyric"))requireUserAction(payload.optString("association_excerpt").isNotBlank()){"请填写歌名或提到地点的短歌词"}
   }
   val local=payload.stringOrNull("local_photo")
   payload.remove("media_id")
   if(RecordDraftRules.requiresLocation(kind,editing!=null,local!=null)) {
    refreshPendingLocation()
-   val place=services.catalog.value.places.find{if(kind=="visit")it.id==target else it.scenes.any{s->s.id==target}} ?: error("地点不存在")
+   val place=services.catalog.value.places.find{if(kind=="visit")it.id==target else it.scenes.any{s->s.id==target}}
+       ?: throw UserActionException("暂时找不到这个地点")
    check(!place.arrivalLocationPendingSync){ArrivalRules.locationUpdateMessage}
    notice.value="正在获取本次现场位置…"
    val fix=services.location.locate()
-   ArrivalRules.rejection(place,fix)?.let{error(it)}
+   ArrivalRules.rejection(place,fix)?.let{throw UserActionException(it)}
    payload.put("fix",fix.json())
   }
   // Validate the live location before transferring the image. GPS never enters the draft.
