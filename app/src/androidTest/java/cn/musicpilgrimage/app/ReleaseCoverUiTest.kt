@@ -15,6 +15,7 @@ import org.junit.Test
 import java.io.File
 
 /** Existing approved image bytes are pushed by the runner, never bundled. */
+@ExtendedDeviceTest
 class ReleaseCoverUiTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private fun fixture(name:String)=Uri.fromFile(File(compose.activity.getExternalFilesDir(null),"material-fixtures/$name")).toString()
@@ -36,6 +37,7 @@ class ReleaseCoverUiTest {
         compose.onNodeWithText("MV取景").assertIsDisplayed()
         compose.onNodeWithContentDescription("发行封面展示验证发行封面").assertIsDisplayed()
         compose.onNodeWithContentDescription("保留的 MV 参考图").assertIsDisplayed()
+        if (!shouldCaptureReviewScreenshot("21-independent-release-cover")) return
         val ins=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
         val folder=File(ins.targetContext.getExternalFilesDir(null),"screenshots").apply{mkdirs()}
         val bitmap=requireNotNull(ins.uiAutomation.takeScreenshot())

@@ -40,6 +40,7 @@ import java.util.UUID
  * nested scroll + mid-dismiss upward takeover + Mid/High detents -> save failure retry -> save success + confirmation.
  */
 @RunWith(AndroidJUnit4::class)
+@ExtendedDeviceTest
 class Round2TripSheetE2eUiTest {
 
     @get:Rule

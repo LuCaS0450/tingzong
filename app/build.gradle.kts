@@ -18,6 +18,8 @@ val signingSettings = Properties().apply {
     rootProject.file(".private/release.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
 fun settingLiteral(key: String): String = "\"" + serviceSettings.getProperty(key, "").trim().replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+val selectedDeviceTests = providers.gradleProperty("android.testInstrumentationRunnerArguments.class")
+val verifyLocalAssets = providers.gradleProperty("tingzongVerifyLocalAssets")
 android {
     namespace = "cn.musicpilgrimage.app"
     compileSdk = 37
@@ -33,6 +35,9 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", settingLiteral("supabase.anonKey"))
         buildConfigField("String", "MAPTILER_KEY", settingLiteral("maptiler.key"))
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        if (selectedDeviceTests.orNull.isNullOrBlank()) {
+            testInstrumentationRunnerArguments["notAnnotation"] = "cn.musicpilgrimage.app.ExtendedDeviceTest"
+        }
     }
     buildFeatures { compose = true; buildConfig = true; prefab = true }
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" } }
@@ -59,7 +64,16 @@ android {
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     } }
     packaging { resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}") }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        if (verifyLocalAssets.orNull != "true") {
+            unitTests.all { test ->
+                test.useJUnit {
+                    excludeCategories("cn.musicpilgrimage.app.LocalAssetCheck")
+                }
+            }
+        }
+    }
 }
 dependencies {
     implementation("com.google.oboe:oboe:1.11.0")

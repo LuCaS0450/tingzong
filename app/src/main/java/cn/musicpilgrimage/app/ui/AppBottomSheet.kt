@@ -951,6 +951,7 @@ internal fun AppConfirmation(
     busy: Boolean = false,
     error: String? = null,
     destructive: Boolean = false,
+    confirmEnabled: Boolean = true,
     details: (@Composable () -> Unit)? = null,
 ) {
     AppCenterConfirmDialog(
@@ -969,7 +970,7 @@ internal fun AppConfirmation(
                 }
                 SwissTextButton(
                     onConfirm,
-                    enabled = !busy,
+                    enabled = confirmEnabled && !busy,
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = if (destructive) RoomColors.Red else RoomColors.Ink,
                     ),

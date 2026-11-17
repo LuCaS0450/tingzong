@@ -37,6 +37,7 @@ class MusicTripUiTest {
     }
 
     private fun capture(name:String) {
+        if (!shouldCaptureReviewScreenshot(name)) return
         compose.waitForIdle()
         instrumentation.waitForIdleSync()
         SystemClock.sleep(300) // Wait for the dialog surfaces to reach the compositor.
@@ -118,6 +119,7 @@ class MusicTripUiTest {
         assertTrue(store.read(key).any{it.id==other.id})
     }
 
+    @ExtendedDeviceTest
     @Test fun taiwanAndHongKongCanBeSelectedIndependentlyAsRegions() {
         val services = (context.applicationContext as PilgrimageApplication).services
         val destinations = services.catalog.value.publicOnly().places
@@ -140,6 +142,7 @@ class MusicTripUiTest {
         capture("region-selection")
     }
 
+    @ExtendedDeviceTest
     @Test fun searchDestinationsAddAcrossCitiesAndEditDirectlyFromDayCard() {
         val services=(context.applicationContext as PilgrimageApplication).services
         assumeTrue("Do not alter a signed-in account",services.userId.value==null)

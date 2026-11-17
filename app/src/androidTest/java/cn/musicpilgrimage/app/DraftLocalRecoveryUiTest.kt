@@ -33,6 +33,7 @@ import org.junit.Test
 import java.io.File
 
 /** Two phases run in separate processes. Only isolated local draft keys are written. */
+@ExtendedDeviceTest
 class DraftLocalRecoveryUiTest {
     @get:Rule val compose=createAndroidComposeRule<MusicSpacePreviewActivity>()
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()

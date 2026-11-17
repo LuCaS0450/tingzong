@@ -9,6 +9,7 @@ import org.junit.Test
 import java.time.LocalDate
 
 /** Exercises the real private asset pipeline without network calls or personal-store writes. */
+@ExtendedDeviceTest
 class LocalCatalogAssetsTest {
     @Test fun actualCatalogPayloadClearsMovedArrivalGuards() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

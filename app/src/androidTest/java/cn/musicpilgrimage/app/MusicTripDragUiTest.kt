@@ -66,6 +66,7 @@ class MusicTripDragUiTest {
     }
     private fun center(tag:String)=compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.center-compose.onNodeWithTag("room-trip-detail").fetchSemanticsNode().boundsInRoot.topLeft
     private fun capture(name:String) {
+        if (!shouldCaptureReviewScreenshot(name)) return
         val folder=File(context.getExternalFilesDir(null),"music-space-stage6").apply{mkdirs()}
         instrumentation.uiAutomation.takeScreenshot().let{bitmap->File(folder,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()}
     }

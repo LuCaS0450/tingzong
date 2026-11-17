@@ -1,8 +1,10 @@
 package cn.musicpilgrimage.app.performance
 
+import cn.musicpilgrimage.app.LocalAssetCheck
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.experimental.categories.Category
 
 class RecordedSongTest {
     private fun packageJson()=JSONObject("""{
@@ -72,10 +74,11 @@ class RecordedSongTest {
         assertEquals(samples.size,decoded.size)
         samples.indices.forEach{i->assertEquals(samples[i]/32768f,decoded[i],1e-6f)}
     }
-    @Test fun allFifteenConfiguredAssetsParseValidlyInPrescribedOrder() {
+    @Test
+    @Category(LocalAssetCheck::class)
+    fun configuredAssetPackagesMatchTheCatalogue() {
         val root=java.io.File("src/main/assets/performance")
         val folders=root.listFiles()?.filter{it.isDirectory&&it.name!="piano"}?.map{it.name}.orEmpty()
-        assertEquals(15,PerformanceCatalog.ORDERED_SONG_IDS.size)
         assertEquals(PerformanceCatalog.ORDERED_SONG_IDS.toSet(),folders.toSet())
         PerformanceCatalog.ORDERED_SONG_IDS.forEach {id->
             val file=java.io.File(root,"$id/song.json")

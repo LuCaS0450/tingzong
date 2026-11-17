@@ -22,6 +22,7 @@ class MusicAccountLayoutTest {
         var page by mutableStateOf("my")
         var nickname by mutableStateOf("音乐旅人")
         var signedOut=false
+        var deleting by mutableStateOf(false)
         var discard by mutableStateOf(false)
         var motion by mutableStateOf(true)
         compose.setContent {PilgrimageTheme {CompositionLocalProvider(LocalPhysicalMotion provides motion) {
@@ -33,6 +34,7 @@ class MusicAccountLayoutTest {
                         RoomProfileManagement("layout@example.invalid",4,1,false,{page="edit"},{},null,{})
                     }) {}
                     "edit"->RoomProfileEditor(MusicProfileDraft(owner="layout-owner",nickname=nickname,originalNickname="音乐旅人",active=true),{nickname=it},{},{},{page="my"},{})
+                    "email" -> RoomAccountInfo("email", "layout@example.invalid", true, deleting, null, { deleting = true }, {})
                     else->RoomSettings(AppPreferencesState(),true,false,null,{},{},{},{signedOut=true})
                 }
             }
@@ -70,6 +72,15 @@ class MusicAccountLayoutTest {
         compose.onNodeWithText("取消").performClick()
         assertFalse(signedOut)
         compose.onNodeWithTag("room-settings").assertIsDisplayed()
+        compose.runOnIdle { page = "email" }
+        compose.onNodeWithTag("account-delete-entry").performClick()
+        val confirmDeletion = compose.onNodeWithText("确认注销")
+        confirmDeletion.assertIsNotEnabled()
+        captureAccountScreen("account-delete-layout-fixture", compose)
+        compose.onNode(hasSetTextAction()).performTextReplacement("删除账号")
+        confirmDeletion.assertIsEnabled().performClick()
+        compose.onNodeWithText("正在注销…").assertIsNotEnabled()
+        compose.onNodeWithText("取消").assertIsNotEnabled()
     }
 
 }

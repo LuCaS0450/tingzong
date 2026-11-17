@@ -27,6 +27,7 @@ import java.security.MessageDigest
 import java.util.UUID
 
 /** Actual original-speed recordings; scoped test owners never alter the signed-in user's results. */
+@ExtendedDeviceTest
 class AddedPerformanceTracksTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()

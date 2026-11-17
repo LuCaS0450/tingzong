@@ -64,13 +64,28 @@ class AppServices(context:Context) {
   ?.stateIn(scope,SharingStarted.Eagerly,null) ?: MutableStateFlow(null)
  val authReady=MutableStateFlow(client==null)
  init {scope.launch{try{ready();val id=client?.auth?.currentUserOrNull()?.id;withTimeoutOrNull(5000){userId.first{it==id}}}catch(e:CancellationException){throw e}catch(_:Exception){}finally{authReady.value=true}}}
- private val http=OkHttpClient.Builder().connectTimeout(15,TimeUnit.SECONDS).readTimeout(30,TimeUnit.SECONDS).callTimeout(45,TimeUnit.SECONDS).build()
+ private val http=OkHttpClient.Builder()
+  .connectTimeout(15,TimeUnit.SECONDS).readTimeout(30,TimeUnit.SECONDS).callTimeout(45,TimeUnit.SECONDS)
+  .eventListenerFactory { call -> call.request().tag(ContentDeletionAttempt::class.java) ?: EventListener.NONE }
+  .build()
  val endpoint=BuildConfig.SUPABASE_URL.trimEnd('/')+"/functions/v1/pilgrimage-v2"
  val repositories=Repositories(this)
  internal val library by lazy{PersonalLibrarySync(app,this)}
  suspend fun ready() { client?.auth?.awaitInitialization() }
  fun token():String? = client?.auth?.currentAccessTokenOrNull()
- suspend fun call(action:String,payload:JSONObject=JSONObject(),expectedOwner:String?=userId.value):Any = withContext(Dispatchers.IO) {
+ suspend fun call(action:String,payload:JSONObject=JSONObject(),expectedOwner:String?=userId.value):Any {
+  return if (action == "delete_content") {
+   retryUnsentContentDeletion { attempt -> callOnce(action, payload, expectedOwner, attempt) }
+  } else {
+   callOnce(action, payload, expectedOwner)
+  }
+ }
+ private suspend fun callOnce(
+  action: String,
+  payload: JSONObject,
+  expectedOwner: String?,
+  deletion: ContentDeletionAttempt? = null,
+ ): Any = withContext(Dispatchers.IO) {
   check(client!=null) { "尚未配置在线服务，仍可浏览官方目录" }
   client.auth.awaitInitialization()
   require(userId.value==expectedOwner) { "账号已切换，请重新打开页面" }
@@ -82,8 +97,10 @@ class AppServices(context:Context) {
    else if(libraryRpc=="personal_library_sync")JSONObject().put("p_kind",payload.getString("kind")).put("p_expected_revision",payload.getLong("expected_revision")).put("p_data",payload.getJSONObject("data")).put("p_client_id",payload.getString("client_id"))
    else JSONObject().put("action",action).put("payload",payload)
   val requestUrl=libraryRpc?.let{BuildConfig.SUPABASE_URL.trimEnd('/')+"/rest/v1/rpc/"+it}?:endpoint
+  val jsonBody = requestBody.toString().toRequestBody("application/json".toMediaType())
   val request=Request.Builder().url(requestUrl).header("apikey",BuildConfig.SUPABASE_ANON_KEY)
-   .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+   .post(if (deletion == null) jsonBody else jsonBody.asOneShotDeletion())
+  deletion?.let { request.tag(ContentDeletionAttempt::class.java, it) }
   requestToken?.let { request.header("Authorization","Bearer "+it) }
   val call=http.newCall(request.build())
   val response=suspendCancellableCoroutine<Response> { continuation ->

@@ -15,6 +15,7 @@ import org.junit.Test
 import java.io.File
 
 /** Existing account, genuine SDK password login. Never imports a saved token or changes account credentials. */
+@ExtendedDeviceTest
 class NativeAccountLoginTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     @Test fun existingAccountSignsInAndReadsItsPrivateLibrary()=runBlocking {

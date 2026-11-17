@@ -36,6 +36,8 @@ APK 输出到 `artifacts/gradle-build/outputs/apk/debug/app-debug.apk`。需要�
 
 ## 开发与版本管理
 
+按改动选择相关的 JVM 用例或设备场景，见 [开发验证入口](docs/PROJECT_GUIDE.md#按改动选验证)。
+
 `main` 保持稳定；较大功能使用临时分支，完成相关验证后合并。每批明确修改验证完成后，自动提交并推送到 GitHub。本机非公开资料使用独立、没有远程的素材仓库记录版本，见 [VERSION_CONTROL.md](docs/VERSION_CONTROL.md)。
 
 首次克隆后启用检查及署名：
@@ -50,4 +52,4 @@ git config --local user.email 147964947+LuCaS0450@users.noreply.github.com
 
 ## 授权状态
 
-本项目暂未为自有源码选择开源许可证。第三方字体、字典和钢琴采样保留各自许可及署名，不能将整个仓库视为采用同一种许可。见 [公开资源清单](docs/PUBLIC_ASSETS.md)。
+本项目暂未为自有源码选择开源许可证。第三方字体、地图资料和钢琴采样保留各自许可及署名。见 [公开资源清单](docs/PUBLIC_ASSETS.md)。

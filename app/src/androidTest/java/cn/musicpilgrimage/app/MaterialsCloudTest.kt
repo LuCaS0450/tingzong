@@ -30,6 +30,7 @@ import org.json.JSONObject
 import androidx.lifecycle.ViewModelProvider
 
 /** Opt-in read-only check against the actual imported catalog, never quiz fixtures. */
+@ExtendedDeviceTest
 class MaterialsCloudTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private fun showWorld(catalog:Catalog, place:Place) {

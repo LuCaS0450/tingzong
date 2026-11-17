@@ -13,6 +13,7 @@ import java.io.File
 import java.util.UUID
 
 /** Opt-in real cloud check; the runner supplies disposable identities in app-private storage. */
+@ExtendedDeviceTest
 class CloudRepositoryTest {
  @Test fun realAuthRepositoriesKeepAccountsAndDraftsSeparate()=runBlocking {
   assumeTrue(InstrumentationRegistry.getArguments().getString("cloudLive")=="true")

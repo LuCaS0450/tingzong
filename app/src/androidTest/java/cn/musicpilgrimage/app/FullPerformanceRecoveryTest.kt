@@ -26,6 +26,7 @@ import java.io.File
 import java.util.UUID
 
 /** Two explicitly selected phases: the host actually force-stops the app between them. */
+@ExtendedDeviceTest
 class FullPerformanceRecoveryTest {
     @get:Rule val compose=createEmptyComposeRule()
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()

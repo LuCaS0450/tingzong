@@ -11,6 +11,7 @@ import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.util.zip.GZIPInputStream
 
+@ExtendedDeviceTest
 class PublishedCatalogMediaTest {
     @Test fun archiveReusesTheReviewedSoundtrackImagesFromWorld() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext

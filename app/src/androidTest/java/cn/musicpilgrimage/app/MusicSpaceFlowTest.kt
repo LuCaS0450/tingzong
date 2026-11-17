@@ -8,6 +8,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
+@ExtendedDeviceTest
 class MusicSpaceFlowTest {
     @get:Rule val compose=createAndroidComposeRule<MusicSpacePreviewActivity>()
     private fun capture(name:String) {

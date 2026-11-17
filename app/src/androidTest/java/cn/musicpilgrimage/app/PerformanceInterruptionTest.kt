@@ -23,6 +23,7 @@ import java.io.File
 import java.util.UUID
 
 /** Private test owners; the explicit two-phase test requires a host-issued process kill. */
+@ExtendedDeviceTest
 class PerformanceInterruptionTest {
     @get:Rule val compose=createEmptyComposeRule()
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()

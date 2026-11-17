@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class CapsuleDraftRetirementTest {
+ @ExtendedDeviceTest
  @Test fun realEdgeRejectsRetiredActionAndProfileHasNoCapsuleBadge()=runBlocking {
   val app=ApplicationProvider.getApplicationContext<PilgrimageApplication>()
   val services=app.services

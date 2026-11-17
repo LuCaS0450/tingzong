@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import cn.musicpilgrimage.app.ui.AppCenterConfirmDialog
+import cn.musicpilgrimage.app.ui.AppConfirmation
 import cn.musicpilgrimage.app.ui.AppBottomSheet
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -273,16 +274,16 @@ import org.json.JSONObject
         if(error!=null)item{Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)}
         if(signedIn)item{SwissOutlinedButton({signOut=true},Modifier.fillMaxWidth().height(50.dp).testTag("account-sign-out"),enabled=!busy,shape=androidx.compose.ui.graphics.RectangleShape){Text("退出登录")}}
     }
-    if(signOut)AppCenterConfirmDialog(onDismissRequest={if(!busy)signOut=false},dismissOnBackPress=!busy,dismissOnClickOutside=!busy) {
-        Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Text("退出登录？",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
-            Text("退出后需重新登录才能查看个人内容。",fontSize=14.sp,color=RoomColors.Muted)
-            if(error!=null)Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
-                SwissTextButton({signOut=false},enabled=!busy){Text("取消")}
-                SwissTextButton({onSignOut()},enabled=!busy){Text(if(busy)"正在退出…" else "退出登录")}
-            }
-        }
+    if (signOut) {
+        AppConfirmation(
+            title = "退出登录？",
+            message = "退出后需重新登录才能查看个人内容。",
+            confirmLabel = if (busy) "正在退出…" else "退出登录",
+            onConfirm = onSignOut,
+            onDismiss = { signOut = false },
+            busy = busy,
+            error = error,
+        )
     }
 }
 
@@ -372,16 +373,24 @@ import org.json.JSONObject
             }
         }
     }
-    if(deleting)AppCenterConfirmDialog(onDismissRequest={if(!busy)deleting=false},dismissOnBackPress=!busy,dismissOnClickOutside=!busy) {
-        Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Text("注销账号",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
-            Text("账号注销后无法恢复，个人记录、媒体与互动将删除。留言匿名保留，已采纳投稿解除身份关联。",fontSize=14.sp,color=RoomColors.Muted)
-            OutlinedTextField(confirmation,{confirmation=it},enabled=!busy,label={Text("输入“删除账号”")},singleLine=true)
-            if(error!=null)Text(error,color=MaterialTheme.colorScheme.error,fontSize=13.sp)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
-                SwissTextButton({deleting=false},enabled=!busy){Text("取消")}
-                SwissTextButton(onDelete,enabled=confirmation=="删除账号"&&!busy){Text(if(busy)"正在注销…" else "确认注销")}
-            }
+    if (deleting) {
+        AppConfirmation(
+            title = "注销账号",
+            message = "账号注销后无法恢复，个人记录、媒体与互动将删除。留言匿名保留，已采纳投稿解除身份关联。",
+            confirmLabel = if (busy) "正在注销…" else "确认注销",
+            onConfirm = onDelete,
+            onDismiss = { deleting = false },
+            busy = busy,
+            error = error,
+            confirmEnabled = confirmation == "删除账号",
+        ) {
+            OutlinedTextField(
+                value = confirmation,
+                onValueChange = { confirmation = it },
+                enabled = !busy,
+                label = { Text("输入“删除账号”") },
+                singleLine = true,
+            )
         }
     }
 }

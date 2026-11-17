@@ -910,6 +910,7 @@ class PrototypeMotionUiTest {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
+    @ExtendedDeviceTest
     @Test
     fun detailMedia_placeObjectFitAndClipBounds_jsContract() {
         val posted = CopyOnWriteArrayList<JSONObject>()
@@ -1790,6 +1791,7 @@ class PrototypeMotionUiTest {
         assertEquals("地点乙", afterSwapB.getString("name"))
     }
 
+    @ExtendedDeviceTest
     @Test
     fun detailViewer_p2_3_instanceLifecycle_doubleBack_cancel_reduceMotion_sources() {
         val assetUrl = "file:///android_asset/design/swiss-details/media/full-samaritaine-jay-1.jpg"

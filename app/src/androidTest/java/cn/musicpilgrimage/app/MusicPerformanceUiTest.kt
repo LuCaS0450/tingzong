@@ -22,6 +22,7 @@ import org.junit.Assert.*
 import java.io.File
 import java.util.UUID
 
+@ExtendedDeviceTest
 class MusicPerformanceUiTest {
     @get:Rule val compose=createEmptyComposeRule()
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()

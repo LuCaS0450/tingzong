@@ -18,6 +18,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /** Local original audio is supplied outside the APK by the developer/private user. */
+@ExtendedDeviceTest
 class RhythmComparisonTest {
     @get:Rule val compose=createEmptyComposeRule()
     private val context get()=InstrumentationRegistry.getInstrumentation().targetContext

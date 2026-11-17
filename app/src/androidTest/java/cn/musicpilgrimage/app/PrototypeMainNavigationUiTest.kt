@@ -77,6 +77,7 @@ class PrototypeMainNavigationUiTest {
         return out
     }
 
+    @ExtendedDeviceTest
     @Test
     fun realMainActivity_sharedCoverHandoffAndBackReturn() {
         compose.waitUntil(15_000) {
@@ -143,6 +144,7 @@ class PrototypeMainNavigationUiTest {
     }
 
     @SuppressLint("VisibleForTests")
+    @ExtendedDeviceTest
     @Test
     fun realMainActivity_predictiveCancel_uiBack_immediateTabSwitch_andReentry() {
         compose.waitUntil(15_000) {
@@ -225,6 +227,7 @@ class PrototypeMainNavigationUiTest {
         compose.onNodeWithTag("world-place-summary").assertIsDisplayed()
     }
 
+    @ExtendedDeviceTest
     @Test fun worldAndPlaceArchivesShowCanonicalLocationAndReviewedFilmPreview() {
         openWorld()
         chooseWorldPlace("大屿山")
@@ -261,6 +264,7 @@ class PrototypeMainNavigationUiTest {
         compose.onNodeWithText(mediaLabel).assertIsDisplayed()
     }
 
+    @ExtendedDeviceTest
     @Test fun placeArchiveMvScreenshotsDecodeOriginalsFromBundleAndNetwork() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -298,6 +302,7 @@ class PrototypeMainNavigationUiTest {
         }
     }
 
+    @ExtendedDeviceTest
     @Test fun widePhotoRotatesInPlaceAndReturnsToTheSameArchivePosition() {
         openWorld()
         chooseWorldPlace("Love 119", "fuchukeiba-seimon-mae-station")
@@ -397,6 +402,7 @@ class PrototypeMainNavigationUiTest {
         }
     }
 
+    @ExtendedDeviceTest
     @Test fun portraitPlaceArchivesKeepPhotosAndTitlesSeparateAndRemoveExplanatoryCopy() {
         openWorld()
         for ((query, id) in listOf("东京日暮里" to "nippori-tokyo-playlist-reference", "Tower View" to "tower-view-street", "Tokyo Flash" to "tokyo-city-lyrics-reference")) {
@@ -420,6 +426,7 @@ class PrototypeMainNavigationUiTest {
         }
     }
 
+    @ExtendedDeviceTest
     @Test fun realMainActivity_worldSummaryTracksTouchAndCanDismiss() {
         openWorld()
         chooseWorldPlace("Stay Alive")
@@ -485,6 +492,7 @@ class PrototypeMainNavigationUiTest {
         compose.onNodeWithTag("world-place-summary").assertDoesNotExist()
     }
 
+    @ExtendedDeviceTest
     @Test
     fun realPreviewActivity_quickBackAndReenterSameAlbum_and_predictiveHalfwayCancelCommit() {
         compose.waitUntil(10_000) {

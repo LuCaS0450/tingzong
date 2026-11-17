@@ -16,6 +16,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
+@ExtendedDeviceTest
 class MusicArchiveFlowTest {
     @get:Rule val compose=createAndroidComposeRule<MusicSpacePreviewActivity>()
     private val context=InstrumentationRegistry.getInstrumentation().targetContext

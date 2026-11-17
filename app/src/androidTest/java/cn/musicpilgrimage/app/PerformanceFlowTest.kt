@@ -39,9 +39,13 @@ class PerformanceFlowTest {
         assertTrue("当前演奏状态未在规定时间到达",condition())
         compose.mainClock.advanceTimeBy(32);compose.waitForIdle()
     }
-    private fun capture(name:String) {java.io.File(context.getExternalFilesDir(null),name).outputStream().use {
-        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)
-    }}
+    private fun capture(name:String) {
+        if (!shouldCaptureReviewScreenshot(name)) return
+        java.io.File(context.getExternalFilesDir(null),name).outputStream().use {
+            InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+                .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+    }
     private fun cleanup(owner:String) = runBlocking(Dispatchers.IO) {
         LibraryDatabase.open(context).openHelper.writableDatabase.apply {
             execSQL("delete from performance_checkpoints where owner=?",arrayOf(owner))

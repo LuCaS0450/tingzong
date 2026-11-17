@@ -10,6 +10,7 @@ import androidx.test.espresso.Espresso
 import org.junit.Rule
 import org.junit.Test
 
+@ExtendedDeviceTest
 class MusicMapFlowTest {
     @get:Rule val compose = createAndroidComposeRule<MusicSpacePreviewActivity>()
 

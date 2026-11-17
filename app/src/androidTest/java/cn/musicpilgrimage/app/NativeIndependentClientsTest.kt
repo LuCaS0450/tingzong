@@ -19,6 +19,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 /** Run in two independently initialized emulator data directories, using ordinary SDK logins. */
+@ExtendedDeviceTest
 class NativeIndependentClientsTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val context get()=InstrumentationRegistry.getInstrumentation().targetContext

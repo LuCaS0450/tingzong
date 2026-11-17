@@ -14,6 +14,7 @@ import org.junit.Assume.assumeTrue
 import java.io.File
 
 internal fun captureAccountScreen(name:String,compose:ComposeTestRule) {
+    if (!shouldCaptureReviewScreenshot(name)) return
     compose.waitForIdle()
     val instrumentation=InstrumentationRegistry.getInstrumentation()
     instrumentation.waitForIdleSync()

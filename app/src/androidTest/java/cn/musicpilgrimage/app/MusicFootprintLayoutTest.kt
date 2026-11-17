@@ -47,9 +47,16 @@ class MusicFootprintLayoutTest {
         compose.onNodeWithText("留言测试记录").assertIsDisplayed()
         compose.onNodeWithTag("archive-tab-visits").performClick().assertIsSelected()
         compose.onNodeWithText("2026-10-19").assertIsDisplayed()
-        val directory=File(context.getExternalFilesDir(null),"music-space-stage2").apply{mkdirs()}
-        compose.waitForIdle()
-        InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot().let{bitmap->File(directory,"footprints-layout-fixture.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()}
+        if (shouldCaptureReviewScreenshot("footprints-layout-fixture")) {
+            val directory = File(context.getExternalFilesDir(null), "music-space-stage2").apply { mkdirs() }
+            compose.waitForIdle()
+            InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot().let { bitmap ->
+                File(directory, "footprints-layout-fixture.png").outputStream().use {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+                bitmap.recycle()
+            }
+        }
         compose.onNodeWithTag("archive-visit-layout-only-record").performTouchInput{longClick()}
         compose.onNodeWithText("编辑").performClick()
         compose.runOnIdle {assertTrue(edited);assertFalse(deleted)}

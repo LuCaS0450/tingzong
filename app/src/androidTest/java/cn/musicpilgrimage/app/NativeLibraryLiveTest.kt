@@ -24,6 +24,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 /** Real retained SDK session and production store/worker/RPC. Only marked new entries may be removed. */
+@ExtendedDeviceTest
 class NativeLibraryLiveTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()

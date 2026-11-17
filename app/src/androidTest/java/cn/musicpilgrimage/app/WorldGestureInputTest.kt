@@ -27,6 +27,7 @@ import kotlin.math.hypot
 
 /** Physical Android multi-pointer input, covering the globe's most failure-prone gesture path. */
 @RunWith(AndroidJUnit4::class)
+@ExtendedDeviceTest
 class WorldGestureInputTest {
     @get:Rule val compose = createAndroidComposeRule<MusicSpacePreviewActivity>()
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()

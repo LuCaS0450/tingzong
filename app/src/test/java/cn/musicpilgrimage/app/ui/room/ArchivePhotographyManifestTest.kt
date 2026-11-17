@@ -1,11 +1,13 @@
 package cn.musicpilgrimage.app.ui.room
 
+import cn.musicpilgrimage.app.LocalAssetCheck
 import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.experimental.categories.Category
 
 class ArchivePhotographyManifestTest {
 
@@ -24,6 +26,7 @@ class ArchivePhotographyManifestTest {
     }
 
     @Test
+    @Category(LocalAssetCheck::class)
     fun releaseLocalPlacePhotosAreBundledOutsidePublicManifest() {
         val swissDetails = File("src/main/assets/design/swiss-details")
         val publicManifest = JSONObject(File(swissDetails, "place-photos.json").readText(Charsets.UTF_8))

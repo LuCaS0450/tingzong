@@ -55,6 +55,7 @@ class MusicFavoriteStoreTest {
 }
 
 /** Run these methods in separate instrumentation processes, with force-stop in between. */
+@ExtendedDeviceTest
 class MusicFavoriteRestartTest {
     private val prefs=InstrumentationRegistry.getInstrumentation().targetContext.getSharedPreferences("music-store-restart-probe",Context.MODE_PRIVATE)
     @Test fun writeBeforeRestart(){

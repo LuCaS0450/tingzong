@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import cn.musicpilgrimage.app.ui.AppCenterConfirmDialog
+import cn.musicpilgrimage.app.ui.AppConfirmation
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -176,15 +177,19 @@ import kotlin.math.roundToInt
             }
         }
     }
-    if(removing)AppCenterConfirmDialog(onDismissRequest={if(!busy)removing=false},dismissOnBackPress=!busy,dismissOnClickOutside=!busy) {
-        Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Text(if(item.kind=="visit")"删除感想与照片？"else "删除这条内容？",fontSize=20.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
-            Text(if(item.kind=="visit")"只移除感想和照片，到访日期与认证会保留。"else "删除后无法恢复。",fontSize=14.sp,color=RoomColors.Muted)
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End) {
-                SwissTextButton({removing=false},enabled=!busy){Text("取消")}
-                SwissTextButton({removing=false;onAction("delete_content",JSONObject().put("id",item.id))},enabled=!busy){Text("删除")}
-            }
-        }
+    if (removing) {
+        val isVisit = item.kind == "visit"
+        AppConfirmation(
+            title = if (isVisit) "删除感想与照片？" else "删除这条内容？",
+            message = if (isVisit) "只移除感想和照片，到访日期与认证会保留。" else "删除后无法恢复。",
+            confirmLabel = "删除",
+            onConfirm = {
+                removing = false
+                onAction("delete_content", JSONObject().put("id", item.id))
+            },
+            onDismiss = { removing = false },
+            busy = busy,
+        )
     }
     if(reporting)AppCenterConfirmDialog(onDismissRequest={reporting=false}) {
         Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {

@@ -7,6 +7,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /** Invoke separately with the preview process stopped between phases. No session is injected. */
+@ExtendedDeviceTest
 class PersonalLibraryRestartTest {
     private val prefs=InstrumentationRegistry.getInstrumentation().targetContext.getSharedPreferences("personal-library-restart-probe",Context.MODE_PRIVATE)
     private val owner="user:isolated-restart-fixture"

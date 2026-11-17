@@ -31,6 +31,7 @@ class MaterialsUiTest {
         val bitmap=requireNotNull(ins.uiAutomation.takeScreenshot())
         File(dir,name).outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()
     }
+    @ExtendedDeviceTest
     @Test fun originalLandscapeCoverDecodesWithCompleteFrame() {
         val file=fixture("mont.jpg");val ready=AtomicBoolean(false)
         show{Column(Modifier.fillMaxSize().padding(20.dp)){PageTitle("真实原作画幅","圣米歇尔山 · 2022专辑封面")
@@ -49,6 +50,7 @@ class MaterialsUiTest {
         compose.onAllNodesWithContentDescription("原作叠图参考").assertCountEquals(0)
         screenshot("07-material-failed-overlay.png")
     }
+    @ExtendedDeviceTest
     @Test fun realMvDecodesBeforeCameraAndCaptureKeepsOriginalRatio() {
         val image=fixture("tower.jpg");val saved=AtomicReference<Uri?>(null)
         val ins=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
@@ -72,6 +74,7 @@ class MaterialsUiTest {
             assertEquals("JPEG including EXIF rotation must use the original MV frame ratio",1280f/720f,width.toFloat()/height,.01f)
         } finally {file.delete()}
     }
+    @ExtendedDeviceTest
     @Test fun titleAndLyricRowsUseRealCoversAndVisibleTypeLabels() {
         val binary=Uri.fromFile(fixture("binary.jpg")).toString();val twelve=Uri.fromFile(fixture("twelve.jpg")).toString()
         val kay=Scene("isolated-title","kay","谢安琪","囍帖街",kind="song_title",imageUrl=binary,imageStatus="approved",referenceKind="release_cover",imageWidth=1280,imageHeight=1148,associationPrecision="landmark",verificationStatus="verified")

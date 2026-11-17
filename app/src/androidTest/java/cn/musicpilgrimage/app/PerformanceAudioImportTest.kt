@@ -45,6 +45,7 @@ class PerformanceAudioImportTest {
             assertArrayEquals(bytes,File(requireNotNull(store.directory(song)),"original.pcmz").readBytes())
         } finally {root.deleteRecursively()}
     }
+    @ExtendedDeviceTest
     @Test fun installAuthorizedFullRecordingIntoFormalLibrary() {
         val song=PerformanceCatalog.load(context).single{it.id=="greatest-works"}
         assertEquals("release-accent-rhythm",song.sources.getString("chartKind"))

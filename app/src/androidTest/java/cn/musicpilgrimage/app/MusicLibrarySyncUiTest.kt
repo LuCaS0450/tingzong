@@ -29,6 +29,7 @@ class MusicLibrarySyncUiTest {
     private val instrumentation get()=InstrumentationRegistry.getInstrumentation()
     private val context get()=instrumentation.targetContext
     private fun capture(name:String) {
+        if (!shouldCaptureReviewScreenshot(name)) return
         compose.waitForIdle();instrumentation.waitForIdleSync();Thread.sleep(250)
         val folder=File(context.getExternalFilesDir(null),"music-space-stage8").apply{mkdirs()}
         instrumentation.uiAutomation.takeScreenshot().let{bitmap->File(folder,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()}

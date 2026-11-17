@@ -30,6 +30,7 @@ import io.github.jan.supabase.auth.auth
 
 /** Genuine Auth, production MainActivity/navigation, Android picker/camera and real backend.
  * The only visit fixture is explicitly private and uncertified. No positive onsite fix is injected. */
+@ExtendedDeviceTest
 class NativeEmulatorAcceptanceTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private val ins get()=InstrumentationRegistry.getInstrumentation()

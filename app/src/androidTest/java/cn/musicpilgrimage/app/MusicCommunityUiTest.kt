@@ -65,6 +65,7 @@ class MusicCommunityUiTest {
         }}}}
     }
     private fun capture(name:String) {
+        if (!shouldCaptureReviewScreenshot(name)) return
         compose.waitForIdle();instrumentation.waitForIdleSync();Thread.sleep(350)
         val folder=File(context.getExternalFilesDir(null),"music-space-stage7").apply{mkdirs()}
         instrumentation.uiAutomation.takeScreenshot().let{bitmap->File(folder,"$name.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)};bitmap.recycle()}
@@ -187,6 +188,7 @@ class MusicCommunityUiTest {
         compose.onNodeWithText("转为私密").performScrollTo().assertExists()
         capture("record-management")
     }
+    @ExtendedDeviceTest
     @Test fun publicProfileDefaultsToRecreationShowsOriginalFirstAndPhotoDialogDoesNotJump() {
         val sample=photo()
         val app=context.applicationContext as PilgrimageApplication
