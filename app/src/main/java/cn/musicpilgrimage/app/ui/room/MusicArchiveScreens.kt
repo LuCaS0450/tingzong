@@ -240,9 +240,10 @@ private fun visitDate(item:ContentItem)=item.raw.optString("verified_at").takeIf
     val offset by animateFloatAsState(if(dragging)raw else if(opened)-width else 0f,tween(if(dragging)0 else 140),label="visit actions")
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Box(Modifier.width(14.dp).fillMaxHeight()){Box(Modifier.align(Alignment.TopCenter).width(1.dp).fillMaxHeight().background(RoomColors.Line));Box(Modifier.align(Alignment.TopCenter).padding(top=9.dp).size(5.dp).background(RoomColors.Muted,RoundedCornerShape(50)))}
-        Box(Modifier.weight(1f).clip(androidx.compose.ui.graphics.RectangleShape).testTag("archive-visit-${record.id}")) {
+        Box(Modifier.weight(1f).testTag("archive-visit-${record.id}")) {
             Row(Modifier.align(Alignment.TopEnd),verticalAlignment=Alignment.CenterVertically){IconButton({onEdit(record)}){Icon(Icons.Outlined.Edit,"编辑到访记录",tint=RoomColors.Navy)};IconButton({remove=true}){Icon(Icons.Outlined.DeleteOutline,"删除感想与照片",tint=RoomColors.Navy)}}
-            Column(Modifier.fillMaxWidth().graphicsLayer{translationX=offset}.background(RoomColors.Paper)
+            Column(Modifier.fillMaxWidth().swipeCardOffset { offset }.background(RoomColors.Paper)
+                .testTag("visit-surface-${record.id}")
                 .pointerInput(record.id){detectHorizontalDragGestures(onDragStart={dragging=true;raw=if(opened)-width else 0f},onHorizontalDrag={change,amount->change.consume();raw=(raw+amount).coerceIn(-width,0f)},onDragEnd={opened=raw < -width/2;dragging=false},onDragCancel={dragging=false})}
                 .combinedClickable(onClick={if(opened)opened=false else menu=true},onLongClick={menu=true}).padding(start=7.dp,bottom=13.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
                 Row(verticalAlignment=Alignment.CenterVertically){Text(visitDate(record),Modifier.weight(1f),fontSize=13.sp,color=RoomColors.Ink);Text(if(record.visibility=="public")"公开" else "仅自己",fontSize=11.sp,color=RoomColors.Muted);IconButton({menu=true},Modifier.size(36.dp)){Icon(Icons.Outlined.MoreHoriz,"到访记录操作",Modifier.size(19.dp),tint=RoomColors.Muted)}}

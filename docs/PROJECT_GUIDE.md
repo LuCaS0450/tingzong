@@ -14,6 +14,7 @@
 
 ## 共用交互
 
+- 行程与足迹的横向操作使用 `swipeCardOffset`，让底板及内容一起展开、收回，并为操作区调整内容宽度。[侧滑布局](../app/src/main/java/cn/musicpilgrimage/app/ui/room/SwipeCardLayout.kt)
 - 页面层级、纸面和配色使用 `RoomHeader`、`RoomPaper`、`RoomColors`。主次操作已有 `SwissButton`、`SwissOutlinedButton`、`SwissTextButton`。点击目标可以大于可见底板，单独的图标按钮提供读屏名称。[应用主题](../app/src/main/java/cn/musicpilgrimage/app/ui/Design.kt) · [页面与配色](../app/src/main/java/cn/musicpilgrimage/app/ui/room/MusicRoomDesign.kt) · [按钮](../app/src/main/java/cn/musicpilgrimage/app/ui/room/SwissButtons.kt)
 - 下滑面板使用 `AppBottomSheet`，双操作确认使用 `AppConfirmation`。需要输入时通过 `details` 放入输入框，使用 `confirmEnabled` 控制提交。允许重试的异步确认传入 `busy`、等待文案和就地错误。自定义选择列表使用 `AppCenterConfirmDialog`。[面板和确认框](../app/src/main/java/cn/musicpilgrimage/app/ui/AppBottomSheet.kt)
 - 社区删除确认后立即关框。确定请求尚未发送的连接失败由数据层自动重试一次，最终仍无法确认时由当前页提示。[删除请求](../app/src/main/java/cn/musicpilgrimage/app/data/ContentDeletionRetry.kt)

@@ -22,7 +22,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -52,7 +51,6 @@ import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import kotlin.math.roundToInt
 
 @Composable internal fun RoomTripList(state:MusicTripState,owner:String,cities:List<MusicTripCity>,vm:MusicTripViewModel,onOpen:(String)->Unit) {
     var create by rememberSaveable{mutableStateOf(false)}
@@ -130,7 +128,7 @@ private val tripBoardFace = Brush.verticalGradient(
             if (motion) swipe.animateTo(TripRowPosition.Closed) else swipe.snapTo(TripRowPosition.Closed)
         }
     }
-    Box(Modifier.fillMaxWidth().shadow(3.dp, RectangleShape, clip = false).clipToBounds().anchoredDraggable(
+    Box(Modifier.fillMaxWidth().anchoredDraggable(
         swipe,reverseDirection=false,orientation=Orientation.Horizontal,enabled=enabled
     )) {
         Box(Modifier.matchParentSize().background(RoomColors.Red),contentAlignment=Alignment.CenterEnd) {
@@ -140,7 +138,8 @@ private val tripBoardFace = Brush.verticalGradient(
                 Icon(Icons.Outlined.DeleteOutline,null,tint=RoomColors.Paper)
             }
         }
-        Box(Modifier.fillMaxWidth().offset{IntOffset(swipe.requireOffset().roundToInt(),0)}
+        Box(Modifier.fillMaxWidth().swipeCardOffset { swipe.requireOffset() }
+            .shadow(3.dp, RectangleShape, clip = false)
             .background(tripBoardFace)
             .border(0.5.dp, RoomColors.Line.copy(alpha = .86f))
             .drawBehind {

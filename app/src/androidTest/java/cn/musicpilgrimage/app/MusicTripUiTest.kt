@@ -87,8 +87,18 @@ class MusicTripUiTest {
         compose.onNodeWithText("左滑行程可删除").assertDoesNotExist()
         compose.onNodeWithText("同步", substring = false).assertDoesNotExist()
         capture("trip-cards")
+        val closedBounds = row.fetchSemanticsNode().boundsInRoot
         reveal()
+        val openBounds = row.fetchSemanticsNode().boundsInRoot
+        assertTrue(openBounds.left < closedBounds.left)
+        assertTrue(openBounds.left >= 0f)
+        assertTrue(compose.onNodeWithText(trip.displayName).fetchSemanticsNode().boundsInRoot.left >= openBounds.left)
         capture("trip-card-swiped")
+        row.performTouchInput { swipeRight() }
+        delete.assertDoesNotExist()
+        assertEquals(closedBounds.left, row.fetchSemanticsNode().boundsInRoot.left, 1f)
+        assertEquals(closedBounds.width, row.fetchSemanticsNode().boundsInRoot.width, 1f)
+        reveal()
         assertNull(opened)
         delete.performClick()
         compose.onNodeWithText("删除行程？").assertIsDisplayed()

@@ -60,7 +60,18 @@ class MusicFootprintLayoutTest {
         compose.onNodeWithTag("archive-visit-layout-only-record").performTouchInput{longClick()}
         compose.onNodeWithText("编辑").performClick()
         compose.runOnIdle {assertTrue(edited);assertFalse(deleted)}
+        val surface = compose.onNodeWithTag("visit-surface-layout-only-record")
+        val closedBounds = surface.fetchSemanticsNode().boundsInRoot
         compose.onNodeWithTag("archive-visit-layout-only-record").performTouchInput{swipeLeft()}
+        val openBounds = surface.fetchSemanticsNode().boundsInRoot
+        assertTrue(openBounds.left < closedBounds.left)
+        assertTrue(openBounds.left >= 0f)
+        compose.onNodeWithText(record.body).assertIsDisplayed()
+        captureAccountScreen("footprint-swiped", compose)
+        compose.onNodeWithTag("archive-visit-layout-only-record").performTouchInput { swipeRight() }
+        assertEquals(closedBounds.left, surface.fetchSemanticsNode().boundsInRoot.left, 1f)
+        assertEquals(closedBounds.width, surface.fetchSemanticsNode().boundsInRoot.width, 1f)
+        compose.onNodeWithTag("archive-visit-layout-only-record").performTouchInput { swipeLeft() }
         compose.onNodeWithContentDescription("删除感想与照片").performClick()
         compose.onNodeWithText("到访日期与已经获得的认证会保留。").assertIsDisplayed()
         compose.onNodeWithText("取消").performClick()
