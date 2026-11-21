@@ -88,21 +88,7 @@ internal fun WorldHudOverlay(
     val hud = readHud()
 
     Box(modifier.fillMaxSize()) {
-        // 1. Header (#header): full 128dp wall header on globe overview, compact 64dp bar + breadcrumb zoomed in.
-        WorldHeaderBar(
-            compact = hud.compactHeader,
-            regionName = hud.regionName,
-            cityName = hud.cityName,
-            cityCount = cityCount,
-            placeCount = placeCount,
-            interactive = interactive,
-            unit = unit,
-            onGoGlobe = onGoGlobe,
-            onZoomRegion = onZoomRegion,
-            onZoomCity = onZoomCity,
-        )
-
-        // 2. Stage overlays (offset below compact 64*unit top bar).
+        // Stage overlays start at the compact header's bottom edge.
         Box(
             Modifier
                 .fillMaxSize()
@@ -225,6 +211,20 @@ internal fun WorldHudOverlay(
                 )
             }
         }
+
+        // The expanded header covers stage controls that are still fading out.
+        WorldHeaderBar(
+            compact = hud.compactHeader,
+            regionName = hud.regionName,
+            cityName = hud.cityName,
+            cityCount = cityCount,
+            placeCount = placeCount,
+            interactive = interactive,
+            unit = unit,
+            onGoGlobe = onGoGlobe,
+            onZoomRegion = onZoomRegion,
+            onZoomCity = onZoomCity,
+        )
     }
 }
 

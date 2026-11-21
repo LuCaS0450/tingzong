@@ -404,6 +404,8 @@ internal class NativeWorldController(
             .pixelRatio(density)
         mapView = MapView(context, options).apply {
             setBackgroundColor(Color.TRANSPARENT)
+            // Compose exposes the map controls and pins with their actual actions and labels.
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
                     if (clipGlobeActive && clipGlobeR > 1f) {

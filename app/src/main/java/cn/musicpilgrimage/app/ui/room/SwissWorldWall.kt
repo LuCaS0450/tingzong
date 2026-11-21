@@ -197,6 +197,9 @@ internal fun SwissWorldWall(
                         }
                     },
                 )
+                if (active && motion) {
+                    WorldTransitionAtmosphere(ctrl, Modifier.fillMaxSize())
+                }
                 WorldPinOverlay(
                     controller = ctrl,
                     modifier = Modifier.fillMaxSize(),
