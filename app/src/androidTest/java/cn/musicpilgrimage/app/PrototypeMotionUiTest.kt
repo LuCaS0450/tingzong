@@ -61,7 +61,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import cn.musicpilgrimage.app.data.Catalog
+import cn.musicpilgrimage.app.data.Place
 import cn.musicpilgrimage.app.data.ReleaseArtwork
+import cn.musicpilgrimage.app.data.Scene
 import cn.musicpilgrimage.app.performance.Judgment
 import cn.musicpilgrimage.app.performance.LibraryDatabase
 import cn.musicpilgrimage.app.performance.MusicEvent
@@ -93,10 +96,13 @@ import cn.musicpilgrimage.app.ui.LocalRouteIsCurrent
 import cn.musicpilgrimage.app.ui.LocalSheetCoordinator
 import cn.musicpilgrimage.app.ui.PilgrimageTheme
 import cn.musicpilgrimage.app.ui.rememberAppHaptics
+import cn.musicpilgrimage.app.ui.room.RoomBrowseState
 import cn.musicpilgrimage.app.ui.room.RoomCommunityPhotoViewer
 import cn.musicpilgrimage.app.ui.room.RoomPerformanceResult
 import cn.musicpilgrimage.app.ui.room.RoomWall
 import cn.musicpilgrimage.app.ui.room.SwissWebDetail
+import cn.musicpilgrimage.app.ui.room.SwissWorldWall
+import cn.musicpilgrimage.app.ui.room.WorldFocusKind
 import cn.musicpilgrimage.app.ui.room.swissDetailData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -1324,471 +1330,97 @@ class PrototypeMotionUiTest {
         assertNull(coordinator.activeMorph)
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
     @Test
-    fun worldJs_p2_2_summaryGesturesAndProgrammaticCameraTarget_realWebView() {
+    fun nativeWorld_p2_2_programmaticCameraTargetAndSummaryMotion() {
         val ctx = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
-        var webRef: WebView? = null
-        val posted = CopyOnWriteArrayList<JSONObject>()
-
-        val harnessHtml = """
-            <!doctype html>
-            <html lang="zh-CN">
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-              <script>
-                window.__jsErrors = [];
-                window.addEventListener('error', function(e) { window.__jsErrors.push(String((e && e.message) || e)); });
-                window.__cameraLog = [];
-                window.__finishCameraMove = function() {
-                  if (window.__activeMap) window.__activeMap.__finish();
-                };
-                window.maplibregl = (function() {
-                  function LngLat(lng, lat) {
-                    this.lng = Number(lng);
-                    this.lat = Number(lat);
-                    this.wrap = function() { return new LngLat(this.lng, this.lat); };
-                  }
-                  function toLngLat(c) {
-                    if (c instanceof LngLat) return c;
-                    if (Array.isArray(c)) return new LngLat(c[0], c[1]);
-                    return new LngLat(c.lng, c.lat);
-                  }
-                  class FakeMap {
-                    constructor(opts) {
-                      window.__activeMap = this;
-                      this._center = toLngLat(opts.center || [0, 0]);
-                      this._zoom = Number.isFinite(opts.zoom) ? opts.zoom : 1;
-                      this._offset = [0, 0];
-                      this._easing = false;
-                      this._handlers = {};
-                      this._onceHandlers = {};
-                      this.container = typeof opts.container === 'string' ? document.getElementById(opts.container) : opts.container;
-                      this.canvas = document.createElement('canvas');
-                      this.canvas.width = 720;
-                      this.canvas.height = 1280;
-                      this.container.appendChild(this.canvas);
-                      const makePt = (x, y) => ({ x, y, clone() { return makePt(this.x, this.y); } });
-                      this.transform = {
-                        centerPoint: makePt(180, 260),
-                        _globeness: 1,
-                        worldSize: 512,
-                        cameraToCenterDistance: 800,
-                        setZoom: (z) => { this._zoom = z; },
-                        setCenter: (c) => { this._center = toLngLat(c); },
-                        setTransitionState: () => {},
-                        clone: () => this.transform,
-                        maxBounds: null,
-                        latRange: [-80, 80],
-                        zoom: 1,
-                        center: this._center,
-                        width: 360,
-                        height: 640
-                      };
-                      this.dragPan = { disable: () => {} };
-                      this.touchZoomRotate = { disable: () => {} };
-                      this.doubleClickZoom = { disable: () => {} };
-                      this.scrollZoom = { disable: () => {} };
-                      this.boxZoom = { disable: () => {} };
-                      this.style = {
-                        projection: { transitionState: 0 },
-                        placement: { transform: { zoom: 1, _globeness: 1 } }
-                      };
-                      this._sources = new Map();
-                      setTimeout(() => {
-                        this._emit('style.load');
-                        setTimeout(() => { this._emit('load'); this._emit('idle'); }, 10);
-                      }, 10);
-                    }
-                    _emit(name, payload = {}) {
-                      (this._handlers[name] || []).slice().forEach(fn => fn(payload));
-                      const once = this._onceHandlers[name] || [];
-                      this._onceHandlers[name] = [];
-                      once.forEach(fn => fn(payload));
-                    }
-                    on(n, fn) { (this._handlers[n] = this._handlers[n] || []).push(fn); }
-                    once(n, fn) { (this._onceHandlers[n] = this._onceHandlers[n] || []).push(fn); }
-                    off(n, fn) { this._handlers[n] = (this._handlers[n] || []).filter(x => x !== fn); }
-                    getContainer() { return this.container; }
-                    getCanvas() { return this.canvas; }
-                    getCenter() { return this._center; }
-                    getZoom() { return this._zoom; }
-                    setZoom(z) { this._zoom = z; this.transform.zoom = z; }
-                    setCenter(c) { this._center = toLngLat(c); this.transform.center = this._center; }
-                    isEasing() { return this._easing; }
-                    isMoving() { return this._easing; }
-                    getMinZoom() { return -3; }
-                    getMaxZoom() { return 18; }
-                    project(lngLat) {
-                      const ll = toLngLat(lngLat);
-                      return { x: 180 + (ll.lng - this._center.lng) * 4, y: 260 - (ll.lat - this._center.lat) * 4 };
-                    }
-                    unproject(pt) {
-                      const x = Array.isArray(pt) ? pt[0] : pt.x;
-                      const y = Array.isArray(pt) ? pt[1] : pt.y;
-                      return new LngLat(this._center.lng + (x - 180) / 4, this._center.lat - (y - 260) / 4);
-                    }
-                    stop() {
-                      const wasEasing = this._easing;
-                      this._easing = false;
-                      if (wasEasing) this._emit('moveend');
-                    }
-                    __finish() {
-                      if (!this._easing) return;
-                      this._easing = false;
-                      if (this._pending) {
-                        this._center = this._pending.center;
-                        this._zoom = this._pending.zoom;
-                        this._offset = this._pending.offset;
-                        this._pending = null;
-                      }
-                      this._emit('move');
-                      this._emit('moveend');
-                    }
-                    jumpTo(o) {
-                      this._easing = false;
-                      this._center = toLngLat(o.center);
-                      if (Number.isFinite(o.zoom)) this._zoom = o.zoom;
-                      this._offset = o.offset || [0, 0];
-                      this.transform.zoom = this._zoom;
-                      this.transform.center = this._center;
-                    }
-                    _animate(kind, o) {
-                      const targetCenter = toLngLat(o.center || this._center);
-                      const targetZoom = Number.isFinite(o.zoom) ? o.zoom : this._zoom;
-                      const targetOffset = o.offset || [0, 0];
-                      window.__cameraLog.push({
-                        kind, center: [targetCenter.lng, targetCenter.lat],
-                        zoom: targetZoom, offset: [...targetOffset],
-                        duration: o.duration, animate: o.animate, essential: Boolean(o.essential)
-                      });
-                      if (o.duration === 0 || o.animate === false) {
-                        this._easing = false;
-                        this._center = targetCenter;
-                        this._zoom = targetZoom;
-                        this._offset = [...targetOffset];
-                        this._pending = null;
-                        this._emit('movestart');
-                        this._emit('move');
-                        this._emit('moveend');
-                        return;
-                      }
-                      this._easing = true;
-                      this._pending = { center: targetCenter, zoom: targetZoom, offset: [...targetOffset] };
-                      this._center = new LngLat((this._center.lng + targetCenter.lng) / 2, (this._center.lat + targetCenter.lat) / 2);
-                      this._zoom = (this._zoom + targetZoom) / 2;
-                      this._emit('movestart');
-                      this._emit('move');
-                    }
-                    flyTo(o) { this._animate('flyTo', o); }
-                    easeTo(o) { this._animate('easeTo', o); }
-                    setVerticalFieldOfView() {}
-                    setProjection() {}
-                    setPixelRatio() {}
-                    setGlyphs() {}
-                    fire(name, payload = {}) { this._emit(name, payload); }
-                    getSource(id) { return this._sources.get(id) || { setData: ()=>{}, setTiles: ()=>{} }; }
-                    addSource(id, src) { this._sources.set(id, { ...src, setData: ()=>{}, setTiles: ()=>{} }); }
-                    getLayer() { return null; }
-                    addLayer() {}
-                    removeLayer() {}
-                    removeSource() {}
-                    isSourceLoaded() { return true; }
-                    triggerRepaint() {}
-                    queryRenderedFeatures() { return []; }
-                    querySourceFeatures() { return []; }
-                    resize() {}
-                    getBounds() { return { getWest:()=>-180, getEast:()=>180, getSouth:()=>-80, getNorth:()=>80, contains:()=>true }; }
-                  }
-                  return {
-                    LngLat,
-                    Map: FakeMap,
-                    setWorkerCount: () => {},
-                    addProtocol: () => {},
-                    removeProtocol: () => {},
-                    MercatorCoordinate: { fromLngLat: () => ({ x: 0.5, y: 0.5, z: 0 }) }
-                  };
-                })();
-              </script>
-              <script defer src="gestures.js"></script>
-              <script defer src="preview.js"></script>
-              <script defer src="earth.js"></script>
-              <script defer src="focus-layer.js"></script>
-              <script defer src="surface-markers.js"></script>
-              <script defer src="world.js"></script>
-            </head>
-            <body style="margin:0">
-              <main id="world" style="width:360px;height:640px;position:relative">
-                <header id="header"><div class="heading"><h1></h1></div><div id="meta"><span id="count"></span></div>
-                  <nav id="crumb"><button data-zoom="0.5"></button><span id="region"></span><span id="city"></span></nav>
-                  <button id="list"></button><button id="search"></button>
-                </header>
-                <div id="stage" style="width:360px;height:520px;position:relative">
-                  <div id="shadow" hidden></div><canvas id="globe-preview" width="304" height="304"></canvas>
-                  <div id="map" style="width:360px;height:520px"></div>
-                  <canvas id="surface-markers" width="360" height="520"></canvas>
-                  <button id="mini"><i></i></button><p id="hint" hidden></p>
-                  <div id="loading" hidden><i></i><button id="retry"></button></div>
-                  <div id="progress" hidden></div><div id="scale"><span></span><i></i></div>
-                  <div id="dock"><button id="trips"></button><button id="footprints"></button></div>
-                  <div id="rail"><button id="plus"></button><div class="track"><button data-zoom="15"></button><button data-zoom="11"></button><button data-zoom="5"></button><button data-zoom="0.5"></button><b id="level"></b></div><button id="minus"></button></div>
-                </div>
-                <section id="summary" hidden style="width:340px;height:220px;position:absolute;bottom:12px;left:10px">
-                  <div class="handle"></div><button id="close"></button><p id="kind"></p><h2 id="place-name"></h2><p id="place-city"></p>
-                  <div id="work"><img id="art" alt=""><div><strong id="work-title"></strong><p id="work-credit"></p></div></div>
-                  <div id="actions"><button id="favorite"><svg><path></path></svg></button><button id="around"></button><button id="add"></button><button id="detail"></button></div>
-                </section>
-                <dialog id="chooser"><h2 id="chooser-title"></h2><button id="chooser-close"></button><input id="filter"><div id="options"></div></dialog>
-                <dialog id="prototype-detail"><button id="detail-back"></button><div id="detail-content"></div></dialog>
-                <div id="toast" hidden></div><div id="map-accessibility"></div>
-              </main>
-            </body>
-            </html>
-        """.trimIndent()
+        val scene = Scene("scene", "artist", "艺人", "测试作品", imageStatus = "approved", verificationStatus = "verified")
+        val catalog = Catalog(
+            listOf(
+                Place("p1", "地点甲", "巴黎", "法国", 48.8566, 2.3522, scenes = listOf(scene)),
+                Place("p2", "地点乙", "维也纳", "奥地利", 48.2082, 16.3738, scenes = listOf(scene.copy(id = "scene2"))),
+            )
+        )
+        var motion by mutableStateOf(true)
+        lateinit var browse: RoomBrowseState
 
         compose.setContent {
-            AndroidView(
-                factory = { context ->
-                    WebView(context).apply {
-                        settings.javaScriptEnabled = true
-                        addJavascriptInterface(
-                            object {
-                                @JavascriptInterface
-                                fun postMessage(raw: String) {
-                                    runCatching { JSONObject(raw) }.onSuccess { posted.add(it) }
-                                }
-                            },
-                            "TingzongWorld",
-                        )
-                        webViewClient = object : WebViewClient() {
-                            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-                                val path = request.url.path ?: return null
-                                if (path == "/test-harness.html") {
-                                    return WebResourceResponse(
-                                        "text/html",
-                                        "UTF-8",
-                                        200,
-                                        "OK",
-                                        emptyMap(),
-                                        ByteArrayInputStream(harnessHtml.toByteArray()),
-                                    )
-                                }
-                                if (path == "/countries.json") {
-                                    return WebResourceResponse(
-                                        "application/json",
-                                        "UTF-8",
-                                        200,
-                                        "OK",
-                                        emptyMap(),
-                                        ByteArrayInputStream("""{"countries":[]}""".toByteArray()),
-                                    )
-                                }
-                                val assetRel = path.removePrefix("/")
-                                if (assetRel.endsWith(".js") || assetRel.endsWith(".json") || assetRel.endsWith(".jpg")) {
-                                    return runCatching {
-                                        val mime = when {
-                                            assetRel.endsWith(".json") -> "application/json"
-                                            assetRel.endsWith(".jpg") -> "image/jpeg"
-                                            else -> "application/javascript"
-                                        }
-                                        WebResourceResponse(mime, "UTF-8", 200, "OK", emptyMap(), ctx.assets.open("design/swiss-world/$assetRel"))
-                                    }.getOrNull()
-                                }
-                                return null
-                            }
-                        }
-                        loadUrl("https://world.tingzong.local/test-harness.html")
-                        webRef = this
-                    }
-                },
-                modifier = Modifier.width(360.dp).height(640.dp),
-            )
-        }
-
-        val bootPayload = JSONObject()
-            .put("motion", true)
-            .put("favorites", JSONArray())
-            .put("visits", JSONArray())
-            .put("state", JSONObject().put("longitude", 10.0).put("latitude", 20.0).put("zoom", 1.0))
-            .put(
-                "places",
-                JSONArray()
-                    .put(
-                        JSONObject().put("id", "p1").put("name", "地点甲").put("city", "巴黎").put("country", "法国")
-                            .put("lat", 48.8566).put("lon", 2.3522).put("category", "地标"),
+            val currentCtx = LocalContext.current
+            val rememberedBrowse = remember(currentCtx) { RoomBrowseState(currentCtx) }
+            browse = rememberedBrowse
+            androidx.compose.runtime.DisposableEffect(rememberedBrowse) {
+                onDispose { rememberedBrowse.worldController?.destroy() }
+            }
+            PilgrimageTheme {
+                CompositionLocalProvider(LocalPhysicalMotion provides motion) {
+                    SwissWorldWall(
+                        catalog = catalog,
+                        browse = rememberedBrowse,
+                        favorites = emptySet(),
+                        favoriteBusy = false,
+                        onPlace = {},
+                        onFavorite = {},
+                        onTrips = {},
+                        onFootprints = {},
+                        onAdd = {},
+                        onSearch = {},
+                        onBack = {},
+                        visits = emptySet(),
+                        active = true,
                     )
-                    .put(
-                        JSONObject().put("id", "p2").put("name", "地点乙").put("city", "维也纳").put("country", "奥地利")
-                            .put("lat", 48.2082).put("lon", 16.3738).put("category", "地标"),
-                    ),
-            )
-
-        compose.waitUntil(8_000) {
-            val w = webRef ?: return@waitUntil false
-            evalSync(w, "Boolean(typeof window.updateNativeWorld === 'function')") == "true"
-        }
-        val web = checkNotNull(webRef)
-        assertEquals("0", evalSync(web, "window.__jsErrors.length"))
-        evalSync(web, "window.updateNativeWorld(${bootPayload}); true")
-        compose.waitUntil(8_000) {
-            val errs = evalSync(web, "window.__jsErrors.length")
-            check(errs == "0") { "JS errors in world harness: ${evalSync(web, "JSON.stringify(window.__jsErrors)")}" }
-            evalSync(web, "Boolean(window.worldDiagnostics && window.worldDiagnostics().ready)") == "true"
+                }
+            }
         }
 
-        // 1) Programmatic camera target + Reduce Motion toggled mid-flyTo lands at exact target coordinates & offset.
-        evalSync(web, "window.__cameraLog = []; window.updateNativeWorld({ focus: 'p1', motion: true }); true")
-        val targetMidA = decodeJsonString(evalSync(web, "JSON.stringify(window.worldDiagnostics())"))
-        val savedTargetA = targetMidA.getJSONObject("cameraTarget")
-        assertEquals("flyTo", savedTargetA.getString("controller"))
-        assertEquals("p1", savedTargetA.getString("placeId"))
-        assertEquals(2.3522, savedTargetA.getJSONArray("center").getDouble(0), 0.001)
-        assertEquals(48.8566, savedTargetA.getJSONArray("center").getDouble(1), 0.001)
-
-        evalSync(web, "window.updateNativeWorld({ motion: false }); true")
-        val afterReduceA = decodeJsonString(evalSync(web, "JSON.stringify(window.worldDiagnostics())"))
-        assertTrue(afterReduceA.isNull("cameraTarget"))
-        assertEquals(2.3522, afterReduceA.getJSONObject("state").getDouble("longitude"), 0.001)
-        assertEquals(48.8566, afterReduceA.getJSONObject("state").getDouble("latitude"), 0.001)
-        assertEquals(15.0, afterReduceA.getJSONObject("state").getDouble("zoom"), 0.01)
-
-        // 2) Switch Place A -> Place B mid-flight, then toggle Reduce Motion -> lands at B (NOT A).
-        evalSync(web, "window.updateNativeWorld({ motion: true, state: { longitude: 0, latitude: 0, zoom: 1 } }); window.__activeMap.jumpTo({ center:[0,0], zoom: 1 }); window.__cameraLog = []; true")
-        evalSync(web, "window.updateNativeWorld({ focus: 'p1' }); window.updateNativeWorld({ focus: 'p2' }); window.updateNativeWorld({ motion: false }); true")
-        val afterSwitchB = decodeJsonString(evalSync(web, "JSON.stringify(window.worldDiagnostics())"))
-        assertTrue(afterSwitchB.isNull("cameraTarget"))
-        assertEquals(16.3738, afterSwitchB.getJSONObject("state").getDouble("longitude"), 0.001)
-        assertEquals(48.2082, afterSwitchB.getJSONObject("state").getDouble("latitude"), 0.001)
-
-        // 3) Manual touchstart / mousedown during flight clears saved cameraTarget; subsequent Reduce Motion preserves manual position.
-        evalSync(web, "window.updateNativeWorld({ motion: true }); window.__activeMap.jumpTo({ center:[0,0], zoom: 1 }); window.updateNativeWorld({ focus: 'p1' }); true")
-        evalSync(
-            web,
-            """
-            (() => {
-              const m = document.getElementById('map');
-              m.dispatchEvent(new MouseEvent('mousedown', { clientX: 180, clientY: 260, bubbles: true, cancelable: true }));
-              window.__activeMap.jumpTo({ center: [77.5, -12.25], zoom: 3.5 });
-              m.dispatchEvent(new MouseEvent('mouseup', { clientX: 180, clientY: 260, bubbles: true, cancelable: true }));
-              return true;
-            })()
-            """.trimIndent(),
-        )
-        val afterManualInput = decodeJsonString(evalSync(web, "JSON.stringify(window.worldDiagnostics())"))
-        assertTrue("Manual input must clear programmatic cameraTarget", afterManualInput.isNull("cameraTarget"))
-        evalSync(web, "window.updateNativeWorld({ motion: false }); true")
-        val afterManualReduce = decodeJsonString(evalSync(web, "JSON.stringify(window.worldDiagnostics())"))
-        assertEquals(77.5, afterManualReduce.getJSONObject("state").getDouble("longitude"), 0.001)
-        assertEquals(-12.25, afterManualReduce.getJSONObject("state").getDouble("latitude"), 0.001)
-
-        // 4) Summary gestures: pointercancel (> threshold) returns to OPEN; pointerup (> threshold) closes; Reduce Motion mid-drag restores clean inline styles synchronously.
-        val takeover = decodeJsonString(evalSync(web, """
-            (() => {
-              window.updateNativeWorld({ motion: true, focus: 'p1' });
-              window.__finishCameraMove();
-              const s = document.getElementById('summary');
-              const work = document.getElementById('work');
-              for (const anim of s.getAnimations({subtree:true})) {
-                anim.pause();
-                anim.currentTime = 42;
-              }
-              const snapshot = () => {
-                const {transform, opacity, clipPath} = getComputedStyle(s);
-                const {transform: workTransform, opacity: workOpacity} = getComputedStyle(work);
-                return {transform, opacity, clipPath, workTransform, workOpacity};
-              };
-              const fire = (type,y) => s.dispatchEvent(new PointerEvent(type, {
-                pointerId:6, clientX:120, clientY:y, isPrimary:true, bubbles:true, cancelable:true
-              }));
-              const before=snapshot();
-              fire('pointerdown',400);
-              const after=snapshot();
-              fire('pointermove',430);
-              const down=new DOMMatrix(s.style.transform);
-              fire('pointermove',395);
-              const up=new DOMMatrix(s.style.transform);
-              fire('pointercancel',395);
-              return JSON.stringify({before, after, down:down.m42, up:up.m42, scale:up.m11});
-            })()
-        """.trimIndent()))
-        val before = takeover.getJSONObject("before")
-        val after = takeover.getJSONObject("after")
-        assertTrue("Must sample a partially clipped opening frame", before.getString("clipPath") != "none")
-        for (key in listOf("transform", "opacity", "clipPath", "workTransform", "workOpacity")) {
-            assertEquals("Taking over must keep the rendered $key",before.getString(key),after.getString(key))
+        compose.waitUntil(15_000) {
+            compose.runOnUiThread {
+                val diag = browse.worldController?.diagnostics()
+                diag != null && diag.ready && diag.hasVisual
+            }
         }
-        assertTrue(takeover.getDouble("down") > takeover.getDouble("up"))
-        assertTrue(takeover.getDouble("scale") < 1.0)
-        compose.waitUntil(4_000) {
-            evalSync(web, "window.worldDiagnostics().summaryState.visual") == "\"open\""
-        }
-        evalSync(
-            web,
-            """
-            (() => {
-              const s = document.getElementById('summary');
-              const fire = (type, y) => s.dispatchEvent(new PointerEvent(type, { pointerId: 7, clientX: 120, clientY: y, isPrimary: true, bubbles: true, cancelable: true }));
-              fire('pointerdown', 400);
-              fire('pointermove', 540);
-              fire('pointercancel', 540);
-              return true;
-            })()
-            """.trimIndent(),
-        )
-        compose.waitUntil(4_000) {
-            val st = decodeJsonString(evalSync(web, "JSON.stringify(window.worldDiagnostics().summaryState)"))
-            st.getBoolean("open") && !st.getBoolean("dragging") && !st.getBoolean("hidden")
+        val ctrl = checkNotNull(browse.worldController)
+
+        // 1) Programmatic camera target + Reduce Motion toggled mid-flight settles immediately at p1.
+        compose.runOnUiThread { browse.focusWorld("p1", WorldFocusKind.Street) }
+        compose.waitForIdle()
+        compose.runOnUiThread { motion = false }
+        compose.waitUntil(5_000) {
+            compose.runOnUiThread {
+                val d = ctrl.diagnostics()
+                !ctrl.hasPendingCameraTarget() &&
+                    kotlin.math.abs(d.latitude - 48.8566) < 0.05 &&
+                    kotlin.math.abs(d.longitude - 2.3522) < 0.05 &&
+                    d.zoom >= 14.5
+            }
         }
 
-        // Drag down past threshold and toggle Reduce Motion ON mid-drag -> stays cleanly open with cleared transform & opacity.
-        val midDragReduce = decodeJsonString(
-            evalSync(
-                web,
-                """
-                (() => {
-                  const s = document.getElementById('summary');
-                  const fire = (type, y) => s.dispatchEvent(new PointerEvent(type, { pointerId: 9, clientX: 120, clientY: y, isPrimary: true, bubbles: true, cancelable: true }));
-                  fire('pointerdown', 400);
-                  fire('pointermove', 500);
-                  window.updateNativeWorld({ motion: false });
-                  return JSON.stringify({
-                    diag: window.worldDiagnostics().summaryState,
-                    transform: s.style.transform || '',
-                    opacity: s.style.opacity || '',
-                    clipPath: s.style.clipPath || ''
-                  });
-                })()
-                """.trimIndent(),
-            ),
-        )
-        assertTrue(midDragReduce.getJSONObject("diag").getBoolean("open"))
-        assertFalse(midDragReduce.getJSONObject("diag").getBoolean("hidden"))
-        assertEquals("", midDragReduce.getString("transform"))
-        assertEquals("", midDragReduce.getString("opacity"))
+        // 2) Switch Place p1 -> p2 mid-flight, then toggle Reduce Motion -> lands at p2 (NOT p1).
+        compose.runOnUiThread {
+            motion = true
+            ctrl.jumpTo(0.0, 0.0, 1.0)
+        }
+        compose.waitForIdle()
+        compose.runOnUiThread {
+            browse.focusWorld("p1", WorldFocusKind.Street)
+            browse.focusWorld("p2", WorldFocusKind.Street)
+            motion = false
+        }
+        compose.waitUntil(5_000) {
+            compose.runOnUiThread {
+                val d = ctrl.diagnostics()
+                !ctrl.hasPendingCameraTarget() &&
+                    kotlin.math.abs(d.latitude - 48.2082) < 0.05 &&
+                    kotlin.math.abs(d.longitude - 16.3738) < 0.05 &&
+                    d.zoom >= 14.5
+            }
+        }
 
-        // Re-enable motion, pointerup past threshold closes summary; switching to p2 mid-close keeps summary open on p2.
-        evalSync(
-            web,
-            """
-            (() => {
-              window.updateNativeWorld({ motion: true });
-              const s = document.getElementById('summary');
-              const fire = (type, y) => s.dispatchEvent(new PointerEvent(type, { pointerId: 11, clientX: 120, clientY: y, isPrimary: true, bubbles: true, cancelable: true }));
-              fire('pointerdown', 380);
-              fire('pointermove', 560);
-              fire('pointerup', 560);
-              window.updateNativeWorld({ focus: 'p2' });
-              window.__finishCameraMove();
-              return true;
-            })()
-            """.trimIndent(),
-        )
-        SystemClock.sleep(280)
-        val afterSwapB = decodeJsonString(evalSync(web, "JSON.stringify({ diag: window.worldDiagnostics().summaryState, name: document.getElementById('place-name').textContent })"))
-        assertTrue("Switching place during closing animation must keep B open", afterSwapB.getJSONObject("diag").getBoolean("open"))
-        assertFalse(afterSwapB.getJSONObject("diag").getBoolean("hidden"))
-        assertEquals("地点乙", afterSwapB.getString("name"))
+        // 3) Summary open, swipe dismiss, and immediate reopen/swap onto p1 keeps summary open on p1.
+        compose.runOnUiThread { motion = true }
+        compose.onNodeWithTag("world-place-summary").assertIsDisplayed()
+        compose.onNodeWithTag("world-summary-handle").performTouchInput { swipeDown() }
+        compose.runOnUiThread { browse.focusWorld("p1", WorldFocusKind.List) }
+        compose.onNodeWithTag("world-place-summary").assertIsDisplayed()
+        compose.onNodeWithTag("world-summary-title").assertIsDisplayed()
     }
 
     @ExtendedDeviceTest

@@ -51,19 +51,30 @@ android {
         }
     }
     buildTypes {
-        if (providers.gradleProperty("tingzongReview").orNull == "true") {
-            getByName("debug") { applicationIdSuffix = ".review"; versionNameSuffix = "-review" }
-        }
-        if (providers.gradleProperty("tingzongProfile").orNull == "true") {
-            require(providers.gradleProperty("tingzongReview").orNull == "true") { "Performance preview requires the private review package" }
-            getByName("debug") { isDebuggable = false; isJniDebuggable = false }
+        getByName("debug") {
+            ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+            if (providers.gradleProperty("tingzongReview").orNull == "true") {
+                applicationIdSuffix = ".review"
+                versionNameSuffix = "-review"
+            }
+            if (providers.gradleProperty("tingzongProfile").orNull == "true") {
+                require(providers.gradleProperty("tingzongReview").orNull == "true") { "Performance preview requires the private review package" }
+                isDebuggable = false
+                isJniDebuggable = false
+            }
         }
         release {
-        isMinifyEnabled = false
-        if(signingSettings.isNotEmpty()) signingConfig = signingConfigs.getByName("pilgrimageRelease")
-        proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-    } }
-    packaging { resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}") }
+            ndk { abiFilters += listOf("arm64-v8a") }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            if (signingSettings.isNotEmpty()) signingConfig = signingConfigs.getByName("pilgrimageRelease")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+    packaging {
+        resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}")
+        jniLibs { useLegacyPackaging = true }
+    }
     testOptions {
         unitTests.isReturnDefaultValues = true
         if (verifyLocalAssets.orNull != "true") {
@@ -89,7 +100,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.navigation:navigation-compose:2.8.9")
-    implementation("androidx.webkit:webkit:1.16.0")
+    implementation("org.maplibre.gl:android-sdk-opengl:2026.11.2-globe")
     implementation("androidx.datastore:datastore-preferences:1.1.4")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("androidx.camera:camera-camera2:1.5.3")

@@ -70,9 +70,9 @@ internal val SwissWallMuted=cn.musicpilgrimage.app.design.AppArt.WallMuted
     var streetCamera by mutableStateOf(prefs.getString("street-camera",null)?.split(',')?.mapNotNull(String::toDoubleOrNull)?.takeIf{it.size==3&&it.all(Double::isFinite)}); private set
     var playIndex=prefs.getInt("play-index",0); private set
     var playOffset=prefs.getInt("play-offset",0); private set
-    var worldState: WorldCameraSnapshot? = null
+    var worldState by mutableStateOf<WorldCameraSnapshot?>(null)
         private set
-    var worldScene:WorldScene?=null
+    var worldController: NativeWorldController? = null
     var worldSelection by mutableStateOf<WorldSelection?>(null); private set
     var worldFocus by mutableStateOf<WorldFocus?>(null); private set
     private var worldFocusToken=0L
@@ -82,6 +82,12 @@ internal val SwissWallMuted=cn.musicpilgrimage.app.design.AppArt.WallMuted
     }
 
     fun world(value: WorldCameraSnapshot) { worldState = value }
+    fun restoreWorldState(snapshot: WorldCameraSnapshot) {
+        worldState = snapshot
+        if (snapshot.selected.isNotBlank()) {
+            worldSelection = WorldSelection(snapshot.selected, snapshot.summaryOpen)
+        }
+    }
     fun focusWorld(id:String,kind:WorldFocusKind=WorldFocusKind.Street) {
         worldSelection=WorldSelection(id,true)
         worldFocus=WorldFocus(id,kind,++worldFocusToken)

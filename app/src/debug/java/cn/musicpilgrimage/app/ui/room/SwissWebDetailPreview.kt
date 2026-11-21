@@ -90,20 +90,7 @@ private data class CachedCoverPreview(val entryId: String?, val data: String?)
     val releaseId=data.optJSONArray("releases")?.optJSONObject(0)?.optString("id")?.takeIf{it.isNotBlank()}
     val morphKey=if(isAlbum&&releaseId!=null)"release:$releaseId" else null
     val morphRoute=if(isAlbum&&releaseId!=null)"album/${Uri.encode(releaseId)}" else null
-    var canCreateWebView by remember{mutableStateOf(false)}
-    var startupSlow by remember{mutableStateOf(false)}
-    LaunchedEffect(context) {
-        (context.applicationContext as PilgrimageApplication).awaitWebViewStartup()
-        canCreateWebView=true
-    }
-    if(!canCreateWebView) {
-        LaunchedEffect(Unit) { delay(3600); startupSlow=true }
-        val retry={canCreateWebView=true}
-        val slow=startupSlow
-        if(data.optString("page")=="place")PlaceBodyLoading(slow,retry)
-        else ArchiveLoadingPage(data,slow,{onAction("back",JSONObject())},retry,coordinator,morphKey,morphRoute,entryId)
-        return
-    }
+    var canCreateWebView by remember{mutableStateOf(true)}
     SwissWebDetailContent(data,morphKey,morphRoute,onArchivePhoto,onAction)
 }
 

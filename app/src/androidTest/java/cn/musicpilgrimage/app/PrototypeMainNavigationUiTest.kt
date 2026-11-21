@@ -470,7 +470,7 @@ class PrototypeMainNavigationUiTest {
             compose.activity.setContent {
                 PilgrimageTheme {
                     CompositionLocalProvider(LocalPhysicalMotion provides false) {
-                        DisposableEffect(browse) { onDispose { browse.worldScene?.destroy() } }
+                        DisposableEffect(browse) { onDispose { browse.worldController?.destroy() } }
                         SwissWorldWall(catalog, browse, emptySet(), false, {}, {}, {}, {}, {}, {}, {}, emptySet(), true,
                             awaitMapStartup = { gate.await() })
                     }
@@ -481,11 +481,13 @@ class PrototypeMainNavigationUiTest {
         compose.onNodeWithTag("world-summary-title").assertTextEquals("北方测试地点")
         chooseWorldPlace("南方测试地点")
         compose.onNodeWithTag("world-summary-title").assertTextEquals("南方测试地点")
-        assertNull(compose.runOnUiThread { browse.worldScene })
+        assertNull(compose.runOnUiThread { browse.worldController })
         compose.runOnUiThread { gate.complete(Unit) }
         compose.waitUntil(20_000) {
-            evalWebByUrl("world.tingzong.local",
-                "Boolean(window.worldDiagnostics?.().state.selected === 'south-test' && window.worldDiagnostics().state.zoom >= 11)") == "true"
+            compose.runOnUiThread {
+                val diag = browse.worldController?.diagnostics()
+                diag != null && diag.ready && diag.hasVisual && diag.selected == "south-test" && diag.zoom >= 11.0
+            }
         }
         assertEquals(2L, compose.runOnUiThread { browse.worldFocus?.token })
         compose.onNodeWithTag("world-summary-close").performClick()

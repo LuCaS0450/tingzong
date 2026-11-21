@@ -38,7 +38,7 @@ class MaterialsCloudTest {
             val browse=RoomBrowseState(activity).apply { focusWorld(place.id, WorldFocusKind.List) }
             activity.setContent {
                 PilgrimageTheme {
-                    DisposableEffect(browse) { onDispose { browse.worldScene?.destroy() } }
+                    DisposableEffect(browse) { onDispose { browse.worldController?.destroy() } }
                     SwissWorldWall(catalog,browse,emptySet(),false,{},{},{},{},{},{},{},emptySet(),true)
                 }
             }

@@ -5,7 +5,7 @@
 | 任务 | 从这里开始 |
 | --- | --- |
 | 页面与导航 | [主界面和路由](../app/src/main/java/cn/musicpilgrimage/app/ui/PilgrimageApp.kt)。从路由追到当前页面和它使用的控件。 |
-| 世界地图 | [Android 世界页](../app/src/main/java/cn/musicpilgrimage/app/ui/room/SwissWorldWall.kt)、[地点选择和摘要](../app/src/main/java/cn/musicpilgrimage/app/ui/room/WorldPlacePanels.kt)及 [MapLibre 网页](../app/src/main/assets/design/swiss-world/index.html)。 |
+| 世界地图 | [Android 世界页](../app/src/main/java/cn/musicpilgrimage/app/ui/room/SwissWorldWall.kt)、[原生地图控制器](../app/src/main/java/cn/musicpilgrimage/app/ui/room/NativeWorldController.kt)、[离线调色与瓦片管线](../app/src/main/java/cn/musicpilgrimage/app/ui/room/WorldTilePipeline.kt)、[球面图钉与 HUD](../app/src/main/java/cn/musicpilgrimage/app/ui/room/WorldPinOverlay.kt)及[地点选择和摘要](../app/src/main/java/cn/musicpilgrimage/app/ui/room/WorldPlacePanels.kt)。 |
 | 档案与行程 | [发行](../app/src/main/java/cn/musicpilgrimage/app/ui/room/NativeReleaseArchive.kt)、[作品](../app/src/main/java/cn/musicpilgrimage/app/ui/room/NativeWorkArchive.kt)、[地点](../app/src/main/java/cn/musicpilgrimage/app/ui/room/NativePlaceArchive.kt)和[行程](../app/src/main/java/cn/musicpilgrimage/app/ui/room/NativeTripArchive.kt)档案由 Compose 绘制。行程列表和新增入口见[行程页面](../app/src/main/java/cn/musicpilgrimage/app/ui/room/MusicTripScreens.kt)。 |
 | 登录与个人资料 | [账号界面](../app/src/main/java/cn/musicpilgrimage/app/ui/room/MusicAccountScreens.kt)。足迹和收藏见[个人档案](../app/src/main/java/cn/musicpilgrimage/app/ui/room/MusicArchiveScreens.kt)。 |
 | 数据与规则 | [数据仓库](../app/src/main/java/cn/musicpilgrimage/app/data/Repositories.kt)、[作品目录与搜索](../app/src/main/java/cn/musicpilgrimage/app/data/MusicCatalogue.kt)、[地点搜索与到访规则](../app/src/main/java/cn/musicpilgrimage/app/data/CatalogSearch.kt)。 |

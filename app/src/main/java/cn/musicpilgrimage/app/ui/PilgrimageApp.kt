@@ -281,8 +281,16 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    val navigationReady=entry!=null
    val focus=LocalFocusManager.current;val keyboard=LocalSoftwareKeyboardController.current
    val context=LocalContext.current
-   val wallBrowse=remember(context){RoomBrowseState(context)}
-   DisposableEffect(wallBrowse){onDispose{wallBrowse.worldScene?.destroy();wallBrowse.worldScene=null}}
+   val savedWorldJson=rememberSaveable{mutableStateOf<String?>(null)}
+   val wallBrowse=remember(context){
+    RoomBrowseState(context).apply {
+     savedWorldJson.value?.let { raw ->
+      runCatching { WorldCameraSnapshot.parse(JSONObject(raw)) }.getOrNull()?.let(::restoreWorldState)
+     }
+    }
+   }
+   LaunchedEffect(wallBrowse){snapshotFlow{wallBrowse.worldState?.json()?.toString()}.collect{savedWorldJson.value=it}}
+   DisposableEffect(wallBrowse){onDispose{wallBrowse.worldController?.destroy();wallBrowse.worldController=null}}
    val scope=rememberCoroutineScope()
    val preferences=remember(context){AppPreferences(context)}
    val pref by preferences.changes.collectAsStateWithLifecycle(AppPreferencesState())
