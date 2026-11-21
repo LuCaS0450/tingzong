@@ -21,6 +21,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.maplibre.android.maps.MapView
 import java.io.File
 import kotlin.math.hypot
 
@@ -141,6 +142,26 @@ class WorldGestureInputTest {
     }
 
     @Test
+    fun zoomRailKeepsItsScreenPositionAcrossLevelLabels() {
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("wall-tab-1").performClick()
+        compose.waitUntil(15_000) { WorldTestRegistry.activeController?.let { diag(it).hasVisual } == true }
+        val ctrl = controller()
+        val zoomIn = compose.onNodeWithTag("world-zoom-in")
+        val initialX = zoomIn.fetchSemanticsNode().boundsInRoot.center.x
+        for (tag in listOf("world-zoom-region", "world-zoom-street", "world-zoom-globe")) {
+            compose.onNodeWithTag(tag).performClick()
+            val deadline = SystemClock.uptimeMillis() + 3_000
+            do {
+                assertEquals("Zoom rail moved at $tag", initialX, zoomIn.fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
+            } while (diag(ctrl).moving && SystemClock.uptimeMillis() < deadline)
+            assertFalse("Camera did not settle at $tag", diag(ctrl).moving)
+        }
+    }
+
+    @Test
     fun physicalPinchLocksFocusAndReverseKeepsTheBrowseState() {
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
@@ -182,6 +203,19 @@ class WorldGestureInputTest {
         lateinit var grabbed: Pair<Double, Double>
         instrumentation.runOnMainSync { grabbed = requireNotNull(ctrl.screenToLatLng(localX, localY)) }
 
+        var projectedFrames = 0
+        var largestPinError = 0.0
+        val checkPins = MapView.OnDidFinishRenderingFrameWithStatsListener { _, _ ->
+            if (ctrl.visiblePins.isNotEmpty()) projectedFrames++
+            for (pin in ctrl.visiblePins) {
+                val projected = ctrl.latLngToScreen(pin.lat, pin.lon) ?: continue
+                largestPinError = maxOf(
+                    largestPinError,
+                    hypot((projected.first - pin.x).toDouble(), (projected.second - pin.y).toDouble()),
+                )
+            }
+        }
+        instrumentation.runOnMainSync { ctrl.mapView.addOnDidFinishRenderingFrameListener(checkPins) }
         val down = SystemClock.uptimeMillis()
         event(down, MotionEvent.ACTION_DOWN, listOf(screenX to screenY))
         for (i in 1..40) {
@@ -197,7 +231,10 @@ class WorldGestureInputTest {
         val dragDrift = hypot((draggedScreen.first - localX - 80f).toDouble(), (draggedScreen.second - localY - 12f).toDouble())
         event(down, MotionEvent.ACTION_UP, listOf(screenX + 80f to screenY + 12f))
         idle(ctrl)
+        instrumentation.runOnMainSync { ctrl.mapView.removeOnDidFinishRenderingFrameListener(checkPins) }
         assertTrue("Grabbed globe coordinate must follow the finger: $dragDrift", dragDrift < 12.0)
+        assertTrue("Expected pin samples during rotation", projectedFrames >= 3)
+        assertTrue("A pin trailed the current map projection by $largestPinError px", largestPinError < 0.5)
 
         val before = diag(ctrl)
         assertTrue("Globe control must be operational before gestures", before.zoom < 2.0)
@@ -234,6 +271,8 @@ class WorldGestureInputTest {
 
         val record = JSONObject()
             .put("dragFocusDriftPx", dragDrift)
+            .put("pinProjectionErrorPx", largestPinError)
+            .put("pinFramesSampled", projectedFrames)
             .put("pinchFocusDriftPx", drift)
             .put("zoomDelta", zoomDelta)
             .put("globePanStop", panStopsOnRelease(ctrl, screenX, screenY))

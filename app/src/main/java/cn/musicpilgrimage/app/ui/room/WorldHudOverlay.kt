@@ -44,6 +44,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -53,12 +54,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cn.musicpilgrimage.app.design.AppArt
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
-import kotlin.math.roundToInt
 
 private val WorldFaint = Color(0xFF9A9E95)
 
@@ -68,7 +66,7 @@ private val WorldFaint = Color(0xFF9A9E95)
  */
 @Composable
 internal fun WorldHudOverlay(
-    hud: WorldHudState,
+    readHud: () -> WorldHudState,
     cityCount: Int,
     placeCount: Int,
     summaryOpen: Boolean,
@@ -87,11 +85,14 @@ internal fun WorldHudOverlay(
     val motion = LocalPhysicalMotion.current
     val context = LocalContext.current
     val miniGlobeBitmap = remember(context) { loadMiniGlobeBitmap(context) }
+    val hud = readHud()
 
     Box(modifier.fillMaxSize()) {
         // 1. Header (#header): full 128dp wall header on globe overview, compact 64dp bar + breadcrumb zoomed in.
         WorldHeaderBar(
-            hud = hud,
+            compact = hud.compactHeader,
+            regionName = hud.regionName,
+            cityName = hud.cityName,
             cityCount = cityCount,
             placeCount = placeCount,
             interactive = interactive,
@@ -210,13 +211,8 @@ internal fun WorldHudOverlay(
 
             // Right-edge zoom rail (hidden when summary card is open).
             if (!summaryOpen) {
-                val railZoom = if (hud.visualZoom < 4.0) {
-                    (hud.zoom - hud.globeZoom + 0.5).coerceAtLeast(0.5)
-                } else {
-                    hud.visualZoom
-                }
                 WorldZoomRail(
-                    zoom = railZoom,
+                    readHud = readHud,
                     levelLabel = hud.levelLabel,
                     interactive = interactive,
                     unit = unit,
@@ -234,7 +230,9 @@ internal fun WorldHudOverlay(
 
 @Composable
 private fun WorldHeaderBar(
-    hud: WorldHudState,
+    compact: Boolean,
+    regionName: String,
+    cityName: String,
     cityCount: Int,
     placeCount: Int,
     interactive: Boolean,
@@ -243,7 +241,7 @@ private fun WorldHeaderBar(
     onZoomRegion: () -> Unit,
     onZoomCity: () -> Unit,
 ) {
-    if (!hud.compactHeader) {
+    if (!compact) {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -321,23 +319,23 @@ private fun WorldHeaderBar(
                 ) {
                     BreadcrumbSegment(
                         label = "世界",
-                        highlighted = hud.regionName.isEmpty() && hud.cityName.isEmpty(),
+                        highlighted = regionName.isEmpty() && cityName.isEmpty(),
                         interactive = interactive,
                         onClick = onGoGlobe,
                     )
-                    if (hud.regionName.isNotEmpty()) {
+                    if (regionName.isNotEmpty()) {
                         Text(" / ", color = WorldFaint, fontSize = 12.sp)
                         BreadcrumbSegment(
-                            label = hud.regionName,
-                            highlighted = hud.cityName.isEmpty(),
+                            label = regionName,
+                            highlighted = cityName.isEmpty(),
                             interactive = interactive,
                             onClick = onZoomRegion,
                         )
                     }
-                    if (hud.cityName.isNotEmpty()) {
+                    if (cityName.isNotEmpty()) {
                         Text(" / ", color = WorldFaint, fontSize = 12.sp)
                         BreadcrumbSegment(
-                            label = hud.cityName,
+                            label = cityName,
                             highlighted = true,
                             interactive = interactive,
                             onClick = onZoomCity,
@@ -508,7 +506,7 @@ private fun WorldBottomDock(
 
 @Composable
 private fun WorldZoomRail(
-    zoom: Double,
+    readHud: () -> WorldHudState,
     levelLabel: String,
     interactive: Boolean,
     unit: Dp,
@@ -525,13 +523,12 @@ private fun WorldZoomRail(
             0.5 to ("缩放到地球" to "world-zoom-globe"),
         )
     }
-    val density = LocalDensity.current
     val trackHeight = unit * 96f
-    val fraction = ((15.0 - zoom) / 14.5).toFloat().coerceIn(0f, 1f)
 
     Box(modifier) {
         Column(
             modifier = Modifier
+                .align(Alignment.TopEnd)
                 .width(unit * 40f)
                 .shadow(3.dp)
                 .background(RoomColors.Paper.copy(alpha = 0.94f))
@@ -612,12 +609,21 @@ private fun WorldZoomRail(
         }
 
         // Dynamic red level badge + horizontal tick line aligned with current stop center on the rail track.
-        val badgeCenterY = 44.dp + trackHeight * (0.125f + 0.75f * fraction)
-        val badgeOffsetY = with(density) { (badgeCenterY - 10.dp).toPx().roundToInt() }
         Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset { IntOffset(x = with(density) { (-(unit * 39f)).toPx().roundToInt() }, y = badgeOffsetY) },
+                .layout { measurable, constraints ->
+                    val badge = measurable.measure(constraints)
+                    layout(badge.width, badge.height) {
+                        val hud = readHud()
+                        val fraction = WorldMapMath.zoomRailFraction(hud.zoom, hud.globeZoom)
+                        val centerY = 44.dp + trackHeight * (0.125f + 0.75f * fraction)
+                        badge.placeRelative(
+                            x = (-unit * 20f + 13.dp).roundToPx(),
+                            y = centerY.roundToPx() - badge.height / 2,
+                        )
+                    }
+                },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
@@ -631,6 +637,7 @@ private fun WorldZoomRail(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Spacer(Modifier.width(4.dp))

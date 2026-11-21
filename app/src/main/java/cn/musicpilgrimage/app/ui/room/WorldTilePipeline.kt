@@ -13,12 +13,16 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.net.URLEncoder
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Executors
-import java.util.concurrent.Future
+import java.util.concurrent.FutureTask
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
 import okhttp3.Cache
 import okhttp3.CacheControl
+import okhttp3.Dispatcher
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -60,18 +64,13 @@ internal object WorldTilePipeline {
     private var cachedClient: OkHttpClient? = null
 
     @Volatile
-    private var cachedUpstream: OkHttpClient? = null
-
-    @Volatile
-    private var cachedCoastClient: OkHttpClient? = null
-
-    @Volatile
     private var cachedOceanAtlas: OceanAtlas? = null
 
-    private val coastExecutor = Executors.newFixedThreadPool(3)
-
-    @Volatile
-    private var lastNetworkFailureAtMs: Long = 0L
+    // A zoom gesture can invalidate the view before auxiliary coast requests finish.
+    private val coastExecutor = ThreadPoolExecutor(
+        6, 6, 30, TimeUnit.SECONDS, ArrayBlockingQueue(8),
+    ).apply { allowCoreThreadTimeOut(true) }
+    private val cacheMaintenance = Executors.newSingleThreadExecutor()
 
     @Volatile
     private var lastStreetFailureAtMs: Long = 0L
@@ -102,7 +101,6 @@ internal object WorldTilePipeline {
     fun recentHdErrorSince(sinceMs: Long): Boolean = lastHdFailureAtMs > sinceMs
 
     fun resetErrorFlags() {
-        lastNetworkFailureAtMs = 0L
         lastStreetFailureAtMs = 0L
         lastHdFailureAtMs = 0L
     }
@@ -111,44 +109,27 @@ internal object WorldTilePipeline {
     fun getClient(context: Context): OkHttpClient {
         cachedClient?.let { return it }
         val appContext = context.applicationContext
-        val upstream = getUpstreamClient()
         val cacheDir = File(appContext.cacheDir, "world-map-tiles")
         val legacyGradedDir = File(cacheDir, "graded-earth")
         if (legacyGradedDir.exists()) {
-            coastExecutor.execute { runCatching { legacyGradedDir.deleteRecursively() } }
+            cacheMaintenance.execute { runCatching { legacyGradedDir.deleteRecursively() } }
         }
         val gradedCacheDir = File(cacheDir, "graded-earth-v2")
-        val coastClient = getCoastClient(File(cacheDir, "coast-v3"))
-        val client = OkHttpClient.Builder()
+        val coastClient = OkHttpClient.Builder()
+            .cache(Cache(File(cacheDir, "coast-v3"), 16L * 1024 * 1024))
+            .callTimeout(2500, TimeUnit.MILLISECONDS)
+            .build()
+        val client = coastClient.newBuilder()
             .cache(Cache(cacheDir, 48L * 1024 * 1024))
+            .dispatcher(Dispatcher().apply { maxRequestsPerHost = 8 })
+            .callTimeout(0, TimeUnit.MILLISECONDS)
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(12, TimeUnit.SECONDS)
-            .addInterceptor(GradedEarthInterceptor(appContext, upstream, coastClient, gradedCacheDir))
+            .addInterceptor(GradedEarthInterceptor(appContext, coastClient, gradedCacheDir))
             .addInterceptor(OfflineFallbackInterceptor())
             .build()
         cachedClient = client
         return client
-    }
-
-    @Synchronized
-    private fun getUpstreamClient(): OkHttpClient {
-        cachedUpstream?.let { return it }
-        return OkHttpClient.Builder()
-            .connectTimeout(8, TimeUnit.SECONDS)
-            .readTimeout(12, TimeUnit.SECONDS)
-            .build()
-            .also { cachedUpstream = it }
-    }
-
-    @Synchronized
-    private fun getCoastClient(coastCacheDir: File): OkHttpClient {
-        cachedCoastClient?.let { return it }
-        return OkHttpClient.Builder()
-            .cache(Cache(coastCacheDir, 16L * 1024 * 1024))
-            .connectTimeout(2500, TimeUnit.MILLISECONDS)
-            .readTimeout(2500, TimeUnit.MILLISECONDS)
-            .build()
-            .also { cachedCoastClient = it }
     }
 
     private fun loadOceanAtlas(context: Context): OceanAtlas? {
@@ -180,15 +161,14 @@ internal object WorldTilePipeline {
             val req = original.newBuilder()
                 .header("User-Agent", USER_AGENT)
                 .build()
-            val host = req.url.host
+            val streetTile = req.url.host == MAPTILER_HOST && req.url.encodedPath.startsWith("/tiles/v3/")
             return try {
                 val response = chain.proceed(req)
-                if (response.isSuccessful) {
-                    if (host == GRADED_EARTH_HOST) lastHdFailureAtMs = 0L
-                    else if (host == MAPTILER_HOST) lastStreetFailureAtMs = 0L
-                } else if (response.code >= 500) {
-                    if (host == GRADED_EARTH_HOST) lastHdFailureAtMs = System.currentTimeMillis()
-                    else if (host == MAPTILER_HOST) lastStreetFailureAtMs = System.currentTimeMillis()
+                if (streetTile) {
+                    if (response.isSuccessful) lastStreetFailureAtMs = 0L
+                    else if (response.code != 404 && response.code != 304) {
+                        lastStreetFailureAtMs = System.currentTimeMillis()
+                    }
                 }
                 response
             } catch (e: IOException) {
@@ -197,14 +177,11 @@ internal object WorldTilePipeline {
                 val cachedReq = req.newBuilder().cacheControl(CacheControl.FORCE_CACHE).build()
                 val cachedResp = runCatching { chain.proceed(cachedReq) }.getOrNull()
                 if (cachedResp != null && cachedResp.isSuccessful) {
-                    if (host == GRADED_EARTH_HOST) lastHdFailureAtMs = 0L
-                    else if (host == MAPTILER_HOST) lastStreetFailureAtMs = 0L
+                    if (streetTile) lastStreetFailureAtMs = 0L
                     cachedResp
                 } else {
                     cachedResp?.close()
-                    if (host == GRADED_EARTH_HOST) lastHdFailureAtMs = System.currentTimeMillis()
-                    else if (host == MAPTILER_HOST) lastStreetFailureAtMs = System.currentTimeMillis()
-                    lastNetworkFailureAtMs = System.currentTimeMillis()
+                    if (streetTile) lastStreetFailureAtMs = System.currentTimeMillis()
                     syntheticError(req, 504, "Offline")
                 }
             }
@@ -213,10 +190,11 @@ internal object WorldTilePipeline {
 
     private class GradedEarthInterceptor(
         private val appContext: Context,
-        private val upstream: OkHttpClient,
         private val coastClient: OkHttpClient,
         private val gradedCacheDir: File,
     ) : Interceptor {
+        private var writesSincePrune = 0
+
         override fun intercept(chain: Interceptor.Chain): Response {
             val req = chain.request()
             if (req.url.host != GRADED_EARTH_HOST) {
@@ -247,93 +225,110 @@ internal object WorldTilePipeline {
             val satelliteUrl = "https://$MAPTILER_HOST/tiles/satellite-v2/$z/$x/$y.jpg?key=$encodedKey"
             val upstreamReq = Request.Builder()
                 .url(satelliteUrl)
-                .header("User-Agent", USER_AGENT)
                 .build()
-            val coastFuture: Future<ByteArray?>? = if (z >= 5) {
-                val coastUrl = "https://$MAPTILER_HOST/tiles/v3/$z/$x/$y?key=$encodedKey"
-                runCatching {
-                    coastExecutor.submit<ByteArray?> {
-                        fetchCoastBytes(coastClient, coastUrl)
-                    }
-                }.getOrNull()
+            val coastCall = if (z >= 5) {
+                coastClient.newCall(Request.Builder()
+                    .url("https://$MAPTILER_HOST/tiles/v3/$z/$x/$y?key=$encodedKey")
+                    .header("User-Agent", USER_AGENT)
+                    .build())
             } else null
+            val coastTask = coastCall?.let { call ->
+                FutureTask<ByteArray?> {
+                    call.execute().use { response -> if (response.isSuccessful) response.body?.bytes() else null }
+                }.also { task ->
+                    try {
+                        coastExecutor.execute(task)
+                    } catch (_: RejectedExecutionException) {
+                        task.cancel(false)
+                    }
+                }
+            }
             val coastDeadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2600L)
             return try {
-                upstream.newCall(upstreamReq).execute().use { upstreamResp ->
-                    val rawBytes = upstreamResp.body?.bytes()
-                    if (!upstreamResp.isSuccessful || rawBytes == null || rawBytes.isEmpty()) {
-                        coastFuture?.cancel(true)
+                // Keep the satellite request on MapLibre's original OkHttp call so cancelling a
+                // tile cancels the actual download and frees a slot for the new viewport.
+                chain.proceed(upstreamReq).use { upstreamResp ->
+                    if (!upstreamResp.isSuccessful) {
                         lastHdFailureAtMs = System.currentTimeMillis()
-                        return syntheticError(req, 503, "Tile upstream unavailable")
+                        return syntheticError(req, upstreamResp.code, "Tile upstream unavailable", upstreamResp.header("Retry-After"))
                     }
-                    val coastBytes = if (coastFuture != null) {
-                        val remainMs = TimeUnit.NANOSECONDS.toMillis(coastDeadlineNs - System.nanoTime()).coerceAtLeast(0L)
-                        runCatching { coastFuture.get(remainMs, TimeUnit.MILLISECONDS) }.getOrNull()
-                            .also { if (!coastFuture.isDone) coastFuture.cancel(true) }
+                    val rawBytes = upstreamResp.body?.bytes()
+                    if (rawBytes == null || rawBytes.isEmpty()) {
+                        lastHdFailureAtMs = System.currentTimeMillis()
+                        return syntheticError(req, 503, "Empty tile")
+                    }
+                    val coastBytes = if (coastTask != null && !chain.call().isCanceled()) {
+                        val remainingNs = (coastDeadlineNs - System.nanoTime()).coerceAtLeast(0)
+                        runCatching { coastTask.get(remainingNs, TimeUnit.NANOSECONDS) }.getOrNull()
                     } else null
-                    val graded = gradeSatelliteBytes(appContext, rawBytes, z, x, y, coastBytes) ?: rawBytes
-                    persistGradedTile(tileFile, z, x, y, graded)
+                    if (chain.call().isCanceled()) throw IOException("Tile cancelled")
+                    val graded = gradeSatelliteBytes(appContext, rawBytes, z, x, y, coastBytes)
+                    if (graded == null) {
+                        lastHdFailureAtMs = System.currentTimeMillis()
+                        return syntheticError(req, 503, "Unreadable tile")
+                    }
+                    val complete = z < 5 || coastBytes != null
+                    if (complete && !chain.call().isCanceled()) persistGradedTile(tileFile, graded)
                     lastHdFailureAtMs = 0L
-                    okTileResponse(req, graded)
+                    // Keep the heuristic fallback usable while the coast data recovers.
+                    okTileResponse(req, graded, maxAgeSeconds = if (complete) 2592000 else 60)
                 }
             } catch (e: IOException) {
-                coastFuture?.cancel(true)
                 if (chain.call().isCanceled()) throw e
                 lastHdFailureAtMs = System.currentTimeMillis()
                 syntheticError(req, 504, "Offline")
+            } finally {
+                if (coastTask?.isDone == false) {
+                    coastCall?.cancel()
+                    coastTask.cancel(false)
+                    coastExecutor.remove(coastTask)
+                }
             }
         }
 
-        private fun fetchCoastBytes(client: OkHttpClient, coastUrl: String): ByteArray? {
-            val req = Request.Builder()
-                .url(coastUrl)
-                .header("User-Agent", USER_AGENT)
-                .build()
-            return runCatching {
-                client.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) null else resp.body?.bytes()
-                }
-            }.getOrNull()
-        }
-
-        private fun okTileResponse(req: Request, bytes: ByteArray): Response =
+        private fun okTileResponse(req: Request, bytes: ByteArray, maxAgeSeconds: Int = 2592000): Response =
             Response.Builder()
                 .request(req)
                 .protocol(Protocol.HTTP_1_1)
                 .code(200)
                 .message("OK")
-                .header("Cache-Control", "public, max-age=2592000")
+                .header("Cache-Control", "public, max-age=$maxAgeSeconds")
                 .body(bytes.toResponseBody("image/jpeg".toMediaType()))
                 .build()
 
-        private fun persistGradedTile(tileFile: File, z: Int, x: Int, y: Int, bytes: ByteArray) {
+        private fun persistGradedTile(tileFile: File, bytes: ByteArray) {
             runCatching {
                 gradedCacheDir.mkdirs()
-                val tmp = File(gradedCacheDir, ".tmp_${z}_${x}_${y}_${System.nanoTime()}")
-                tmp.writeBytes(bytes)
-                if (!tmp.renameTo(tileFile)) {
-                    tileFile.writeBytes(bytes)
+                val tmp = File.createTempFile(".tmp_", null, gradedCacheDir)
+                try {
+                    tmp.writeBytes(bytes)
+                    tmp.renameTo(tileFile)
+                } finally {
                     tmp.delete()
                 }
-                val cached = gradedCacheDir.listFiles { f -> f.isFile && !f.name.startsWith(".tmp_") }
-                if (cached != null && cached.size > 400) {
-                    cached.sortBy { it.lastModified() }
-                    val pruneCount = cached.size - 320
-                    for (i in 0 until pruneCount) {
-                        cached[i].delete()
+                synchronized(this) {
+                    if (++writesSincePrune < 32) return
+                    writesSincePrune = 0
+                }
+                cacheMaintenance.execute {
+                    val cached = gradedCacheDir.listFiles { f -> f.isFile && f.extension == "jpg" }
+                    if (cached != null && cached.size > 400) {
+                        cached.sortBy { it.lastModified() }
+                        for (i in 0 until cached.size - 320) cached[i].delete()
                     }
                 }
             }
         }
     }
 
-    private fun syntheticError(req: Request, code: Int, message: String): Response =
+    private fun syntheticError(req: Request, code: Int, message: String, retryAfter: String? = null): Response =
         Response.Builder()
             .request(req)
             .protocol(Protocol.HTTP_1_1)
             .code(code)
             .message(message)
             .header("Cache-Control", "no-store")
+            .apply { if (retryAfter != null) header("Retry-After", retryAfter) }
             .body(ByteArray(0).toResponseBody("text/plain".toMediaType()))
             .build()
 
@@ -624,6 +619,16 @@ internal object WorldTilePipeline {
         val seaDeep = if (hasAtlas) NATURAL_DEEP else DEEP_OPTICAL
         val seaShallow = if (hasAtlas) NATURAL_SHALLOW else SHALLOW_OPTICAL
         val tilesCount = (1 shl z).toDouble()
+        val atlasX0 = IntArray(if (hasAtlas) width else 0)
+        val atlasX1 = IntArray(atlasX0.size)
+        val atlasTx = DoubleArray(atlasX0.size)
+        for (col in atlasX0.indices) {
+            val fx = (((tileX + (col + 0.5) / width) / tilesCount) * atlasWidth) - 0.5
+            val fxInt = floor(fx).toInt()
+            atlasTx[col] = fx - fxInt
+            atlasX0[col] = Math.floorMod(fxInt, atlasWidth)
+            atlasX1[col] = (atlasX0[col] + 1) % atlasWidth
+        }
 
         for (row in 0 until height) {
             var y0 = 0
@@ -657,11 +662,9 @@ internal object WorldTilePipeline {
                 var ocB = 0.0
                 var depthCoverage = 0.0
                 if (hasAtlas) {
-                    val fx = (((tileX + (col + 0.5) / width) / tilesCount) * atlasWidth) - 0.5
-                    val fxInt = floor(fx).toInt()
-                    val tx = fx - fxInt
-                    val x0 = ((fxInt % atlasWidth) + atlasWidth) % atlasWidth
-                    val x1 = (x0 + 1) % atlasWidth
+                    val tx = atlasTx[col]
+                    val x0 = atlasX0[col]
+                    val x1 = atlasX1[col]
 
                     val p00 = atlasPixels!![row0Offset + x0]
                     val p10 = atlasPixels[row0Offset + x1]
@@ -835,7 +838,7 @@ internal object WorldTilePipeline {
                         "paint",
                         JSONObject().apply {
                             put("background-color", "#ecebe4")
-                            put("background-opacity", exprInterpolateLinearZoom(4.0 to 0.0, 7.0 to 1.0))
+                            put("background-opacity", if (hasRemoteKey) exprInterpolateLinearZoom(4.0 to 0.0, 7.0 to 1.0) else 0)
                         },
                     )
                 },
@@ -845,10 +848,11 @@ internal object WorldTilePipeline {
                     put("id", "earth-base")
                     put("type", "raster")
                     put("source", "earth-base")
+                    if (hasRemoteKey) put("maxzoom", 8)
                     put(
                         "paint",
                         JSONObject().apply {
-                            put("raster-opacity", exprInterpolateLinearZoom(5.0 to 1.0, 8.0 to 0.0))
+                            put("raster-opacity", if (hasRemoteKey) exprInterpolateLinearZoom(5.0 to 1.0, 8.0 to 0.0) else 1)
                             put("raster-fade-duration", 0)
                             put("raster-resampling", "linear")
                         },
@@ -860,10 +864,11 @@ internal object WorldTilePipeline {
                     put("id", "earth")
                     put("type", "raster")
                     put("source", "earth")
+                    if (hasRemoteKey) put("maxzoom", 8)
                     put(
                         "paint",
                         JSONObject().apply {
-                            put("raster-opacity", exprInterpolateLinearZoom(5.0 to 1.0, 8.0 to 0.0))
+                            put("raster-opacity", if (hasRemoteKey) exprInterpolateLinearZoom(5.0 to 1.0, 8.0 to 0.0) else 1)
                             put("raster-fade-duration", 200)
                             put("raster-resampling", "linear")
                         },

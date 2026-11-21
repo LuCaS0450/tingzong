@@ -12,10 +12,8 @@ import android.view.ViewOutlineProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import cn.musicpilgrimage.app.BuildConfig
 import cn.musicpilgrimage.app.data.Place
 import cn.musicpilgrimage.app.data.canonicalRegionName
 import cn.musicpilgrimage.app.data.unifiedDestinationRegion
@@ -25,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.constants.MapLibreConstants
@@ -39,6 +38,7 @@ import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.android.style.sources.RasterSource
 import org.maplibre.android.tile.TileOperation
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
@@ -241,9 +241,12 @@ internal object WorldMapMath {
             40075016.686 * max(0.087, cos(Math.toRadians(latitude))) / (512.0 * 2.0.pow(zoom) * safeDensity)
         val idealMeters = (metersPerPx * 80.0 * safeDensity).coerceAtLeast(1.0)
         val power = 10.0.pow(floor(log10(idealMeters)))
-        val value = listOf(1.0, 2.0, 5.0, 10.0)
-            .map { it * power }
-            .lastOrNull { it <= idealMeters } ?: power
+        val value = when {
+            idealMeters >= 10.0 * power -> 10.0 * power
+            idealMeters >= 5.0 * power -> 5.0 * power
+            idealMeters >= 2.0 * power -> 2.0 * power
+            else -> power
+        }
         val intValue = value.toInt().coerceAtLeast(1)
         val label = if (intValue >= 1000) "${intValue / 1000} km" else "$intValue m"
         val barPx = (value / metersPerPx).toFloat().coerceIn(24f, 140f * safeDensity)
@@ -256,6 +259,12 @@ internal object WorldMapMath {
         zoom >= 3.0 -> "国家或地区"
         else -> "地球"
     }
+
+    fun zoomRailFraction(zoom: Double, globeZoom: Double): Float = when {
+        zoom >= 11.0 -> ((15.0 - zoom) / 4.0 / 3.0).coerceAtLeast(0.0)
+        zoom >= 5.0 -> (1.0 + (11.0 - zoom) / 6.0) / 3.0
+        else -> (2.0 + ((5.0 - zoom) / (5.0 - globeZoom)).coerceIn(0.0, 1.0)) / 3.0
+    }.toFloat()
 
     fun globenessForZoom(zoom: Double): Float = ((6.0 - zoom) / 1.0).toFloat().coerceIn(0f, 1f)
 
@@ -290,9 +299,10 @@ internal class NativeWorldController(
         private set
     var isMoving by mutableStateOf(false)
         private set
-    var frameTick by mutableLongStateOf(0L)
-        private set
     var selectionPulseTick by mutableIntStateOf(0)
+        private set
+    private var pinCamera: CameraPosition? = null
+    var pinZoom by mutableStateOf(initialSnapshot?.zoom ?: 0.9)
         private set
     var hudState by mutableStateOf(
         run {
@@ -338,11 +348,11 @@ internal class NativeWorldController(
     private var lastSyncedSelectedId: String? = null
     private var initialCameraPlaced = false
     private var destroyed = false
-    private var activeSelectionStartMs: Long = 0L
     private var lastSelectedKey: String? = null
     private var tileLoadingSinceMs: Long = 0L
     private var lastRetryAtMs: Long = 0L
-    private var activeTileRequests: Int = 0
+    private data class TileRequest(val source: String, val z: Int, val x: Int, val y: Int)
+    private val activeTileRequests = mutableSetOf<TileRequest>()
     private var cameraTargetSeq: Long = 0L
     private var activeCameraTargetSeq: Long = 0L
     private var activeTargetCamera: CameraPosition? = null
@@ -376,9 +386,6 @@ internal class NativeWorldController(
         override fun run() {
             if (destroyed) return
             updateLoadingState()
-            if (selectedId.isNotEmpty() && System.currentTimeMillis() - activeSelectionStartMs < 500L) {
-                recomputePins()
-            }
             mainHandler.postDelayed(this, 180L)
         }
     }
@@ -418,27 +425,30 @@ internal class NativeWorldController(
         }
         mapView.onCreate(null)
 
-        scope.launch(Dispatchers.Default) {
-            countries = WorldCountryLookup.load(appContext)
-            mainHandler.post { if (!destroyed) updateRegionAndCityLabels() }
+        scope.launch {
+            countries = withContext(Dispatchers.Default) { WorldCountryLookup.load(appContext) }
+            updateRegionAndCityLabels()
         }
 
-        mapView.addOnSourceChangedListener {
-            if (!destroyed) pinsDirty = true
+        mapView.addOnSourceChangedListener { source ->
+            if (!destroyed && source == "places") pinsDirty = true
         }
-        mapView.addOnDidFinishRenderingFrameListener { _, _, _ ->
-            if (!destroyed && ready && !hasVisual) {
-                hasVisual = true
-                pinsDirty = true
-                flushPendingFocus()
+        // The SDK refreshes its camera cache in its own stats listener. Use the
+        // same listener list so projection runs after that refresh.
+        mapView.addOnDidFinishRenderingFrameListener { _, _ ->
+            if (destroyed || !ready || !initialCameraPlaced || solvingCamera) {
+                return@addOnDidFinishRenderingFrameListener
             }
-            if (!destroyed && ready) {
-                val selectionAnimating = selectedId.isNotEmpty() &&
-                    System.currentTimeMillis() - activeSelectionStartMs < 500L
-                if (pinsDirty || isMoving || selectionAnimating) {
-                    pinsDirty = false
-                    recomputePins()
-                }
+            val camera = map?.cameraPosition ?: return@addOnDidFinishRenderingFrameListener
+            if (pinsDirty || camera != pinCamera) {
+                pinsDirty = false
+                pinCamera = camera
+                recomputePins(camera)
+                syncHudFromCamera()
+            }
+            if (!hasVisual) {
+                hasVisual = true
+                flushPendingFocus()
             }
         }
         mapView.addOnDidFailLoadingMapListener {
@@ -446,31 +456,33 @@ internal class NativeWorldController(
         }
         mapView.addOnDidFinishRenderingMapListener { fully ->
             if (!destroyed && fully) {
-                activeTileRequests = 0
+                activeTileRequests.clear()
                 tileLoadingSinceMs = 0L
                 updateLoadingState()
             }
         }
         mapView.addOnDidBecomeIdleListener {
             if (!destroyed) {
-                activeTileRequests = 0
+                activeTileRequests.clear()
                 tileLoadingSinceMs = 0L
                 updateLoadingState()
             }
         }
-        mapView.addOnTileActionListener { operation, _, _, _, _, _, _ ->
+        mapView.addOnTileActionListener { operation, x, y, z, _, _, source ->
             if (destroyed) return@addOnTileActionListener
+            if (source == "places" && operation == TileOperation.EndParse) pinsDirty = true
+            if (source != "earth-hd" && source != "streets") return@addOnTileActionListener
             when (operation) {
                 TileOperation.RequestedFromNetwork -> {
-                    activeTileRequests++
+                    activeTileRequests.add(TileRequest(source, z, x, y))
                     if (tileLoadingSinceMs == 0L) tileLoadingSinceMs = System.currentTimeMillis()
                 }
                 TileOperation.LoadFromNetwork,
                 TileOperation.LoadFromCache,
                 TileOperation.Error,
                 TileOperation.Cancelled -> {
-                    activeTileRequests = (activeTileRequests - 1).coerceAtLeast(0)
-                    if (activeTileRequests == 0 && operation != TileOperation.Error) {
+                    activeTileRequests.remove(TileRequest(source, z, x, y))
+                    if (activeTileRequests.isEmpty()) {
                         tileLoadingSinceMs = 0L
                     }
                 }
@@ -483,7 +495,6 @@ internal class NativeWorldController(
             map = libreMap
             configureMap(libreMap)
         }
-        mainHandler.postDelayed(loadingTicker, 250L)
     }
 
     private fun configureMap(libreMap: MapLibreMap) {
@@ -512,12 +523,6 @@ internal class NativeWorldController(
                 activeTargetCamera = null
             }
         }
-        libreMap.addOnCameraMoveListener {
-            if (destroyed || solvingCamera) return@addOnCameraMoveListener
-            pinsDirty = true
-            syncHudFromCamera()
-            recomputePins()
-        }
         libreMap.addOnCameraIdleListener {
             if (destroyed || solvingCamera || touchMode != TouchMode.NONE) return@addOnCameraIdleListener
             isMoving = false
@@ -526,7 +531,6 @@ internal class NativeWorldController(
             syncHudFromCamera()
             updateRegionAndCityLabels()
             persistCameraSnapshot()
-            recomputePins()
             updateLoadingState()
         }
 
@@ -534,18 +538,19 @@ internal class NativeWorldController(
         libreMap.setStyle(Style.Builder().fromJson(styleJson)) { loadedStyle ->
             if (destroyed) return@setStyle
             style = loadedStyle
-            ensurePinSources(loadedStyle)
+            configureStyleSources(loadedStyle)
             applyInitialCameraIfNeeded()
             syncGeoJsonSources(force = true)
             ready = true
             syncHudFromCamera()
             updateRegionAndCityLabels()
-            recomputePins()
             flushPendingFocus()
         }
     }
 
-    private fun ensurePinSources(loadedStyle: Style) {
+    private fun configureStyleSources(loadedStyle: Style) {
+        // The bundled raster already covers the globe while ideal HD tiles are loading.
+        loadedStyle.getSourceAs<RasterSource>("earth-hd")?.setPrefetchZoomDelta(0)
         if (loadedStyle.getSource("places") == null) {
             val options = GeoJsonOptions()
                 .withCluster(true)
@@ -584,7 +589,6 @@ internal class NativeWorldController(
             pinsDirty = true
             applyInitialCameraIfNeeded()
             syncHudFromCamera()
-            recomputePins()
             flushPendingFocus()
         }
     }
@@ -688,7 +692,7 @@ internal class NativeWorldController(
                 }
             }
         }
-        if (focus != null) {
+        if (focus != null && focus.token > lastAppliedFocusToken) {
             this.pendingFocus = focus
         }
 
@@ -705,9 +709,6 @@ internal class NativeWorldController(
                     else m.moveCamera(CameraUpdateFactory.newCameraPosition(cam))
                 }
             }
-        }
-        if (selectedChanged || entriesChanged || visitsChanged) {
-            recomputePins()
         }
         flushPendingFocus()
         persistCameraSnapshot()
@@ -744,8 +745,8 @@ internal class NativeWorldController(
     private fun flushPendingFocus() {
         val focus = pendingFocus ?: return
         if (!ready || !hasVisual || stageWidthPx <= 0 || stageHeightPx <= 0) return
-        if (focus.token <= lastAppliedFocusToken) return
         val entry = byId[focus.placeId] ?: return
+        pendingFocus = null
         lastAppliedFocusToken = focus.token
         val m = map ?: return
         val pos = m.cameraPosition
@@ -814,18 +815,16 @@ internal class NativeWorldController(
         isMoving = true
         val callback = object : MapLibreMap.CancelableCallback {
             override fun onCancel() {
-                if (activeCameraTargetSeq == seq) {
-                    activeCameraTargetSeq = 0L
-                    activeTargetCamera = null
-                }
+                if (activeCameraTargetSeq != seq) return
+                activeCameraTargetSeq = 0L
+                activeTargetCamera = null
                 isMoving = false
             }
 
             override fun onFinish() {
-                if (activeCameraTargetSeq == seq) {
-                    activeCameraTargetSeq = 0L
-                    activeTargetCamera = null
-                }
+                if (activeCameraTargetSeq != seq) return
+                activeCameraTargetSeq = 0L
+                activeTargetCamera = null
                 isMoving = false
                 syncHudFromCamera()
                 updateRegionAndCityLabels()
@@ -889,7 +888,7 @@ internal class NativeWorldController(
         m.setStyle(Style.Builder().fromJson(styleJson)) { loaded ->
             if (destroyed) return@setStyle
             style = loaded
-            ensurePinSources(loaded)
+            configureStyleSources(loaded)
             syncGeoJsonSources(force = true)
             m.moveCamera(CameraUpdateFactory.newCameraPosition(cur))
             updateLoadingState()
@@ -1058,14 +1057,12 @@ internal class NativeWorldController(
                             syncHudFromCamera()
                             updateRegionAndCityLabels()
                             persistCameraSnapshot()
-                            recomputePins()
                             updateLoadingState()
                         }
                     }
                 } else if (wasMoved) {
                     pinsDirty = true
                     syncHudFromCamera()
-                    recomputePins()
                 }
                 return true
             }
@@ -1139,7 +1136,11 @@ internal class NativeWorldController(
 
         solvingCamera = true
         try {
-            applyImmediateCamera(m, centerLat, centerLon, startZoom, padBottom)
+            if (centerLat != curTarget.latitude || centerLon != curTarget.longitude ||
+                abs(startZoom - cur.zoom) > 1e-9 || padBottom != (cur.padding?.getOrNull(3) ?: 0.0)
+            ) {
+                applyImmediateCamera(m, centerLat, centerLon, startZoom, padBottom)
+            }
             var bestLat = centerLat
             var bestLon = centerLon
             var bestZoom = startZoom
@@ -1181,9 +1182,6 @@ internal class NativeWorldController(
         } finally {
             solvingCamera = false
         }
-        pinsDirty = true
-        syncHudFromCamera()
-        recomputePins()
     }
 
     private fun applyImmediateCamera(
@@ -1365,7 +1363,7 @@ internal class NativeWorldController(
         } else {
             WorldTilePipeline.recentStreetErrorSince(lastRetryAtMs)
         }
-        val active = activeTileRequests > 0
+        val active = activeTileRequests.isNotEmpty()
         if (!active && !error) {
             hudState = hudState.copy(loadingVisible = false, progressVisible = false, loadingError = false)
             return
@@ -1387,14 +1385,14 @@ internal class NativeWorldController(
         )
     }
 
-    private fun recomputePins() {
+    private fun recomputePins(pos: CameraPosition) {
         val m = map ?: return
         val loadedStyle = style ?: return
         if (stageWidthPx <= 0 || stageHeightPx <= 0) return
 
         val projection = m.projection
-        val pos = m.cameraPosition
         val zoom = pos.zoom
+        pinZoom = zoom
         val globeness = WorldMapMath.globenessForZoom(zoom)
         currentGlobeness = globeness
 
@@ -1447,13 +1445,12 @@ internal class NativeWorldController(
             if (!seen.add(key)) continue
 
             val latLng = LatLng(point.latitude(), point.longitude())
-            if (globeness > 0f && projection.isLocationOccluded(latLng)) continue
-
             val screen = projection.toScreenLocation(latLng)
             if (!screen.x.isFinite() || !screen.y.isFinite()) continue
             if (screen.x < -marginX || screen.x > stageWidthPx + marginX || screen.y < -marginY || screen.y > stageHeightPx + marginY) {
                 continue
             }
+            if (globeness > 0f && projection.isLocationOccluded(latLng)) continue
 
             var nx = 0f
             var ny = 0f
@@ -1534,7 +1531,6 @@ internal class NativeWorldController(
         if (currentSelectedKey != lastSelectedKey) {
             lastSelectedKey = currentSelectedKey
             if (currentSelectedKey != null) {
-                activeSelectionStartMs = System.currentTimeMillis()
                 selectionPulseTick++
             }
         }
@@ -1548,7 +1544,6 @@ internal class NativeWorldController(
                     else -> b.y.compareTo(a.y)
                 }
             }
-        frameTick++
     }
 
     private fun measureRenderedGlobeRadius(
@@ -1651,12 +1646,6 @@ internal class NativeWorldController(
         )
     }
 
-    fun selectionAnimationProgress(motion: Boolean): Float {
-        if (!motion || selectedId.isEmpty()) return 1f
-        val elapsed = (System.currentTimeMillis() - activeSelectionStartMs).coerceAtLeast(0L)
-        return (elapsed / 360f).coerceIn(0f, 1f)
-    }
-
     fun screenToLatLng(xPx: Float, yPx: Float): Pair<Double, Double>? {
         val m = map ?: return null
         val ll = runCatching { m.projection.fromScreenLocation(PointF(xPx, yPx)) }.getOrNull() ?: return null
@@ -1684,7 +1673,6 @@ internal class NativeWorldController(
         m.moveCamera(CameraUpdateFactory.newCameraPosition(cam))
         isMoving = false
         syncHudFromCamera()
-        recomputePins()
         persistCameraSnapshot()
     }
 
@@ -1713,11 +1701,16 @@ internal class NativeWorldController(
     }
 
     fun onResume() {
-        if (!destroyed) mapView.onResume()
+        if (!destroyed) {
+            mapView.onResume()
+            mainHandler.removeCallbacks(loadingTicker)
+            mainHandler.post(loadingTicker)
+        }
     }
 
     fun onPause() {
         if (!destroyed) {
+            mainHandler.removeCallbacks(loadingTicker)
             persistCameraSnapshot()
             mapView.onPause()
         }

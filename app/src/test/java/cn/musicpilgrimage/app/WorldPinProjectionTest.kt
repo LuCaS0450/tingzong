@@ -143,6 +143,10 @@ class WorldPinProjectionTest {
         assertEquals("国家或地区", WorldMapMath.levelLabel(5.0))
         assertEquals("城市", WorldMapMath.levelLabel(11.0))
         assertEquals("街道", WorldMapMath.levelLabel(15.0))
+        assertEquals(1f, WorldMapMath.zoomRailFraction(0.9, 0.9), 0.001f)
+        assertEquals(2f / 3f, WorldMapMath.zoomRailFraction(5.0, 0.9), 0.001f)
+        assertEquals(1f / 3f, WorldMapMath.zoomRailFraction(11.0, 0.9), 0.001f)
+        assertEquals(0f, WorldMapMath.zoomRailFraction(15.0, 0.9), 0.001f)
 
         val (globeLabel, globeWidth) = WorldMapMath.scaleBarMetric(1.0, 24.0, 2.0f)
         val (streetLabel, streetWidth) = WorldMapMath.scaleBarMetric(15.0, 48.85, 2.0f)
@@ -160,6 +164,14 @@ class WorldPinProjectionTest {
         assertTrue(offlineSources.has("earth"))
         assertFalse(offlineSources.has("streets"))
         assertFalse(offlineSources.has("earth-hd"))
+        val offlineLayers = offlineStyle.getJSONArray("layers")
+        for (i in 0 until offlineLayers.length()) {
+            val layer = offlineLayers.getJSONObject(i)
+            if (layer.getString("type") == "raster") {
+                assertFalse(layer.has("maxzoom"))
+                assertEquals(1, layer.getJSONObject("paint").getInt("raster-opacity"))
+            }
+        }
 
         val keyedStyle = JSONObject(WorldTilePipeline.buildWorldStyleJson(rawKey = "test-key"))
         val keyedSources = keyedStyle.getJSONObject("sources")

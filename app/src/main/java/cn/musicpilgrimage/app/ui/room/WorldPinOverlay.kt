@@ -2,12 +2,19 @@ package cn.musicpilgrimage.app.ui.room
 
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -30,6 +37,11 @@ import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+private val RedEnamel = intArrayOf(189, 56, 43)
+private val VisitedEnamel = intArrayOf(59, 68, 63)
+private val IvoryEnamel = intArrayOf(245, 242, 234)
+private val IvoryEdge = intArrayOf(196, 191, 178)
+
 /**
  * Pure Compose 1:1 port of the enamel globe pin layer (`surface-markers.js`) and subtle sphere
  * drop-shadow/rim lighting (`focus-layer.js`). Keeps pin labels hidden on the map per `AGENTS.md`
@@ -42,11 +54,19 @@ internal fun WorldPinOverlay(
 ) {
     val density = LocalDensity.current.density.coerceAtLeast(1f)
     val motion = LocalPhysicalMotion.current
-    val pins = controller.visiblePins
-    val hud = controller.hudState
-    val globeBounds = controller.activeGlobeBounds
-    val frameTick = controller.frameTick
     val pulseTick = controller.selectionPulseTick
+    val pulse = remember { Animatable(1f) }
+    LaunchedEffect(pulseTick, motion) {
+        if (motion && pulseTick > 0) {
+            pulse.snapTo(0f)
+            pulse.animateTo(1f, tween(durationMillis = 360, easing = LinearEasing))
+        }
+    }
+    val pinLabels by remember(controller) {
+        derivedStateOf {
+            controller.visiblePins.map { it.key to it.name }.sortedBy { it.first }
+        }
+    }
 
     val countPaint = remember(density) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -57,21 +77,18 @@ internal fun WorldPinOverlay(
 
     Box(modifier) {
         Canvas(Modifier.fillMaxSize()) {
-            // Touch frameTick / pulseTick to keep Canvas invalidated in lockstep with MapLibre frames.
-            @Suppress("UNUSED_EXPRESSION")
-            frameTick
-            @Suppress("UNUSED_EXPRESSION")
-            pulseTick
-
-            if (globeBounds != null && hud.zoom < 4.0 && globeBounds.radius > 4f) {
-                drawGlobeShadowAndRim(globeBounds, hud.zoom, density)
+            val pins = controller.visiblePins
+            val zoom = controller.pinZoom
+            val globeBounds = controller.activeGlobeBounds
+            if (globeBounds != null && zoom < 4.0 && globeBounds.radius > 4f) {
+                drawGlobeShadowAndRim(globeBounds, zoom, density)
             }
 
-            val selectionAnimProgress = controller.selectionAnimationProgress(motion)
+            val selectionAnimProgress = if (motion) pulse.value else 1f
             for (i in pins.lastIndex downTo 0) {
                 drawEnamelPin(
                     pin = pins[i],
-                    zoom = hud.zoom,
+                    zoom = zoom,
                     density = density,
                     selectionProgress = selectionAnimProgress,
                     motion = motion,
@@ -81,27 +98,31 @@ internal fun WorldPinOverlay(
         }
 
         // Accessibility-only nodes: zero pointer interception so gestures flow straight to MapView.
-        for (pin in pins) {
-            val touchSizeDp = 44.dp
-            val halfTouchPx = with(LocalDensity.current) { (touchSizeDp / 2).toPx() }
-            Box(
-                Modifier
-                    .offset {
-                        IntOffset(
-                            (pin.hx - halfTouchPx).roundToInt(),
-                            (pin.hy - halfTouchPx).roundToInt(),
-                        )
-                    }
-                    .size(touchSizeDp)
-                    .semantics {
-                        contentDescription = pin.name
-                        role = Role.Button
-                        onClick(label = pin.name) {
-                            controller.handlePinAccessibilityClick(pin)
-                            true
+        val touchSize = 44.dp
+        val halfTouchPx = touchSize.value * density / 2
+        for ((id, name) in pinLabels) {
+            key(id) {
+                Box(
+                    Modifier
+                        .offset {
+                            val pin = controller.visiblePins.firstOrNull { it.key == id }
+                            if (pin == null) IntOffset.Zero else IntOffset(
+                                (pin.hx - halfTouchPx).roundToInt(),
+                                (pin.hy - halfTouchPx).roundToInt(),
+                            )
                         }
-                    }
-            )
+                        .size(touchSize)
+                        .semantics {
+                            contentDescription = name
+                            role = Role.Button
+                            onClick(label = name) {
+                                val pin = controller.visiblePins.firstOrNull { it.key == id }
+                                if (pin != null) controller.handlePinAccessibilityClick(pin)
+                                pin != null
+                            }
+                        }
+                )
+            }
         }
     }
 }
@@ -185,7 +206,7 @@ private fun DrawScope.drawEnamelPin(
     val isCluster = pin.pointCount > 0
     val isSelected = pin.isSelected
     val rPx = pin.radius * density
-    val baseRgb = if (pin.visited) intArrayOf(59, 68, 63) else intArrayOf(189, 56, 43)
+    val baseRgb = if (pin.visited) VisitedEnamel else RedEnamel
 
     // 1. Ground contact shadow aligned with sphere tangent ellipse.
     val shadowOffset = stand * (if (isSelected) 3.0f else 2.0f) * density
@@ -219,7 +240,7 @@ private fun DrawScope.drawEnamelPin(
             val rippleR = WorldMapMath.mix(ringR, ringR + 8.5f * density, 1f - flare)
             drawGroundEllipse(
                 pin.x, pin.y, rippleR * pin.ratio, rippleR, angleDeg,
-                shadedColor(intArrayOf(189, 56, 43), pin.light, 0f, 0.55f * flare * flare * opacity),
+                shadedColor(RedEnamel, pin.light, 0f, 0.55f * flare * flare * opacity),
                 strokeWidth = 1.1f * density,
             )
         }
@@ -231,7 +252,7 @@ private fun DrawScope.drawEnamelPin(
         val innerR = max(1f, ringR - 1.3f * density)
         drawGroundEllipse(
             pin.x, pin.y, innerR * pin.ratio, innerR, angleDeg,
-            shadedColor(intArrayOf(189, 56, 43), pin.light, 0f, 0.92f * opacity),
+            shadedColor(RedEnamel, pin.light, 0f, 0.92f * opacity),
             strokeWidth = 1.15f * density,
         )
     } else if (stand > 0.15f) {
@@ -282,12 +303,10 @@ private fun DrawScope.drawEnamelPin(
 
     val gradCenter = Offset(pin.hx - rPx * 0.36f, pin.hy - rPx * 0.40f)
     val beadBrush = if (isCluster) {
-        val ivory = intArrayOf(245, 242, 234)
-        val ivoryEdge = intArrayOf(196, 191, 178)
         Brush.radialGradient(
-            0f to shadedColor(ivory, pin.light * 1.04f, 38f * pin.highlight + 18f, opacity),
-            0.52f to shadedColor(ivory, pin.light, 10f * pin.highlight, opacity),
-            1f to shadedColor(ivoryEdge, pin.light * 0.88f, 0f, opacity),
+            0f to shadedColor(IvoryEnamel, pin.light * 1.04f, 38f * pin.highlight + 18f, opacity),
+            0.52f to shadedColor(IvoryEnamel, pin.light, 10f * pin.highlight, opacity),
+            1f to shadedColor(IvoryEdge, pin.light * 0.88f, 0f, opacity),
             center = gradCenter,
             radius = rPx * 1.15f,
         )
@@ -326,7 +345,7 @@ private fun DrawScope.drawEnamelPin(
             )
             val innerClusterR = max(1.5f * density, rPx - 2.1f * density)
             drawCircle(
-                color = shadedColor(intArrayOf(189, 56, 43), pin.light, 0f, 0.58f * opacity),
+                color = shadedColor(RedEnamel, pin.light, 0f, 0.58f * opacity),
                 radius = innerClusterR,
                 center = headCenter,
                 style = Stroke(0.85f * density),
@@ -373,7 +392,7 @@ private fun DrawScope.drawEnamelPin(
             val coreAlpha = opacity * (1f - numOpacity * 0.92f)
             val coreR = WorldMapMath.mix(rPx * 0.36f, rPx * 0.22f, numOpacity)
             drawCircle(
-                color = shadedColor(intArrayOf(189, 56, 43), pin.light, 0f, coreAlpha),
+                color = shadedColor(RedEnamel, pin.light, 0f, coreAlpha),
                 radius = coreR,
                 center = headCenter,
             )

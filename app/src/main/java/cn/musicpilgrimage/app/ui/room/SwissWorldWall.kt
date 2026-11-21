@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -146,8 +147,6 @@ internal fun SwissWorldWall(
                             }
                         }
                     }
-                    ctrl.onStart()
-                    ctrl.onResume()
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
                             Lifecycle.Event.ON_START -> ctrl.onStart()
@@ -165,6 +164,7 @@ internal fun SwissWorldWall(
                         }
                         ctrl.onTapEvent = null
                         ctrl.onPause()
+                        ctrl.onStop()
                     }
                 }
             }
@@ -204,11 +204,11 @@ internal fun SwissWorldWall(
             }
         }
 
-        val hud = controller?.hudState ?: WorldHudState()
-        val compact = hud.compactHeader
+        val compact by remember { derivedStateOf { controller?.hudState?.compactHeader == true } }
+        val initialHud = remember { WorldHudState() }
 
         WorldHudOverlay(
-            hud = hud,
+            readHud = { controller?.hudState ?: initialHud },
             cityCount = cities.size,
             placeCount = entries.size,
             summaryOpen = summary != null,
