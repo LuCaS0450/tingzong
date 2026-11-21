@@ -2,10 +2,13 @@ package cn.musicpilgrimage.app.ui.room
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.PointF
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewOutlineProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -24,10 +27,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.constants.MapLibreConstants
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Projection
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
@@ -40,6 +45,7 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.acos
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.floor
@@ -49,13 +55,14 @@ import kotlin.math.log2
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 
 internal const val InitialWorldLongitude = 35.0
 internal const val InitialWorldLatitude = 24.0
-internal const val WorldFovDegrees = 22.0
+internal const val WorldFovDegrees = MapLibreConstants.DEFAULT_FOV
 
 internal data class GlobeBounds(val x: Float, val y: Float, val radius: Float)
 
@@ -87,6 +94,7 @@ internal data class WorldHudState(
     val longitude: Double = InitialWorldLongitude,
     val latitude: Double = InitialWorldLatitude,
     val zoom: Double = 0.9,
+    val visualZoom: Double = 0.9,
     val globeZoom: Double = 0.9,
     val compactHeader: Boolean = false,
     val enlarged: Boolean = false,
@@ -139,8 +147,16 @@ internal object WorldMapMath {
 
     fun mix(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
-    fun globeZoom(
-        latitude: Double,
+    fun equatorialZoom(zoom: Double, latitude: Double): Double =
+        zoom - log2(max(0.087, cos(Math.toRadians(latitude))))
+
+    fun zoomForEquatorialZoom(eqZoom: Double, latitude: Double): Double =
+        eqZoom + log2(max(0.087, cos(Math.toRadians(latitude))))
+
+    fun visualZoom(zoom: Double, latitude: Double): Double =
+        zoom - globenessForZoom(zoom).toDouble() * log2(max(0.087, cos(Math.toRadians(latitude))))
+
+    fun globeEquatorialZoom(
         stageWidthDp: Double,
         stageHeightDp: Double,
         fovDegrees: Double = WorldFovDegrees,
@@ -149,9 +165,51 @@ internal object WorldMapMath {
         val r = stageWidthDp * (304.0 / 360.0) / 2.0
         val d = stageHeightDp / (2.0 * tan(Math.toRadians(fovDegrees / 2.0)).coerceAtLeast(1e-4))
         val bigR = r * r / d + r * sqrt(1.0 + r * r / (d * d))
-        val cosLat = max(0.087, cos(Math.toRadians(latitude)))
-        return log2(bigR * 2.0 * PI * cosLat / 512.0).coerceIn(0.0, 3.0)
+        return log2(bigR * 2.0 * PI / 512.0)
     }
+
+    fun globeZoom(
+        latitude: Double,
+        stageWidthDp: Double,
+        stageHeightDp: Double,
+        fovDegrees: Double = WorldFovDegrees,
+    ): Double {
+        if (stageWidthDp <= 0.0 || stageHeightDp <= 0.0) return 0.9
+        val eqZoom = globeEquatorialZoom(stageWidthDp, stageHeightDp, fovDegrees)
+        return zoomForEquatorialZoom(eqZoom, latitude).coerceIn(0.0, 3.0)
+    }
+
+    fun maxConstantSizeGlobeLatitude(eqZoom: Double): Double {
+        val minCos = 2.0.pow(-eqZoom).coerceIn(0.087, 1.0)
+        return min(80.0, Math.toDegrees(acos(minCos)))
+    }
+
+    /**
+     * Infers the rendered sphere screen radius `r = R / sqrt(1 + 2 * R / d)` from two
+     * meridional screen offsets `(s1, s2)` at great-circle angular separations `(theta1Rad, theta2Rad)`.
+     */
+    fun measureGlobeRadiusFromProjection(
+        s1: Double,
+        theta1Rad: Double,
+        s2: Double,
+        theta2Rad: Double,
+    ): Double? {
+        if (!s1.isFinite() || !s2.isFinite() || s1 <= 1.0 || s2 <= s1) return null
+        val sin1 = sin(theta1Rad)
+        val sin2 = sin(theta2Rad)
+        val c1 = 1.0 - cos(theta1Rad)
+        val c2 = 1.0 - cos(theta2Rad)
+        val denom = s2 * sin1 * c2 - s1 * sin2 * c1
+        if (abs(denom) < 1e-6) return null
+        val k = (s1 * sin2 - s2 * sin1) / denom
+        if (!k.isFinite() || k <= 1e-6 || k >= 1.5) return null
+        val bigR = s1 * (1.0 + k * c1) / sin1
+        if (!bigR.isFinite() || bigR <= 1.0) return null
+        val radius = bigR / sqrt(1.0 + 2.0 * k)
+        return radius.takeIf { it.isFinite() && it > 1.0 }
+    }
+
+    fun globeClipInsetPx(density: Float): Float = max(1.25f, 0.75f * density)
 
     fun globeBounds(
         zoom: Double,
@@ -237,16 +295,22 @@ internal class NativeWorldController(
     var selectionPulseTick by mutableIntStateOf(0)
         private set
     var hudState by mutableStateOf(
-        WorldHudState(
-            longitude = initialSnapshot?.longitude ?: InitialWorldLongitude,
-            latitude = initialSnapshot?.latitude ?: InitialWorldLatitude,
-            zoom = initialSnapshot?.zoom ?: 0.9,
-            compactHeader = (initialSnapshot?.zoom ?: 0.9) >= 3.0,
-            enlarged = (initialSnapshot?.zoom ?: 0.9) > 0.91,
-            beyondGlobe = (initialSnapshot?.zoom ?: 0.9) >= 4.0,
-            satelliteScale = (initialSnapshot?.zoom ?: 0.9) < 8.0,
-            levelLabel = WorldMapMath.levelLabel(initialSnapshot?.zoom ?: 0.9),
-        )
+        run {
+            val initLat = initialSnapshot?.latitude ?: InitialWorldLatitude
+            val initZoom = initialSnapshot?.zoom ?: 0.9
+            val initVisualZoom = WorldMapMath.visualZoom(initZoom, initLat)
+            WorldHudState(
+                longitude = initialSnapshot?.longitude ?: InitialWorldLongitude,
+                latitude = initLat,
+                zoom = initZoom,
+                visualZoom = initVisualZoom,
+                compactHeader = initVisualZoom >= 3.0,
+                enlarged = initZoom > 0.91,
+                beyondGlobe = initVisualZoom >= 4.0,
+                satelliteScale = initZoom < 8.0,
+                levelLabel = WorldMapMath.levelLabel(initVisualZoom),
+            )
+        }
     )
         private set
 
@@ -291,6 +355,9 @@ internal class NativeWorldController(
     private var gestureDownY: Float = 0f
     private var gestureDownTimeMs: Long = 0L
     private var gestureMoved: Boolean = false
+    private var gestureStartLat: Double = InitialWorldLatitude
+    private var gestureStartZoom: Double = 0.9
+    private var gestureStartEqZoom: Double = 0.9
     private var pinchStartSpan: Float = 0f
     private var pinchStartZoom: Double = 0.0
     private var pinchMaxMove: Float = 0f
@@ -298,6 +365,10 @@ internal class NativeWorldController(
     private var lastTapX: Float = 0f
     private var lastTapY: Float = 0f
     private var solvingCamera: Boolean = false
+    private var clipGlobeActive: Boolean = false
+    private var clipGlobeX: Float = 0f
+    private var clipGlobeY: Float = 0f
+    private var clipGlobeR: Float = 0f
 
     var onTapEvent: ((WorldTapEvent) -> Unit)? = null
 
@@ -326,6 +397,23 @@ internal class NativeWorldController(
             .pixelRatio(density)
         mapView = MapView(context, options).apply {
             setBackgroundColor(Color.TRANSPARENT)
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    if (clipGlobeActive && clipGlobeR > 1f) {
+                        val r = clipGlobeR
+                        outline.setRoundRect(
+                            (clipGlobeX - r).roundToInt(),
+                            (clipGlobeY - r).roundToInt(),
+                            (clipGlobeX + r).roundToInt(),
+                            (clipGlobeY + r).roundToInt(),
+                            r,
+                        )
+                    } else {
+                        outline.setRect(0, 0, view.width, view.height)
+                    }
+                }
+            }
+            clipToOutline = false
             setOnTouchListener { _, event -> handleTouchEvent(event) }
         }
         mapView.onCreate(null)
@@ -512,7 +600,7 @@ internal class NativeWorldController(
         val baseGlobeZ = WorldMapMath.globeZoom(startLat, stageWdp, stageHdp)
         m.setMinZoomPreference(0.0)
         val startZoom = (initialSnapshot?.zoom ?: baseGlobeZ).coerceIn(baseGlobeZ, 18.0)
-        val padBottom = currentBottomPaddingPx(startZoom).toDouble()
+        val padBottom = currentBottomPaddingPx(startZoom, startLat).toDouble()
         val cam = CameraPosition.Builder()
             .target(LatLng(startLat, startLon))
             .zoom(startZoom)
@@ -522,26 +610,36 @@ internal class NativeWorldController(
         m.moveCamera(CameraUpdateFactory.newCameraPosition(cam))
     }
 
-    private fun currentBottomPaddingPx(zoom: Double = map?.cameraPosition?.zoom ?: hudState.zoom): Int {
+    private fun currentBottomPaddingPx(
+        zoom: Double = map?.cameraPosition?.zoom ?: hudState.zoom,
+        lat: Double = map?.cameraPosition?.target?.latitude ?: hudState.latitude,
+    ): Int {
         if (summaryOpen && summaryHeightPx > 0) return summaryHeightPx
-        return if (zoom < 4.0) WorldMapMath.baseBottomPaddingPx(stageWidthPx, stageHeightPx) else 0
+        return if (WorldMapMath.visualZoom(zoom, lat) < 4.0) {
+            WorldMapMath.baseBottomPaddingPx(stageWidthPx, stageHeightPx)
+        } else 0
     }
 
     private fun clampCameraBoundsOnIdle() {
         val m = map ?: return
         val pos = m.cameraPosition
         val target = pos.target ?: return
-        val clampedLat = WorldMapMath.clampLatitude(target.latitude)
-        val wrappedLon = WorldMapMath.wrapLongitude(target.longitude)
         val stageWdp = (stageWidthPx / density.toDouble()).coerceAtLeast(360.0)
         val stageHdp = (stageHeightPx / density.toDouble()).coerceAtLeast(560.0)
+        val minGlobeEqZ = WorldMapMath.globeEquatorialZoom(stageWdp, stageHdp)
+        val curEqZ = max(WorldMapMath.equatorialZoom(pos.zoom, target.latitude), minGlobeEqZ)
+        val globeness = WorldMapMath.globenessForZoom(pos.zoom)
+        val maxLat = if (globeness >= 0.999f) WorldMapMath.maxConstantSizeGlobeLatitude(curEqZ) else 80.0
+        val clampedLat = if (target.latitude.isFinite()) target.latitude.coerceIn(-maxLat, maxLat) else 0.0
+        val wrappedLon = WorldMapMath.wrapLongitude(target.longitude)
         val minGlobeZ = WorldMapMath.globeZoom(clampedLat, stageWdp, stageHdp)
-        val latChanged = kotlin.math.abs(clampedLat - target.latitude) > 0.01
+        val latChanged = abs(clampedLat - target.latitude) > 0.01
         val zoomBelowMin = pos.zoom < minGlobeZ - 0.02
         if (latChanged || zoomBelowMin) {
+            val updatedZoom = if (zoomBelowMin) minGlobeZ else pos.zoom
             val updated = CameraPosition.Builder(pos)
                 .target(LatLng(clampedLat, wrappedLon))
-                .zoom(max(pos.zoom, minGlobeZ))
+                .zoom(updatedZoom)
                 .build()
             if (zoomBelowMin && motionEnabled) {
                 m.easeCamera(CameraUpdateFactory.newCameraPosition(updated), 180)
@@ -650,18 +748,30 @@ internal class NativeWorldController(
         val entry = byId[focus.placeId] ?: return
         lastAppliedFocusToken = focus.token
         val m = map ?: return
-        val currentZoom = m.cameraPosition.zoom
+        val pos = m.cameraPosition
+        val currentZoom = pos.zoom
+        val currentLat = pos.target?.latitude ?: hudState.latitude
+        val stageWdp = (stageWidthPx / density.toDouble()).coerceAtLeast(360.0)
+        val stageHdp = (stageHeightPx / density.toDouble()).coerceAtLeast(560.0)
+        val targetGlobeMinZ = WorldMapMath.globeZoom(entry.place.latitude, stageWdp, stageHdp)
         val targetZoom = when (focus.kind) {
-            WorldFocusKind.Pin -> currentZoom
+            WorldFocusKind.Pin -> {
+                if (currentZoom < 5.0) {
+                    val eqZoom = WorldMapMath.equatorialZoom(currentZoom, currentLat)
+                    WorldMapMath.zoomForEquatorialZoom(eqZoom, entry.place.latitude)
+                } else {
+                    currentZoom
+                }
+            }
             WorldFocusKind.List -> max(11.0, currentZoom)
             WorldFocusKind.Street -> 15.0
-        }.coerceIn(hudState.globeZoom, 18.0)
+        }.coerceIn(targetGlobeMinZ, 18.0)
         val duration = if (focus.kind == WorldFocusKind.Pin) 360 else 850
         moveCameraTo(
             lat = entry.place.latitude,
             lon = entry.place.longitude,
             zoom = targetZoom,
-            paddingBottom = currentBottomPaddingPx(targetZoom).toDouble(),
+            paddingBottom = currentBottomPaddingPx(targetZoom, entry.place.latitude).toDouble(),
             durationMs = duration,
             useFly = focus.kind != WorldFocusKind.Pin,
         )
@@ -671,14 +781,17 @@ internal class NativeWorldController(
         lat: Double,
         lon: Double,
         zoom: Double,
-        paddingBottom: Double = currentBottomPaddingPx(zoom).toDouble(),
+        paddingBottom: Double = currentBottomPaddingPx(zoom, lat).toDouble(),
         durationMs: Int = 360,
         useFly: Boolean = false,
     ) {
         val m = map ?: return
         val clampedLat = WorldMapMath.clampLatitude(lat)
         val wrappedLon = WorldMapMath.wrapLongitude(lon)
-        val clampedZoom = zoom.coerceIn(hudState.globeZoom, 18.0)
+        val stageWdp = (stageWidthPx / density.toDouble()).coerceAtLeast(360.0)
+        val stageHdp = (stageHeightPx / density.toDouble()).coerceAtLeast(560.0)
+        val targetMinZoom = WorldMapMath.globeZoom(clampedLat, stageWdp, stageHdp)
+        val clampedZoom = zoom.coerceIn(targetMinZoom, 18.0)
         val seq = ++cameraTargetSeq
         activeCameraTargetSeq = seq
         val cam = CameraPosition.Builder()
@@ -801,11 +914,15 @@ internal class NativeWorldController(
                 m.cancelTransitions()
                 activeCameraTargetSeq = 0L
                 activeTargetCamera = null
+                val pos = m.cameraPosition
                 touchMode = TouchMode.DRAG
                 gestureDownX = event.x
                 gestureDownY = event.y
                 gestureDownTimeMs = event.eventTime
                 gestureMoved = false
+                gestureStartLat = WorldMapMath.clampLatitude(pos.target?.latitude ?: hudState.latitude)
+                gestureStartZoom = pos.zoom
+                gestureStartEqZoom = WorldMapMath.equatorialZoom(pos.zoom, gestureStartLat)
                 gestureAnchor = sampleAnchor(m, event.x, event.y)
                 return true
             }
@@ -821,12 +938,16 @@ internal class NativeWorldController(
                         event.getX(1) - event.getX(0),
                         event.getY(1) - event.getY(0),
                     ).coerceAtLeast(16f)
+                    val pos = m.cameraPosition
                     touchMode = TouchMode.PINCH
                     gestureDownX = midX
                     gestureDownY = midY
                     pinchStartSpan = span
-                    pinchStartZoom = m.cameraPosition.zoom
+                    pinchStartZoom = pos.zoom
                     pinchMaxMove = 0f
+                    gestureStartLat = WorldMapMath.clampLatitude(pos.target?.latitude ?: hudState.latitude)
+                    gestureStartZoom = pos.zoom
+                    gestureStartEqZoom = WorldMapMath.equatorialZoom(pos.zoom, gestureStartLat)
                     gestureAnchor = sampleAnchor(m, midX, midY)
                     isMoving = true
                 }
@@ -849,7 +970,8 @@ internal class NativeWorldController(
                         val anchor = gestureAnchor ?: sampleAnchor(m, midX, midY).also { gestureAnchor = it }
                         if (anchor != null) {
                             isMoving = true
-                            solveAnchorToPoint(m, anchor, PointF(midX, midY), nextZoom)
+                            val targetEqZoom = WorldMapMath.equatorialZoom(nextZoom, gestureStartLat)
+                            solveAnchorToPoint(m, anchor, PointF(midX, midY), nextZoom, targetEqZoom)
                         }
                     }
                     TouchMode.DRAG -> if (event.pointerCount == 1) {
@@ -861,7 +983,7 @@ internal class NativeWorldController(
                         if (gestureMoved) {
                             val anchor = gestureAnchor ?: sampleAnchor(m, event.x, event.y).also { gestureAnchor = it }
                             if (anchor != null) {
-                                solveAnchorToPoint(m, anchor, PointF(event.x, event.y), m.cameraPosition.zoom)
+                                solveAnchorToPoint(m, anchor, PointF(event.x, event.y), gestureStartZoom, gestureStartEqZoom)
                             }
                         }
                     }
@@ -880,10 +1002,14 @@ internal class NativeWorldController(
                         val remainIdx = if (event.actionIndex == 0) 1 else 0
                         val rx = event.getX(remainIdx)
                         val ry = event.getY(remainIdx)
+                        val pos = m.cameraPosition
                         touchMode = TouchMode.DRAG
                         gestureDownX = rx
                         gestureDownY = ry
                         gestureMoved = true
+                        gestureStartLat = WorldMapMath.clampLatitude(pos.target?.latitude ?: hudState.latitude)
+                        gestureStartZoom = pos.zoom
+                        gestureStartEqZoom = WorldMapMath.equatorialZoom(pos.zoom, gestureStartLat)
                         gestureAnchor = sampleAnchor(m, rx, ry)
                     }
                 }
@@ -950,7 +1076,7 @@ internal class NativeWorldController(
     private fun sampleAnchor(m: MapLibreMap, xPx: Float, yPx: Float): LatLng? {
         val pos = m.cameraPosition
         val target = pos.target ?: return null
-        val padBottom = currentBottomPaddingPx(pos.zoom).toDouble()
+        val padBottom = currentBottomPaddingPx(pos.zoom, target.latitude).toDouble()
         val pt = clampPointToGlobe(PointF(xPx, yPx), pos.zoom, target.latitude, padBottom)
         val geo = runCatching { m.projection.fromScreenLocation(pt) }.getOrNull() ?: return null
         if (!geo.latitude.isFinite() || !geo.longitude.isFinite()) return null
@@ -986,23 +1112,37 @@ internal class NativeWorldController(
         anchor: LatLng,
         rawTargetPx: PointF,
         rawZoom: Double,
+        targetEqZoom: Double,
     ) {
         val cur = m.cameraPosition
         val curTarget = cur.target ?: return
         val stageWdp = (stageWidthPx / density.toDouble()).coerceAtLeast(360.0)
         val stageHdp = (stageHeightPx / density.toDouble()).coerceAtLeast(560.0)
-        var centerLat = WorldMapMath.clampLatitude(curTarget.latitude)
-        var centerLon = WorldMapMath.wrapLongitude(curTarget.longitude)
-        val minZoom = WorldMapMath.globeZoom(centerLat, stageWdp, stageHdp)
-        val clampedZoom = rawZoom.coerceIn(minZoom, 18.0)
-        val padBottom = currentBottomPaddingPx(clampedZoom).toDouble()
-        val targetPx = clampPointToGlobe(rawTargetPx, clampedZoom, centerLat, padBottom)
+        val minGlobeEqZoom = WorldMapMath.globeEquatorialZoom(stageWdp, stageHdp)
+        val clampedEqZoom = max(targetEqZoom, minGlobeEqZoom)
+        val globeness = WorldMapMath.globenessForZoom(rawZoom)
+        val maxLat = if (globeness >= 0.999f) WorldMapMath.maxConstantSizeGlobeLatitude(clampedEqZoom) else 80.0
+        fun clampLat(lat: Double): Double = if (!lat.isFinite()) 0.0 else lat.coerceIn(-maxLat, maxLat)
+        fun zoomForLat(lat: Double): Double {
+            val minZ = WorldMapMath.globeZoom(lat, stageWdp, stageHdp)
+            if (globeness <= 0.001f) return rawZoom.coerceIn(minZ, 18.0)
+            val eqZ = WorldMapMath.zoomForEquatorialZoom(clampedEqZoom, lat)
+            val blended = if (globeness >= 0.999f) eqZ else rawZoom + (eqZ - rawZoom) * globeness.toDouble()
+            return blended.coerceIn(minZ, 18.0)
+        }
+
+        val centerLat = clampLat(curTarget.latitude)
+        val centerLon = WorldMapMath.wrapLongitude(curTarget.longitude)
+        val startZoom = zoomForLat(centerLat)
+        val padBottom = currentBottomPaddingPx(startZoom, centerLat).toDouble()
+        val targetPx = clampPointToGlobe(rawTargetPx, startZoom, centerLat, padBottom)
 
         solvingCamera = true
         try {
-            applyImmediateCamera(m, centerLat, centerLon, clampedZoom, padBottom)
+            applyImmediateCamera(m, centerLat, centerLon, startZoom, padBottom)
             var bestLat = centerLat
             var bestLon = centerLon
+            var bestZoom = startZoom
             var bestErr = screenError(m, anchor, targetPx)
 
             for (iter in 0 until 6) {
@@ -1011,25 +1151,29 @@ internal class NativeWorldController(
                 if (!atTarget.latitude.isFinite() || !atTarget.longitude.isFinite()) break
                 val dLat = anchor.latitude - atTarget.latitude
                 val dLon = wrapDeltaLongitude(anchor.longitude - atTarget.longitude)
-                val nextLat = WorldMapMath.clampLatitude(bestLat + dLat)
+                val nextLat = clampLat(bestLat + dLat)
                 val nextLon = WorldMapMath.wrapLongitude(bestLon + dLon)
-                applyImmediateCamera(m, nextLat, nextLon, clampedZoom, padBottom)
+                val nextZoom = zoomForLat(nextLat)
+                applyImmediateCamera(m, nextLat, nextLon, nextZoom, padBottom)
                 val err = screenError(m, anchor, targetPx)
                 if (err < bestErr) {
                     bestLat = nextLat
                     bestLon = nextLon
+                    bestZoom = nextZoom
                     bestErr = err
                 } else {
-                    val halfLat = WorldMapMath.clampLatitude(bestLat + dLat * 0.5)
+                    val halfLat = clampLat(bestLat + dLat * 0.5)
                     val halfLon = WorldMapMath.wrapLongitude(bestLon + dLon * 0.5)
-                    applyImmediateCamera(m, halfLat, halfLon, clampedZoom, padBottom)
+                    val halfZoom = zoomForLat(halfLat)
+                    applyImmediateCamera(m, halfLat, halfLon, halfZoom, padBottom)
                     val halfErr = screenError(m, anchor, targetPx)
                     if (halfErr < bestErr) {
                         bestLat = halfLat
                         bestLon = halfLon
+                        bestZoom = halfZoom
                         bestErr = halfErr
                     } else {
-                        applyImmediateCamera(m, bestLat, bestLon, clampedZoom, padBottom)
+                        applyImmediateCamera(m, bestLat, bestLon, bestZoom, padBottom)
                         break
                     }
                 }
@@ -1156,17 +1300,19 @@ internal class NativeWorldController(
         val stageWdp = (stageWidthPx / density.toDouble()).coerceAtLeast(360.0)
         val stageHdp = (stageHeightPx / density.toDouble()).coerceAtLeast(560.0)
         val minGlobeZ = WorldMapMath.globeZoom(lat, stageWdp, stageHdp)
+        val visualZ = WorldMapMath.visualZoom(zoom, lat)
         val (scaleLabel, scaleWidthPx) = WorldMapMath.scaleBarMetric(zoom, lat, density)
         hudState = hudState.copy(
             longitude = lon,
             latitude = lat,
             zoom = zoom,
+            visualZoom = visualZ,
             globeZoom = minGlobeZ,
-            compactHeader = zoom >= 3.0,
+            compactHeader = visualZ >= 3.0,
             enlarged = zoom > minGlobeZ + 0.05,
-            beyondGlobe = zoom >= 4.0,
+            beyondGlobe = visualZ >= 4.0,
             satelliteScale = zoom < 8.0,
-            levelLabel = WorldMapMath.levelLabel(zoom),
+            levelLabel = WorldMapMath.levelLabel(visualZ),
             scaleLabel = scaleLabel,
             scaleWidthPx = scaleWidthPx,
         )
@@ -1199,7 +1345,7 @@ internal class NativeWorldController(
             (visibleBounds?.contains(LatLng(nearestEntry.place.latitude, nearestEntry.place.longitude)) == true)
         val nearbyRegion = if (visibleCity && degrees < 0.2) nearestEntry else null
         val country = nearbyRegion?.place?.country?.let(::canonicalRegionName) ?: centerRegion
-        val regionName = if (zoom >= 3.0 && country.isNotBlank()) country else ""
+        val regionName = if (WorldMapMath.visualZoom(zoom, lat) >= 3.0 && country.isNotBlank()) country else ""
         val rawCity = nearestEntry?.let { unifiedDestinationRegion(canonicalRegionName(it.place.country)) ?: it.place.city }
         val cityName = if (visibleCity && !rawCity.isNullOrBlank() && rawCity != country) rawCity else ""
         if (hudState.regionName != regionName || hudState.cityName != cityName) {
@@ -1255,7 +1401,7 @@ internal class NativeWorldController(
         val centerLatLng = pos.target ?: LatLng(InitialWorldLatitude, InitialWorldLongitude)
         val centerScreen = projection.toScreenLocation(centerLatLng)
         val bounds = if (globeness > 0.01f) {
-            WorldMapMath.globeBounds(
+            val fallback = WorldMapMath.globeBounds(
                 zoom = zoom,
                 latitude = centerLatLng.latitude,
                 centerX = centerScreen.x,
@@ -1263,8 +1409,17 @@ internal class NativeWorldController(
                 stageHeightPx = stageHeightPx.toFloat(),
                 density = density,
             )
+            val measuredRadius = if (globeness >= 0.99f && centerScreen.x.isFinite() && centerScreen.y.isFinite()) {
+                measureRenderedGlobeRadius(projection, centerLatLng, centerScreen, fallback.radius)
+            } else null
+            if (measuredRadius != null) {
+                GlobeBounds(centerScreen.x, centerScreen.y, measuredRadius)
+            } else {
+                fallback
+            }
         } else null
         activeGlobeBounds = bounds
+        updateGlobeClipOutline(bounds, globeness)
 
         val lighting = ((4.2 - zoom) / 3.0).toFloat().coerceIn(0f, 1f) * globeness
         val stand = max(WorldMapMath.smoothstep(3.2f, 7.2f, zoom.toFloat()), 1f - globeness)
@@ -1396,6 +1551,69 @@ internal class NativeWorldController(
         frameTick++
     }
 
+    private fun measureRenderedGlobeRadius(
+        projection: Projection,
+        center: LatLng,
+        centerScreen: PointF,
+        fallbackRadius: Float,
+    ): Float? {
+        val dir = if (center.latitude >= 0.0) -1.0 else 1.0
+        val lat1 = center.latitude + dir * 22.0
+        val lat2 = center.latitude + dir * 44.0
+        val p1Geo = LatLng(lat1, center.longitude)
+        val p2Geo = LatLng(lat2, center.longitude)
+        if (runCatching { projection.isLocationOccluded(p1Geo) || projection.isLocationOccluded(p2Geo) }.getOrDefault(true)) {
+            return null
+        }
+        val p1 = runCatching { projection.toScreenLocation(p1Geo) }.getOrNull() ?: return null
+        val p2 = runCatching { projection.toScreenLocation(p2Geo) }.getOrNull() ?: return null
+        if (!p1.x.isFinite() || !p1.y.isFinite() || !p2.x.isFinite() || !p2.y.isFinite()) return null
+        val s1 = hypot((p1.x - centerScreen.x).toDouble(), (p1.y - centerScreen.y).toDouble())
+        val s2 = hypot((p2.x - centerScreen.x).toDouble(), (p2.y - centerScreen.y).toDouble())
+        val measured = WorldMapMath.measureGlobeRadiusFromProjection(
+            s1 = s1,
+            theta1Rad = Math.toRadians(22.0),
+            s2 = s2,
+            theta2Rad = Math.toRadians(44.0),
+        )?.toFloat() ?: return null
+        return measured.takeIf { it in (fallbackRadius * 0.75f)..(fallbackRadius * 1.25f) }
+    }
+
+    private fun updateGlobeClipOutline(bounds: GlobeBounds?, globeness: Float) {
+        val w = stageWidthPx.toFloat()
+        val h = stageHeightPx.toFloat()
+        val shouldClip = if (globeness >= 0.99f && bounds != null && w > 0f && h > 0f) {
+            val maxCornerDist = max(
+                max(hypot(bounds.x, bounds.y), hypot(w - bounds.x, bounds.y)),
+                max(hypot(bounds.x, h - bounds.y), hypot(w - bounds.x, h - bounds.y)),
+            )
+            bounds.radius < maxCornerDist + 4f
+        } else {
+            false
+        }
+        if (shouldClip && bounds != null) {
+            val nextR = (bounds.radius - WorldMapMath.globeClipInsetPx(density)).coerceAtLeast(1f)
+            val changed = !clipGlobeActive ||
+                abs(clipGlobeX - bounds.x) > 0.25f ||
+                abs(clipGlobeY - bounds.y) > 0.25f ||
+                abs(clipGlobeR - nextR) > 0.25f
+            clipGlobeActive = true
+            clipGlobeX = bounds.x
+            clipGlobeY = bounds.y
+            clipGlobeR = nextR
+            if (!mapView.clipToOutline) {
+                mapView.clipToOutline = true
+            }
+            if (changed) {
+                mapView.invalidateOutline()
+            }
+        } else if (clipGlobeActive || mapView.clipToOutline) {
+            clipGlobeActive = false
+            mapView.clipToOutline = false
+            mapView.invalidateOutline()
+        }
+    }
+
     private fun clusterOverlapsSelection(cluster: ProjectedPin, selection: ProjectedPin, density: Float): Boolean {
         val cR = (cluster.radius + 1.5f) * density
         val sR = (selection.radius + 1.5f) * density
@@ -1455,11 +1673,12 @@ internal class NativeWorldController(
         val m = map ?: return
         activeCameraTargetSeq = 0L
         activeTargetCamera = null
+        val clampedLat = WorldMapMath.clampLatitude(lat)
         val cam = CameraPosition.Builder()
-            .target(LatLng(WorldMapMath.clampLatitude(lat), WorldMapMath.wrapLongitude(lon)))
+            .target(LatLng(clampedLat, WorldMapMath.wrapLongitude(lon)))
             .zoom(zoom.coerceIn(hudState.globeZoom, 18.0))
             .fov(WorldFovDegrees)
-            .padding(0.0, 0.0, 0.0, currentBottomPaddingPx(zoom).toDouble())
+            .padding(0.0, 0.0, 0.0, currentBottomPaddingPx(zoom, clampedLat).toDouble())
             .build()
         m.cancelTransitions()
         m.moveCamera(CameraUpdateFactory.newCameraPosition(cam))

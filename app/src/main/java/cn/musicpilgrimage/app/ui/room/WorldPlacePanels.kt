@@ -267,8 +267,27 @@ internal fun WorldPlaceSummary(
                         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (art.isNotBlank()) {
-                                AsyncImage(art, null, Modifier.fillMaxWidth(.34f).aspectRatio(16f / 9f).clipToBounds()
-                                    .background(RoomColors.Wall), contentScale = ContentScale.Crop)
+                                var resolvedRatio by remember(scene.id, art) {
+                                    mutableFloatStateOf(scene.aspectRatio.coerceIn(0.65f, 1.85f))
+                                }
+                                val widthDp = (78f * resolvedRatio).coerceAtMost(120f)
+                                val heightDp = (widthDp / resolvedRatio).coerceAtLeast(56f)
+                                AsyncImage(
+                                    model = art,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(width = widthDp.dp, height = heightDp.dp)
+                                        .clipToBounds()
+                                        .background(RoomColors.Wall)
+                                        .testTag("world-summary-art"),
+                                    contentScale = ContentScale.Fit,
+                                    onSuccess = { result ->
+                                        val size = result.painter.intrinsicSize
+                                        if (size.width.isFinite() && size.height.isFinite() && size.width > 1f && size.height > 1f) {
+                                            resolvedRatio = (size.width / size.height).coerceIn(0.65f, 1.85f)
+                                        }
+                                    },
+                                )
                             }
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 if (scene.work.isNotBlank()) Text("《${scene.work}》", color = RoomColors.Ink, fontSize = 15.sp, fontWeight = FontWeight.Medium)

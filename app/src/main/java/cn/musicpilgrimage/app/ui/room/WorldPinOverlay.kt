@@ -107,12 +107,13 @@ internal fun WorldPinOverlay(
 }
 
 private fun DrawScope.drawGlobeShadowAndRim(bounds: GlobeBounds, zoom: Double, density: Float) {
+    val r = (bounds.radius - WorldMapMath.globeClipInsetPx(density)).coerceAtLeast(1f)
     val shadowAlpha = ((3.2 - zoom) / 2.0).toFloat().coerceIn(0f, 1f)
     if (shadowAlpha > 0.01f) {
-        val shadowW = bounds.radius * 1.24f
+        val shadowW = r * 1.24f
         val shadowH = 28f * density
-        val sx = bounds.x + bounds.radius * 0.16f
-        val sy = bounds.y + bounds.radius + 14f * density
+        val sx = bounds.x + r * 0.16f
+        val sy = bounds.y + r + 14f * density
         withTransform({
             translate(sx, sy)
             scale(scaleX = 1f, scaleY = shadowH / max(1f, shadowW), pivot = Offset.Zero)
@@ -133,20 +134,40 @@ private fun DrawScope.drawGlobeShadowAndRim(bounds: GlobeBounds, zoom: Double, d
 
     val lightStrength = ((4.0 - zoom) / 2.8).toFloat().coerceIn(0f, 1f)
     if (lightStrength > 0.01f) {
-        val r = bounds.radius
         val c = Offset(bounds.x, bounds.y)
-        // Subtle fixed top-left specular bloom and bottom-right curvature shading.
+        // Subtle fixed top-left specular bloom and bottom-right curvature shading inside the clipped sphere.
         drawCircle(
             brush = Brush.radialGradient(
-                0f to Color.White.copy(alpha = 0.08f * lightStrength),
+                0f to Color.White.copy(alpha = 0.06f * lightStrength),
                 0.55f to Color.Transparent,
-                0.86f to Color(0xFF1F2B28).copy(alpha = 0.14f * lightStrength),
-                1.0f to Color(0xFFA1CFE3).copy(alpha = 0.18f * lightStrength),
-                center = Offset(bounds.x - r * 0.36f, bounds.y - r * 0.40f),
-                radius = r * 1.48f,
+                center = Offset(bounds.x - r * 0.34f, bounds.y - r * 0.38f),
+                radius = r * 0.95f,
             ),
             radius = r,
             center = c,
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                0f to Color.Transparent,
+                0.68f to Color.Transparent,
+                1.0f to Color(0xFF1A2629).copy(alpha = 0.16f * lightStrength),
+                center = Offset(bounds.x - r * 0.28f, bounds.y - r * 0.30f),
+                radius = r * 1.28f,
+            ),
+            radius = r,
+            center = c,
+        )
+        val rimStroke = 1.0f * density
+        drawCircle(
+            brush = Brush.linearGradient(
+                0f to Color(0xFFA1CFE3).copy(alpha = 0.16f * lightStrength),
+                1f to Color(0xFF1F2B28).copy(alpha = 0.08f * lightStrength),
+                start = Offset(bounds.x - r * 0.7f, bounds.y - r * 0.7f),
+                end = Offset(bounds.x + r * 0.7f, bounds.y + r * 0.7f),
+            ),
+            radius = max(1f, r - rimStroke * 0.5f),
+            center = c,
+            style = Stroke(width = rimStroke),
         )
     }
 }

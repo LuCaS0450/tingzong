@@ -210,8 +210,13 @@ internal fun WorldHudOverlay(
 
             // Right-edge zoom rail (hidden when summary card is open).
             if (!summaryOpen) {
+                val railZoom = if (hud.visualZoom < 4.0) {
+                    (hud.zoom - hud.globeZoom + 0.5).coerceAtLeast(0.5)
+                } else {
+                    hud.visualZoom
+                }
                 WorldZoomRail(
-                    zoom = hud.zoom,
+                    zoom = railZoom,
                     levelLabel = hud.levelLabel,
                     interactive = interactive,
                     unit = unit,

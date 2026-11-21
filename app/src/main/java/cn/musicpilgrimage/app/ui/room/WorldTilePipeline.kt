@@ -3,8 +3,20 @@ package cn.musicpilgrimage.app.ui.room
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
 import cn.musicpilgrimage.app.BuildConfig
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.IOException
 import java.net.URLEncoder
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPInputStream
 import okhttp3.Cache
 import okhttp3.CacheControl
 import okhttp3.Interceptor
@@ -18,10 +30,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.maplibre.android.MapLibre
 import org.maplibre.android.module.http.HttpRequestUtil
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.IOException
-import java.util.concurrent.TimeUnit
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -37,7 +46,7 @@ internal object WorldTilePipeline {
     private val USER_AGENT =
         "cn.musicpilgrimage.app/${BuildConfig.VERSION_NAME} (${BuildConfig.APPLICATION_ID}; MapLibre Android)"
 
-    private val TILE_PATH_REGEX = Regex("^/(\\d+)/(\\d+)/(\\d+)\\.jpg$")
+    private val TILE_PATH_REGEX = Regex("^/v2/(\\d+)/(\\d+)/(\\d+)\\.jpg$")
     private val POW_LUT = DoubleArray(256) { i -> (i / 255.0).pow(0.6) }
 
     private val DEEP_OPTICAL = intArrayOf(118, 172, 194)
@@ -54,7 +63,12 @@ internal object WorldTilePipeline {
     private var cachedUpstream: OkHttpClient? = null
 
     @Volatile
+    private var cachedCoastClient: OkHttpClient? = null
+
+    @Volatile
     private var cachedOceanAtlas: OceanAtlas? = null
+
+    private val coastExecutor = Executors.newFixedThreadPool(3)
 
     @Volatile
     private var lastNetworkFailureAtMs: Long = 0L
@@ -99,12 +113,17 @@ internal object WorldTilePipeline {
         val appContext = context.applicationContext
         val upstream = getUpstreamClient()
         val cacheDir = File(appContext.cacheDir, "world-map-tiles")
-        val gradedCacheDir = File(cacheDir, "graded-earth")
+        val legacyGradedDir = File(cacheDir, "graded-earth")
+        if (legacyGradedDir.exists()) {
+            coastExecutor.execute { runCatching { legacyGradedDir.deleteRecursively() } }
+        }
+        val gradedCacheDir = File(cacheDir, "graded-earth-v2")
+        val coastClient = getCoastClient(File(cacheDir, "coast-v3"))
         val client = OkHttpClient.Builder()
             .cache(Cache(cacheDir, 48L * 1024 * 1024))
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(12, TimeUnit.SECONDS)
-            .addInterceptor(GradedEarthInterceptor(appContext, upstream, gradedCacheDir))
+            .addInterceptor(GradedEarthInterceptor(appContext, upstream, coastClient, gradedCacheDir))
             .addInterceptor(OfflineFallbackInterceptor())
             .build()
         cachedClient = client
@@ -121,13 +140,27 @@ internal object WorldTilePipeline {
             .also { cachedUpstream = it }
     }
 
+    @Synchronized
+    private fun getCoastClient(coastCacheDir: File): OkHttpClient {
+        cachedCoastClient?.let { return it }
+        return OkHttpClient.Builder()
+            .cache(Cache(coastCacheDir, 16L * 1024 * 1024))
+            .connectTimeout(2500, TimeUnit.MILLISECONDS)
+            .readTimeout(2500, TimeUnit.MILLISECONDS)
+            .build()
+            .also { cachedCoastClient = it }
+    }
+
     private fun loadOceanAtlas(context: Context): OceanAtlas? {
         cachedOceanAtlas?.let { return it }
         synchronized(this) {
             cachedOceanAtlas?.let { return it }
             val loaded = runCatching {
                 context.assets.open("design/swiss-world/ocean-colors.png").use { stream ->
-                    val opts = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+                    val opts = BitmapFactory.Options().apply {
+                        inPreferredConfig = Bitmap.Config.ARGB_8888
+                        inPremultiplied = false
+                    }
                     val bmp = BitmapFactory.decodeStream(stream, null, opts) ?: return@runCatching null
                     val pixels = IntArray(bmp.width * bmp.height)
                     bmp.getPixels(pixels, 0, bmp.width, 0, 0, bmp.width, bmp.height)
@@ -181,6 +214,7 @@ internal object WorldTilePipeline {
     private class GradedEarthInterceptor(
         private val appContext: Context,
         private val upstream: OkHttpClient,
+        private val coastClient: OkHttpClient,
         private val gradedCacheDir: File,
     ) : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
@@ -209,28 +243,57 @@ internal object WorldTilePipeline {
             if (key.isEmpty()) {
                 return syntheticError(req, 503, "No tile key")
             }
-            val satelliteUrl = "https://$MAPTILER_HOST/tiles/satellite-v2/$z/$x/$y.jpg?key=${URLEncoder.encode(key, "UTF-8")}"
+            val encodedKey = URLEncoder.encode(key, "UTF-8")
+            val satelliteUrl = "https://$MAPTILER_HOST/tiles/satellite-v2/$z/$x/$y.jpg?key=$encodedKey"
             val upstreamReq = Request.Builder()
                 .url(satelliteUrl)
                 .header("User-Agent", USER_AGENT)
                 .build()
+            val coastFuture: Future<ByteArray?>? = if (z >= 5) {
+                val coastUrl = "https://$MAPTILER_HOST/tiles/v3/$z/$x/$y?key=$encodedKey"
+                runCatching {
+                    coastExecutor.submit<ByteArray?> {
+                        fetchCoastBytes(coastClient, coastUrl)
+                    }
+                }.getOrNull()
+            } else null
+            val coastDeadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2600L)
             return try {
                 upstream.newCall(upstreamReq).execute().use { upstreamResp ->
                     val rawBytes = upstreamResp.body?.bytes()
                     if (!upstreamResp.isSuccessful || rawBytes == null || rawBytes.isEmpty()) {
+                        coastFuture?.cancel(true)
                         lastHdFailureAtMs = System.currentTimeMillis()
                         return syntheticError(req, 503, "Tile upstream unavailable")
                     }
-                    val graded = gradeSatelliteBytes(appContext, rawBytes, z, x, y) ?: rawBytes
+                    val coastBytes = if (coastFuture != null) {
+                        val remainMs = TimeUnit.NANOSECONDS.toMillis(coastDeadlineNs - System.nanoTime()).coerceAtLeast(0L)
+                        runCatching { coastFuture.get(remainMs, TimeUnit.MILLISECONDS) }.getOrNull()
+                            .also { if (!coastFuture.isDone) coastFuture.cancel(true) }
+                    } else null
+                    val graded = gradeSatelliteBytes(appContext, rawBytes, z, x, y, coastBytes) ?: rawBytes
                     persistGradedTile(tileFile, z, x, y, graded)
                     lastHdFailureAtMs = 0L
                     okTileResponse(req, graded)
                 }
             } catch (e: IOException) {
+                coastFuture?.cancel(true)
                 if (chain.call().isCanceled()) throw e
                 lastHdFailureAtMs = System.currentTimeMillis()
                 syntheticError(req, 504, "Offline")
             }
+        }
+
+        private fun fetchCoastBytes(client: OkHttpClient, coastUrl: String): ByteArray? {
+            val req = Request.Builder()
+                .url(coastUrl)
+                .header("User-Agent", USER_AGENT)
+                .build()
+            return runCatching {
+                client.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) null else resp.body?.bytes()
+                }
+            }.getOrNull()
         }
 
         private fun okTileResponse(req: Request, bytes: ByteArray): Response =
@@ -280,6 +343,7 @@ internal object WorldTilePipeline {
         z: Int,
         tileX: Int,
         tileY: Int,
+        coastPbfBytes: ByteArray? = null,
     ): ByteArray? {
         val opts = BitmapFactory.Options().apply { inMutable = true; inPreferredConfig = Bitmap.Config.ARGB_8888 }
         val bmp = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, opts) ?: return null
@@ -290,17 +354,259 @@ internal object WorldTilePipeline {
             val pixels = IntArray(w * h)
             bmp.getPixels(pixels, 0, w, 0, 0, w, h)
             val atlas = loadOceanAtlas(context)
-            gradePixels(pixels, w, h, z, tileX, tileY, atlas)
+            val oceanMask = if (coastPbfBytes != null && coastPbfBytes.isNotEmpty()) {
+                runCatching { decodeOceanMask(coastPbfBytes, w, h) }.getOrNull()
+            } else null
+            gradePixels(pixels, w, h, z, tileX, tileY, atlas, oceanMask)
             bmp.setPixels(pixels, 0, w, 0, 0, w, h)
             val out = ByteArrayOutputStream(rawBytes.size)
-            bmp.compress(Bitmap.CompressFormat.JPEG, 86, out)
+            bmp.compress(Bitmap.CompressFormat.JPEG, 92, out)
             out.toByteArray()
         } finally {
             bmp.recycle()
         }
     }
 
-    /** Ports `earth-worker.js` ocean depth tinting and Swiss paper-warm land grading to native pixels. */
+    internal class OceanMaskGeometry(
+        val extent: Int,
+        val polygons: List<List<FloatArray>>,
+    )
+
+    private class MvtReader(private val bytes: ByteArray) {
+        var pos: Int = 0
+        val done: Boolean get() = pos >= bytes.size
+
+        fun varint(): Long {
+            var value = 0L
+            var shift = 0
+            while (!done && shift < 64) {
+                val b = bytes[pos++].toInt() and 0xFF
+                value = value or ((b and 0x7F).toLong() shl shift)
+                if ((b and 0x80) == 0) return value
+                shift += 7
+            }
+            throw IllegalArgumentException("Truncated varint")
+        }
+
+        fun take(length: Int): ByteArray {
+            require(length >= 0 && pos + length <= bytes.size) { "Truncated field" }
+            val slice = bytes.copyOfRange(pos, pos + length)
+            pos += length
+            return slice
+        }
+
+        inline fun forEachField(block: (field: Int, wireType: Int, longVal: Long, bytesVal: ByteArray?) -> Unit) {
+            while (!done) {
+                val tag = varint()
+                val field = (tag ushr 3).toInt()
+                val wire = (tag and 7L).toInt()
+                if (field <= 0) throw IllegalArgumentException("Invalid field")
+                when (wire) {
+                    0 -> block(field, wire, varint(), null)
+                    2 -> {
+                        val len = varint().toInt()
+                        block(field, wire, 0L, take(len))
+                    }
+                    1 -> { take(8) }
+                    5 -> { take(4) }
+                    else -> throw IllegalArgumentException("Unsupported wire type: $wire")
+                }
+            }
+        }
+    }
+
+    private fun gunzipIfNeeded(raw: ByteArray): ByteArray {
+        if (raw.size >= 2 && raw[0] == 0x1F.toByte() && raw[1] == 0x8B.toByte()) {
+            GZIPInputStream(ByteArrayInputStream(raw)).use { return it.readBytes() }
+        }
+        return raw
+    }
+
+    internal fun extractOceanPolygons(pbfBytes: ByteArray): OceanMaskGeometry? {
+        val data = gunzipIfNeeded(pbfBytes)
+        var foundWater = false
+        var extent = 4096
+        val polygons = ArrayList<List<FloatArray>>()
+        MvtReader(data).forEachField { field, _, _, layerBytes ->
+            if (field != 3 || layerBytes == null || foundWater) return@forEachField
+            var layerName = ""
+            val features = ArrayList<ByteArray>()
+            val keys = ArrayList<String>()
+            val values = ArrayList<String?>()
+            var layerExtent = 4096
+            MvtReader(layerBytes).forEachField { id, _, longVal, bytesVal ->
+                when (id) {
+                    1 -> if (bytesVal != null) layerName = bytesVal.decodeToString()
+                    2 -> if (bytesVal != null) features.add(bytesVal)
+                    3 -> if (bytesVal != null) keys.add(bytesVal.decodeToString())
+                    4 -> if (bytesVal != null) {
+                        var strVal: String? = null
+                        MvtReader(bytesVal).forEachField { vKey, _, _, vBytes ->
+                            if (vKey == 1 && vBytes != null) strVal = vBytes.decodeToString()
+                        }
+                        values.add(strVal)
+                    }
+                    5 -> if (longVal > 0L) layerExtent = longVal.toInt()
+                }
+            }
+            if (layerName != "water") return@forEachField
+            foundWater = true
+            if (layerExtent <= 0) return@forEachField
+            extent = layerExtent
+            for (featBytes in features) {
+                var tags: ByteArray? = null
+                var type = 0L
+                var geom: ByteArray? = null
+                MvtReader(featBytes).forEachField { id, _, longVal, bytesVal ->
+                    when (id) {
+                        2 -> tags = bytesVal
+                        3 -> type = longVal
+                        4 -> geom = bytesVal
+                    }
+                }
+                if (type == 3L && geom != null && isOceanFeature(tags, keys, values)) {
+                    val rings = decodeMvtPolygonRings(geom!!)
+                    if (rings.isNotEmpty()) polygons.add(rings)
+                }
+            }
+        }
+        if (!foundWater) return null
+        return OceanMaskGeometry(extent, polygons)
+    }
+
+    private fun isOceanFeature(tags: ByteArray?, keys: List<String>, values: List<String?>): Boolean {
+        if (tags == null) return false
+        val reader = MvtReader(tags)
+        while (!reader.done) {
+            val kIdx = reader.varint().toInt()
+            val vIdx = reader.varint().toInt()
+            if (kIdx in keys.indices && keys[kIdx] == "class") {
+                return vIdx in values.indices && values[vIdx] == "ocean"
+            }
+        }
+        return false
+    }
+
+    private fun decodeMvtPolygonRings(geometry: ByteArray): List<FloatArray> {
+        val reader = MvtReader(geometry)
+        var x = 0
+        var y = 0
+        fun zigzag(v: Long): Int = ((v ushr 1) xor -(v and 1L)).toInt()
+        val rings = ArrayList<FloatArray>()
+        var current = FloatArray(16)
+        var len = 0
+        fun appendPt(px: Int, py: Int) {
+            if (len + 2 > current.size) {
+                current = current.copyOf(current.size * 2)
+            }
+            current[len++] = px.toFloat()
+            current[len++] = py.toFloat()
+        }
+        while (!reader.done) {
+            val header = reader.varint()
+            val cmd = (header and 7L).toInt()
+            val count = (header ushr 3).toInt()
+            if (cmd == 7 && count == 1) {
+                if (len >= 6) rings.add(current.copyOf(len))
+                len = 0
+                continue
+            }
+            if (count <= 0 || (cmd != 1 && cmd != 2)) break
+            for (i in 0 until count) {
+                x += zigzag(reader.varint())
+                y += zigzag(reader.varint())
+                if (cmd == 1 && len >= 6) {
+                    rings.add(current.copyOf(len))
+                    len = 0
+                }
+                appendPt(x, y)
+            }
+        }
+        if (len >= 6) rings.add(current.copyOf(len))
+        return rings
+    }
+
+    internal fun decodeOceanMask(pbfBytes: ByteArray, width: Int, height: Int): ByteArray? {
+        if (width <= 0 || height <= 0) return null
+        val geometry = extractOceanPolygons(pbfBytes) ?: return null
+        val mask = ByteArray(width * height)
+        if (geometry.polygons.isEmpty()) return mask
+        val config: Bitmap.Config? = Bitmap.Config.ARGB_8888
+        val bmp: Bitmap? = if (config != null) runCatching { Bitmap.createBitmap(width, height, config) }.getOrNull() else null
+        if (bmp != null) {
+            try {
+                val canvas = Canvas(bmp)
+                val scaleX = width / geometry.extent.toFloat()
+                val scaleY = height / geometry.extent.toFloat()
+                canvas.scale(scaleX, scaleY)
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.FILL
+                    color = Color.BLACK
+                }
+                val path = Path().apply { fillType = Path.FillType.WINDING }
+                for (rings in geometry.polygons) {
+                    for (pts in rings) {
+                        if (pts.size < 6) continue
+                        path.moveTo(pts[0], pts[1])
+                        var i = 2
+                        while (i + 1 < pts.size) {
+                            path.lineTo(pts[i], pts[i + 1])
+                            i += 2
+                        }
+                        path.close()
+                    }
+                }
+                canvas.drawPath(path, paint)
+                val pixels = IntArray(width * height)
+                bmp.getPixels(pixels, 0, width, 0, 0, width, height)
+                for (i in pixels.indices) {
+                    mask[i] = ((pixels[i] ushr 24) and 0xFF).toByte()
+                }
+            } finally {
+                bmp.recycle()
+            }
+            return mask
+        }
+        // Pure-JVM scanline fallback when Android Bitmap is unavailable in local unit tests.
+        val scaleX = geometry.extent / width.toDouble()
+        val scaleY = geometry.extent / height.toDouble()
+        for (row in 0 until height) {
+            val sy = (row + 0.5) * scaleY
+            for (col in 0 until width) {
+                val sx = (col + 0.5) * scaleX
+                if (pointInOceanPolygons(sx, sy, geometry.polygons)) {
+                    mask[row * width + col] = 0xFF.toByte()
+                }
+            }
+        }
+        return mask
+    }
+
+    private fun pointInOceanPolygons(sx: Double, sy: Double, polygons: List<List<FloatArray>>): Boolean {
+        var winding = 0
+        for (rings in polygons) {
+            for (pts in rings) {
+                val n = pts.size / 2
+                if (n < 3) continue
+                var j = n - 1
+                for (i in 0 until n) {
+                    val x1 = pts[j * 2].toDouble()
+                    val y1 = pts[j * 2 + 1].toDouble()
+                    val x2 = pts[i * 2].toDouble()
+                    val y2 = pts[i * 2 + 1].toDouble()
+                    if (y1 <= sy) {
+                        if (y2 > sy && ((x2 - x1) * (sy - y1) - (sx - x1) * (y2 - y1)) > 0.0) winding++
+                    } else {
+                        if (y2 <= sy && ((x2 - x1) * (sy - y1) - (sx - x1) * (y2 - y1)) < 0.0) winding--
+                    }
+                    j = i
+                }
+            }
+        }
+        return winding != 0
+    }
+
+    /** Ports `earth-worker.js` ocean depth tinting, bilinear atlas sampling, and coastline masking. */
     internal fun gradePixels(
         pixels: IntArray,
         width: Int,
@@ -311,18 +617,27 @@ internal object WorldTilePipeline {
         atlasWidth: Int,
         atlasHeight: Int,
         atlasPixels: IntArray?,
+        oceanMask: ByteArray? = null,
     ) {
         val hasAtlas = atlasPixels != null && atlasWidth > 0 && atlasHeight > 0
+        val hasMask = oceanMask != null && oceanMask.size == width * height
         val seaDeep = if (hasAtlas) NATURAL_DEEP else DEEP_OPTICAL
         val seaShallow = if (hasAtlas) NATURAL_SHALLOW else SHALLOW_OPTICAL
         val tilesCount = (1 shl z).toDouble()
 
         for (row in 0 until height) {
-            val atlasY = if (hasAtlas) {
-                (((tileY + (row + 0.5) / height) / tilesCount) * atlasHeight)
-                    .toInt().coerceIn(0, atlasHeight - 1)
-            } else 0
-            val atlasRowOffset = atlasY * atlasWidth
+            var y0 = 0
+            var y1 = 0
+            var ty = 0.0
+            if (hasAtlas) {
+                val fy = (((tileY + (row + 0.5) / height) / tilesCount) * atlasHeight) - 0.5
+                val fyInt = floor(fy).toInt()
+                ty = fy - fyInt
+                y0 = fyInt.coerceIn(0, atlasHeight - 1)
+                y1 = (fyInt + 1).coerceIn(0, atlasHeight - 1)
+            }
+            val row0Offset = y0 * atlasWidth
+            val row1Offset = y1 * atlasWidth
             val rowOffset = row * width
 
             for (col in 0 until width) {
@@ -337,32 +652,71 @@ internal object WorldTilePipeline {
                 val b = b8 / 255.0
                 val lum = 0.3 * r + 0.59 * g + 0.11 * b
 
-                var oceanColor = 0
+                var ocR = 0.0
+                var ocG = 0.0
+                var ocB = 0.0
                 var depthCoverage = 0.0
                 if (hasAtlas) {
-                    val atlasX = (((tileX + (col + 0.5) / width) / tilesCount) * atlasWidth)
-                        .toInt().coerceIn(0, atlasWidth - 1)
-                    oceanColor = atlasPixels!![atlasRowOffset + atlasX]
-                    depthCoverage = ((oceanColor ushr 24) and 0xFF) / 255.0
+                    val fx = (((tileX + (col + 0.5) / width) / tilesCount) * atlasWidth) - 0.5
+                    val fxInt = floor(fx).toInt()
+                    val tx = fx - fxInt
+                    val x0 = ((fxInt % atlasWidth) + atlasWidth) % atlasWidth
+                    val x1 = (x0 + 1) % atlasWidth
+
+                    val p00 = atlasPixels!![row0Offset + x0]
+                    val p10 = atlasPixels[row0Offset + x1]
+                    val p01 = atlasPixels[row1Offset + x0]
+                    val p11 = atlasPixels[row1Offset + x1]
+
+                    val w00 = (1.0 - tx) * (1.0 - ty)
+                    val w10 = tx * (1.0 - ty)
+                    val w01 = (1.0 - tx) * ty
+                    val w11 = tx * ty
+
+                    val wa00 = w00 * ((p00 ushr 24) and 0xFF)
+                    val wa10 = w10 * ((p10 ushr 24) and 0xFF)
+                    val wa01 = w01 * ((p01 ushr 24) and 0xFF)
+                    val wa11 = w11 * ((p11 ushr 24) and 0xFF)
+                    val aSum = wa00 + wa10 + wa01 + wa11
+                    depthCoverage = aSum / 255.0
+                    if (aSum > 1e-4) {
+                        val invA = 1.0 / aSum
+                        ocR = (wa00 * ((p00 ushr 16) and 0xFF) + wa10 * ((p10 ushr 16) and 0xFF) +
+                            wa01 * ((p01 ushr 16) and 0xFF) + wa11 * ((p11 ushr 16) and 0xFF)) * invA
+                        ocG = (wa00 * ((p00 ushr 8) and 0xFF) + wa10 * ((p10 ushr 8) and 0xFF) +
+                            wa01 * ((p01 ushr 8) and 0xFF) + wa11 * ((p11 ushr 8) and 0xFF)) * invA
+                        ocB = (wa00 * (p00 and 0xFF) + wa10 * (p10 and 0xFF) +
+                            wa01 * (p01 and 0xFF) + wa11 * (p11 and 0xFF)) * invA
+                    }
                 }
 
-                val navy = smooth(0.0, 0.05, b - max(r, g * 0.92)) * smooth(0.42, 0.22, lum)
-                val cyan = smooth(0.04, 0.14, b - r) * smooth(0.02, 0.10, g - r) * smooth(0.65, 0.4, lum)
-                val dark = smooth(0.20, 0.09, lum) * smooth(-0.03, 0.03, b - r) * smooth(0.06, -0.02, g - b)
-                val water = max(navy, max(cyan, dark))
-                val shelf = 0.6 * smooth(0.06, 0.30, g + 0.5 * b - 0.2)
-                val depthMix = depthCoverage * max(water, 1.0 - smooth(0.25, 0.62, lum))
-                val opticalMix = water * (1.0 - depthMix)
-                val landMix = (1.0 - water) * (1.0 - depthMix)
+                val shelf: Double
+                val depthMix: Double
+                val opticalMix: Double
+                val landMix: Double
+                if (hasMask) {
+                    val maskAlpha = (oceanMask!![idx].toInt() and 0xFF) / 255.0
+                    val water = maskAlpha * smooth(0.78, 0.52, lum) * smooth(0.085, 0.035, max(r - b, g - b))
+                    val teal = min(g - r, b - r)
+                    shelf = smooth(0.025, 0.26, teal)
+                    depthMix = water * depthCoverage * (1.0 - 0.85 * smooth(0.025, 0.15, teal))
+                    opticalMix = water - depthMix
+                    landMix = 1.0 - water
+                } else {
+                    val navy = smooth(0.0, 0.05, b - max(r, g * 0.92)) * smooth(0.42, 0.22, lum)
+                    val cyan = smooth(0.04, 0.14, b - r) * smooth(0.02, 0.10, g - r) * smooth(0.65, 0.4, lum)
+                    val dark = smooth(0.20, 0.09, lum) * smooth(-0.03, 0.03, b - r) * smooth(0.06, -0.02, g - b)
+                    val water = max(navy, max(cyan, dark))
+                    shelf = 0.6 * smooth(0.06, 0.30, g + 0.5 * b - 0.2)
+                    depthMix = depthCoverage * max(water, 1.0 - smooth(0.25, 0.62, lum))
+                    opticalMix = water * (1.0 - depthMix)
+                    landMix = (1.0 - water) * (1.0 - depthMix)
+                }
 
                 val pr = POW_LUT[r8]
                 val pg = POW_LUT[g8]
                 val pb = POW_LUT[b8]
                 val l2 = 0.3 * pr + 0.59 * pg + 0.11 * pb
-
-                val ocR = (oceanColor ushr 16) and 0xFF
-                val ocG = (oceanColor ushr 8) and 0xFF
-                val ocB = oceanColor and 0xFF
 
                 val outR = channelOut(seaDeep[0], seaShallow[0], shelf, opticalMix, l2, pr, LAND_TINT[0], PAPER_RGB[0], landMix, ocR, depthMix)
                 val outG = channelOut(seaDeep[1], seaShallow[1], shelf, opticalMix, l2, pg, LAND_TINT[1], PAPER_RGB[1], landMix, ocG, depthMix)
@@ -380,6 +734,7 @@ internal object WorldTilePipeline {
         tileX: Int,
         tileY: Int,
         atlas: OceanAtlas?,
+        oceanMask: ByteArray?,
     ) = gradePixels(
         pixels = pixels,
         width = width,
@@ -390,6 +745,7 @@ internal object WorldTilePipeline {
         atlasWidth = atlas?.width ?: 0,
         atlasHeight = atlas?.height ?: 0,
         atlasPixels = atlas?.pixels,
+        oceanMask = oceanMask,
     )
 
     private fun channelOut(
@@ -402,7 +758,7 @@ internal object WorldTilePipeline {
         tint: Double,
         paper: Int,
         landMix: Double,
-        atlasChan: Int,
+        atlasChan: Double,
         depthMix: Double,
     ): Int {
         val opticalSea = deep * (1.0 - shelf) + shallow * shelf
@@ -454,7 +810,7 @@ internal object WorldTilePipeline {
                     "earth-hd",
                     JSONObject().apply {
                         put("type", "raster")
-                        put("tiles", JSONArray(listOf("https://$GRADED_EARTH_HOST/{z}/{x}/{y}.jpg")))
+                        put("tiles", JSONArray(listOf("https://$GRADED_EARTH_HOST/v2/{z}/{x}/{y}.jpg")))
                         put("tileSize", 256)
                         put("minzoom", 3)
                         put("maxzoom", 9)
