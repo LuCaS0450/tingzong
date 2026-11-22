@@ -358,6 +358,7 @@ internal class NativeWorldController(
 
     val mapView: MapView
     private val map: MapboxMap
+    private val mapTexture: WorldMapTexture?
 
     var ready by mutableStateOf(false)
         private set
@@ -379,7 +380,9 @@ internal class NativeWorldController(
         override fun onConfigurationChanged(newConfig: Configuration) = Unit
 
         override fun onLowMemory() {
-            if (!destroyed) mapView.onLowMemory()
+            if (destroyed) return
+            mapTexture?.releaseDetachedTexture()
+            mapView.onLowMemory()
         }
 
         @Suppress("DEPRECATION")
@@ -401,6 +404,7 @@ internal class NativeWorldController(
         // This view belongs to RoomBrowseState and can outlive a navigation entry.
         val plugins = MapInitOptions.defaultPluginList.filterNot { it.id == Plugin.MAPBOX_LIFECYCLE_PLUGIN_ID }
         mapView = MapView(context, MapInitOptions(context, mapOptions = options, plugins = plugins, styleUri = null, textureView = true))
+        mapTexture = WorldMapTexture.retainIn(mapView)
         map = mapView.mapboxMap
         mapView.scalebar.enabled = false
         mapView.compass.enabled = false
@@ -1108,6 +1112,7 @@ internal class NativeWorldController(
         streetQuery?.cancel()
         tapQuery?.cancel()
         scope.cancel()
+        mapTexture?.close()
         mapView.onDestroy()
         artwork.values.forEach(Bitmap::recycle)
         artwork = emptyMap()

@@ -2,13 +2,16 @@ package cn.musicpilgrimage.app
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.SurfaceTexture
 import android.os.SystemClock
+import android.view.TextureView
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.core.view.descendants
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import cn.musicpilgrimage.app.ui.room.NativeWorldController
@@ -18,6 +21,7 @@ import com.mapbox.maps.RenderedQueryOptions
 import com.mapbox.maps.ScreenBox
 import com.mapbox.maps.ScreenCoordinate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -96,10 +100,12 @@ class WorldRenderingDeviceTest {
             controller.diagnostics()
         }
         captureInitialGlobe(controller, output, "globe-before")
+        val globeTexture = mapTexture(controller)
         for (tab in listOf("wall-tab-0", "wall-tab-2")) {
             leaveWorld(tab)
             controller = openWorld()
             captureInitialGlobe(controller, output, "globe-after-$tab")
+            assertSame("Returning from $tab recreated the globe drawing surface", globeTexture, mapTexture(controller))
             val restored = compose.runOnUiThread { controller.diagnostics() }
             assertEquals(globe.longitude, restored.longitude, 0.01)
             assertEquals(globe.latitude, restored.latitude, 0.01)
@@ -111,13 +117,19 @@ class WorldRenderingDeviceTest {
             controller.diagnostics()
         }
         captureStreet(controller, output, "street-before")
+        val streetTexture = mapTexture(controller)
         leaveWorld("wall-tab-2")
         controller = openWorld()
         captureStreet(controller, output, "street-after")
+        assertSame("Returning to the street map recreated its drawing surface", streetTexture, mapTexture(controller))
         val restored = compose.runOnUiThread { controller.diagnostics() }
         assertEquals(street.longitude, restored.longitude, 0.01)
         assertEquals(street.latitude, restored.latitude, 0.01)
         assertEquals(street.zoom, restored.zoom, 0.005)
+    }
+
+    private fun mapTexture(controller: NativeWorldController): SurfaceTexture = compose.runOnUiThread {
+        requireNotNull(controller.mapView.descendants.filterIsInstance<TextureView>().single().surfaceTexture)
     }
 
     private fun leaveWorld(tab: String) {
