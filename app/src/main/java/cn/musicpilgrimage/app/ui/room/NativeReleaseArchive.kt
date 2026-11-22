@@ -182,9 +182,9 @@ internal fun NativeReleaseArchive(
                                 Text(if(favorite) "已收藏" else "收藏",color = RoomColors.Ink)
                             }
                             TextButton(onSearch, Modifier.weight(1f)) {
-                                Icon(Icons.Outlined.Search,null,Modifier.size(18.dp),tint = RoomColors.Ink)
+                                Icon(Icons.Outlined.Search,null,Modifier.size(20.dp),tint = RoomColors.Ink)
                                 Spacer(Modifier.width(8.dp))
-                                Text("搜索作品",color = RoomColors.Ink)
+                                Text("搜索",color = RoomColors.Ink)
                             }
                         }
                         HorizontalDivider(color = RoomColors.Line)
