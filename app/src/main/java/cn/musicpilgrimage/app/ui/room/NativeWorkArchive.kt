@@ -99,11 +99,8 @@ internal fun NativeWorkArchive(
                         HorizontalDivider(color = RoomColors.Line)
                         ReleaseSectionTitle("关联地点", "${places.size} PLACES")
                         places.forEach { place ->
-                            val relations = place.optJSONArray("relations")
-                            val label = relations?.let { (0 until it.length()).joinToString(" · ") { index -> relations.optString(index) } }.orEmpty()
-                            val photo = place.optString("image")
-                            ReleaseArchiveRow(place.optString("name"), label, { onPlace(place.optString("id")) }) {
-                                RelatedPlaceThumbnail(place.optString("id"), photo)
+                            ReleaseArchiveRow(place.name, place.relations, { onPlace(place.id) }) {
+                                place.photo?.let { PlacePhotoThumbnail(place.id, it) }
                             }
                         }
                         SwissTextButton({ sources = true }) { Text("资料来源 ↗", color = RoomColors.Muted) }

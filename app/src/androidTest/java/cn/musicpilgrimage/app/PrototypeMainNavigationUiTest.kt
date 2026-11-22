@@ -553,6 +553,43 @@ class PrototypeMainNavigationUiTest {
 
     @ExtendedDeviceTest
     @Test
+    fun relatedArchivesShowPhotosForSwissAlpsAndCharlesBridge() {
+        compose.waitUntil(15_000) {
+            compose.onAllNodesWithTag("room-search-button").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("room-search-button").performClick()
+        compose.onNodeWithTag("room-search-input").performTextInput("学不会")
+        compose.onNodeWithTag("room-work-jj|学不会").performClick()
+        compose.onNodeWithTag("native-work-archive").assertIsDisplayed()
+
+        fun checkThumbnails() {
+            for (id in listOf("charles-bridge", "swiss-alps-reference")) {
+                val tag = "place-photo-preview-$id"
+                compose.waitUntil(12_000) {
+                    compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+                }
+                compose.onNodeWithTag(tag, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+            }
+        }
+
+        checkThumbnails()
+        compose.onNodeWithText("资料来源 ↗").performScrollTo()
+        captureAccountScreen("work-related-place-previews", compose)
+        compose.onNodeWithText("发行详情").performScrollTo().performClick()
+        compose.onNodeWithTag("native-release-archive").assertIsDisplayed()
+        checkThumbnails()
+        compose.onNodeWithText("资料来源 ↗").performScrollTo()
+        captureAccountScreen("release-related-place-previews", compose)
+
+        compose.onNode(hasText("瑞士阿尔卑斯山", substring = true) and hasClickAction()).performClick()
+        compose.waitUntil(12_000) {
+            compose.onAllNodes(hasTestTag("place-archive-photo") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("place-archive-photo").assertIsDisplayed()
+    }
+
+    @ExtendedDeviceTest
+    @Test
     fun detailBackFollowsAndReversesForSlideAndCoverZoom() {
         compose.waitUntil(10_000) {
             compose.onAllNodesWithTag("room-search-button").fetchSemanticsNodes().isNotEmpty()

@@ -17,6 +17,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
+internal data class ArchivePlaceLink(
+    val id: String,
+    val name: String,
+    val location: String,
+    val relations: String,
+    val photo: ArchivePhoto?,
+)
+
 internal class SwissDetailMedia(private val context:Context) {
     private val reviewed by lazy{JSONObject(context.assets.open("design/swiss-details/media-index.json").bufferedReader().use{it.readText()})}
     val fallbacks=JSONObject()
@@ -50,9 +58,15 @@ internal class SwissDetailMedia(private val context:Context) {
             .put("listLocation",parts.filterNot{it==name}.joinToString(" · "))
     }
 
-    fun archiveLink(link: MusicPlaceLink): JSONObject = archivePlaceIdentity(link.place)
-        .put("image", link.place.takeIf { it.archiveScope() == "地点级" }?.let(::archivePhoto)?.asset.orEmpty())
-        .put("relations", JSONArray(link.scenes.map { it.archiveConnection().label }.distinct()))
+    fun archiveLink(link: MusicPlaceLink): ArchivePlaceLink {
+        val place = link.place
+        val identity = archivePlaceIdentity(place)
+        return ArchivePlaceLink(
+            place.id, identity.getString("name"), identity.getString("listLocation"),
+            link.scenes.map { it.archiveConnection().label }.distinct().joinToString(" · "),
+            ArchivePhotography.photo(context, place),
+        )
+    }
 
     private fun connectionImage(scene: Scene): JSONObject? {
         if (!scene.imageApproved) return null

@@ -719,7 +719,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
      page("archive/{kind}"){e->key(libraryOwner) {
       val kind=e.arguments?.getString("kind").orEmpty()
       val places=sourceCatalog.publicOnly().places
-      val openPlace:(String)->Unit={navigate("place/${Uri.encode(it)}")}
+      val openPlace:(String)->Unit={navigateTo("place/${Uri.encode(it)}",useThumbnail=true)}
       val initialKind=when(kind){"songs","releases","places"->kind;else->"footprints"}
       val initialFootprint=when(kind){"recreations","messages"->kind;else->"visits"}
       RoomArchive(initialKind,music={selection->

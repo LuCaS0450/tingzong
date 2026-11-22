@@ -2,6 +2,7 @@ package cn.musicpilgrimage.app.ui.room
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
@@ -27,6 +28,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -41,13 +43,48 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-internal fun RelatedPlaceThumbnail(placeId: String, photo: String) {
-    if (photo.isBlank()) return
-    val zoom = rememberDetailZoomSource("place/${Uri.encode(placeId)}", photo, ContentScale.Crop)
-    val thumbnail = Modifier.size(46.dp)
+internal fun ArchivePreviewImage(
+    sources: List<String>,
+    modifier: Modifier,
+    scale: ContentScale,
+    loadedTag: String? = null,
+    onLoaded: (Drawable) -> Unit = {},
+    onUnavailable: () -> Unit = {},
+) {
+    var index by remember(sources) { mutableIntStateOf(0) }
+    val source = sources.getOrNull(index) ?: return
+    var loaded by remember(source) { mutableStateOf(false) }
     AsyncImage(
-        photo, null, zoom?.position(thumbnail) ?: thumbnail, contentScale = ContentScale.Crop,
-        onSuccess = { zoom?.load(it.result.drawable) }, onError = { zoom?.load(null) },
+        source, null, if (loaded && loadedTag != null) modifier.testTag(loadedTag) else modifier, contentScale = scale,
+        onSuccess = {
+            loaded = true
+            onLoaded(it.result.drawable)
+        },
+        onError = {
+            index++
+            if (index == sources.size) onUnavailable()
+        },
+    )
+}
+
+@Composable
+internal fun PlacePhotoThumbnail(
+    placeId: String,
+    photo: ArchivePhoto,
+    modifier: Modifier = Modifier.size(46.dp),
+    fallback: @Composable () -> Unit = {},
+) {
+    var unavailable by remember(photo) { mutableStateOf(false) }
+    if (unavailable) {
+        fallback()
+        return
+    }
+    val zoom = rememberDetailZoomSource("place/${Uri.encode(placeId)}", photo.asset, ContentScale.Crop)
+    ArchivePreviewImage(
+        photo.previewSources, zoom?.position(modifier) ?: modifier, ContentScale.Crop,
+        loadedTag = "place-photo-preview-$placeId",
+        onLoaded = { zoom?.load(it) },
+        onUnavailable = { unavailable = true; zoom?.load(null) },
     )
 }
 

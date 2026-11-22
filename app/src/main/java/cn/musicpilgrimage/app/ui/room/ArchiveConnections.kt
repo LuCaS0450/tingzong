@@ -104,6 +104,8 @@ internal data class ArchivePhoto(
     val asset: String, val url: String, val description: String, val width: Int, val height: Int,
     val author: String, val license: String, val licenseUrl: String, val source: String,
 ) {
+    val previewSources get() = listOf(asset, url).filter(String::isNotBlank).distinct()
+
     fun json() = JSONObject().put("image", asset).put("description", description)
         .put("width", width).put("height", height).put("credit", "$author · $license")
 }

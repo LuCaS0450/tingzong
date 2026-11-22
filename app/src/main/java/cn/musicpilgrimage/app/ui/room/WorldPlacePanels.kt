@@ -52,7 +52,6 @@ import cn.musicpilgrimage.app.data.musicTerm
 import cn.musicpilgrimage.app.ui.AppBottomSheet
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.appMotionEasing
-import coil.compose.AsyncImage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -258,43 +257,7 @@ internal fun WorldPlaceSummary(
                             Icon(Icons.Outlined.Close, "收起地点摘要", tint = RoomColors.Muted)
                         }
                     }
-                    presented.scene?.let { scene ->
-                        val context = LocalContext.current
-                        val art = remember(context, scene) { SwissDetailMedia(context).scene(scene) }
-                        val timestamp = scene.timestampSeconds?.let { "${(it / 60).toString().padStart(2, '0')}:${(it % 60).toString().padStart(2, '0')}" }
-                        val credit = listOfNotNull(scene.artistName, scene.archiveMediaLabel(), timestamp).filter(String::isNotBlank).joinToString(" · ")
-                        HorizontalDivider(Modifier.padding(top = 8.dp), color = RoomColors.Line)
-                        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            if (art.isNotBlank()) {
-                                var resolvedRatio by rememberSaveable(scene.id, art) {
-                                    mutableFloatStateOf(scene.aspectRatio.coerceIn(0.65f, 1.85f))
-                                }
-                                val widthDp = (78f * resolvedRatio).coerceAtMost(120f)
-                                val heightDp = (widthDp / resolvedRatio).coerceAtLeast(56f)
-                                AsyncImage(
-                                    model = art,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(width = widthDp.dp, height = heightDp.dp)
-                                        .clipToBounds()
-                                        .background(RoomColors.Wall)
-                                        .testTag("world-summary-art"),
-                                    contentScale = ContentScale.Fit,
-                                    onSuccess = { result ->
-                                        val size = result.painter.intrinsicSize
-                                        if (size.width.isFinite() && size.height.isFinite() && size.width > 1f && size.height > 1f) {
-                                            resolvedRatio = (size.width / size.height).coerceIn(0.65f, 1.85f)
-                                        }
-                                    },
-                                )
-                            }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                if (scene.work.isNotBlank()) Text("《${scene.work}》", color = RoomColors.Ink, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                                if (credit.isNotBlank()) Text(credit, Modifier.testTag("world-summary-media-credit"), color = RoomColors.Muted, fontSize = 12.sp)
-                            }
-                        }
-                    }
+                    WorldSummaryPreview(presented)
                     HorizontalDivider(color = RoomColors.Line)
                     Spacer(Modifier.height(10.dp))
                     val id = presented.place.id
@@ -312,6 +275,59 @@ internal fun WorldPlaceSummary(
                         WorldSummaryAction("查看详情", Modifier.weight(1.1f).testTag("world-summary-detail"), actionsEnabled, primary = true) { onDetail(id) }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorldSummaryPreview(entry: WorldPlaceEntry) {
+    val context = LocalContext.current
+    val scene = entry.scene
+    val sceneSources = remember(context, scene) {
+        if (scene?.imageApproved == true) {
+            listOfNotNull(SwissDetailMedia(context).scene(scene), scene.thumbnailUrl, scene.imageUrl)
+                .filter(String::isNotBlank).distinct()
+        } else emptyList()
+    }
+    var sceneUnavailable by rememberSaveable(scene?.id, sceneSources) { mutableStateOf(false) }
+    val useScene = sceneSources.isNotEmpty() && !sceneUnavailable
+    val photo = remember(context, entry.place, useScene) {
+        if (useScene) null else ArchivePhotography.photo(context, entry.place)
+    }
+    var photoUnavailable by rememberSaveable(photo?.asset) { mutableStateOf(false) }
+    val sources = if (useScene) sceneSources else photo?.takeUnless { photoUnavailable }?.previewSources.orEmpty()
+    if (scene == null && sources.isEmpty()) return
+
+    val initialRatio = scene?.aspectRatio ?: photo?.let { it.width.toFloat() / it.height.coerceAtLeast(1) } ?: 1f
+    var ratio by rememberSaveable(scene?.id, sceneSources) { mutableFloatStateOf(initialRatio.coerceIn(.65f, 1.85f)) }
+    val timestamp = scene?.timestampSeconds?.let { "${(it / 60).toString().padStart(2, '0')}:${(it % 60).toString().padStart(2, '0')}" }
+    val credit = listOfNotNull(scene?.artistName, scene?.archiveMediaLabel()?.takeIf { useScene }, timestamp?.takeIf { useScene })
+        .filter(String::isNotBlank).joinToString(" · ")
+    HorizontalDivider(Modifier.padding(top = 8.dp), color = RoomColors.Line)
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (sources.isNotEmpty()) {
+            val width = (78f * ratio).coerceAtMost(120f)
+            val height = (width / ratio).coerceAtLeast(56f)
+            ArchivePreviewImage(
+                sources, Modifier.size(width.dp, height.dp).clipToBounds().background(RoomColors.Wall),
+                ContentScale.Fit,
+                loadedTag = if (useScene) "world-summary-art" else "world-summary-place-photo",
+                onLoaded = { drawable ->
+                    if (useScene && drawable.intrinsicWidth > 1 && drawable.intrinsicHeight > 1) {
+                        ratio = (drawable.intrinsicWidth.toFloat() / drawable.intrinsicHeight).coerceIn(.65f, 1.85f)
+                    }
+                },
+                onUnavailable = { if (useScene) sceneUnavailable = true else photoUnavailable = true },
+            )
+        }
+        scene?.let {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (it.work.isNotBlank()) Text("《${it.work}》", color = RoomColors.Ink, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                if (credit.isNotBlank()) Text(credit, Modifier.testTag("world-summary-media-credit"), color = RoomColors.Muted, fontSize = 12.sp)
             }
         }
     }

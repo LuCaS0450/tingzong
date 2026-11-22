@@ -205,9 +205,15 @@ private fun LazyListScope.archiveStatus(archive:MusicArchiveState,onReload:()->U
 }
 
 @Composable private fun ArchivePlaceImage(place:Place?,modifier:Modifier) {
-    val scene=place?.scenes?.firstOrNull{it.publiclyVisible&&it.imageApproved}
-    if(scene!=null)RoomReference(scene,place.name,modifier)
-    else Box(modifier.background(RoomColors.Paper),contentAlignment=Alignment.Center){Icon(Icons.Outlined.Place,null,tint=RoomColors.Muted)}
+    val context=LocalContext.current
+    val photo=remember(context,place){place?.let{ArchivePhotography.photo(context,it)}}
+    val fallback:@Composable ()->Unit={
+        val scene=place?.scenes?.firstOrNull{it.publiclyVisible&&it.imageApproved}
+        if(scene!=null)RoomReference(scene,place.name,modifier)
+        else Box(modifier.background(RoomColors.Paper),contentAlignment=Alignment.Center){Icon(Icons.Outlined.Place,null,tint=RoomColors.Muted)}
+    }
+    if(place!=null&&photo!=null)PlacePhotoThumbnail(place.id,photo,modifier,fallback)
+    else fallback()
 }
 
 private fun visitDate(item:ContentItem)=item.raw.optString("verified_at").takeIf{it.length>=10&&it!="null"}?.take(10)?:item.date

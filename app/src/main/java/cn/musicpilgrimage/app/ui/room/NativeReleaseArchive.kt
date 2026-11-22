@@ -197,10 +197,8 @@ internal fun NativeReleaseArchive(
                         if (release.works.isEmpty()) Text("这张发行从封面出发，收录了下方地点。",color = RoomColors.Muted,fontSize = 13.sp)
                         ReleaseSectionTitle("关联地点", "PLACES")
                         places.forEach { place ->
-                            val name = place.optString("name")
-                            val photo = place.optString("image")
-                            ReleaseArchiveRow(name, place.optString("listLocation"), { onPlace(place.optString("id")) }) {
-                                RelatedPlaceThumbnail(place.optString("id"), photo)
+                            ReleaseArchiveRow(place.name, place.location, { onPlace(place.id) }) {
+                                place.photo?.let { PlacePhotoThumbnail(place.id, it) }
                             }
                         }
                         TextButton({ sources = true }) { Text("资料来源 ↗",color = RoomColors.Muted) }
