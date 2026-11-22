@@ -97,7 +97,7 @@ internal fun NativeWorkArchive(
                             }
                         }
                         HorizontalDivider(color = RoomColors.Line)
-                        ReleaseSectionTitle("关联地点", "${places.size} PLACES")
+                        ReleaseSectionTitle("关联地点", "PLACES")
                         places.forEach { place ->
                             ReleaseArchiveRow(place.name, place.relations, { onPlace(place.id) }) {
                                 place.photo?.let { PlacePhotoThumbnail(place.id, it) }

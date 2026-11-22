@@ -188,7 +188,7 @@ internal fun NativeReleaseArchive(
                             }
                         }
                         HorizontalDivider(color = RoomColors.Line)
-                        ReleaseSectionTitle("收录作品", "${release.works.size} WORKS")
+                        ReleaseSectionTitle("收录作品", "WORKS")
                         release.works.forEachIndexed { index, work ->
                             ReleaseArchiveRow(work.title, "${work.places.size} 处音乐地点", { onWork(work) }) {
                                 SwissEyebrow((index + 1).toString().padStart(2, '0'))
