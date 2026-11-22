@@ -174,7 +174,6 @@ internal fun NativeReleaseArchive(
                         )
                         Text("${release.artist} · 发行封面",fontSize = 12.sp,color = RoomColors.Muted)
                         Spacer(Modifier.height(16.dp))
-                        HorizontalDivider(color = RoomColors.Line)
                         Row(Modifier.fillMaxWidth()) {
                             TextButton(onFavorite, Modifier.weight(1f)) {
                                 ArchiveFavoriteIcon(favorite, null, Modifier.size(18.dp))
@@ -187,7 +186,6 @@ internal fun NativeReleaseArchive(
                                 Text("搜索",color = RoomColors.Ink)
                             }
                         }
-                        HorizontalDivider(color = RoomColors.Line)
                         ReleaseSectionTitle("收录作品", "WORKS")
                         release.works.forEachIndexed { index, work ->
                             ReleaseArchiveRow(work.title, "${work.places.size} 处音乐地点", { onWork(work) }) {

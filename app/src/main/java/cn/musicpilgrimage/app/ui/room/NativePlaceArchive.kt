@@ -92,7 +92,6 @@ internal fun NativePlaceArchive(
                 fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.Medium, color = RoomColors.Ink,
             )
             Spacer(Modifier.height(16.dp))
-            HorizontalDivider(color = RoomColors.Line)
             Row(Modifier.fillMaxWidth()) {
                 SwissTextButton(onFavorite, Modifier.weight(1f).testTag("place-archive-favorite"), enabled = !favoriteBusy,
                     contentPadding = PaddingValues(horizontal = 4.dp)) {
@@ -111,7 +110,6 @@ internal fun NativePlaceArchive(
                     Text("地图", color = RoomColors.Ink)
                 }
             }
-            HorizontalDivider(color = RoomColors.Line)
             ReleaseSectionTitle("地点与音乐", "THE CONNECTION")
             val groups = archive.optJSONArray("connections")
             if (groups != null) for (groupIndex in 0 until groups.length()) {
@@ -158,7 +156,6 @@ internal fun NativePlaceArchive(
                     }
                 }
             }
-            SwissTextButton(onSources) { Text("资料来源 ↗", color = RoomColors.Muted) }
         }
     }
 }

@@ -5,7 +5,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -83,7 +82,6 @@ internal fun NativeWorkArchive(
                             }
                         }
                         Spacer(Modifier.height(12.dp))
-                        HorizontalDivider(color = RoomColors.Line)
                         Row(Modifier.fillMaxWidth()) {
                             SwissTextButton(onFavorite, Modifier.weight(1f)) {
                                 ArchiveFavoriteIcon(favorite, null, Modifier.size(18.dp))
@@ -96,7 +94,6 @@ internal fun NativeWorkArchive(
                                 Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(17.dp), tint = RoomColors.Ink)
                             }
                         }
-                        HorizontalDivider(color = RoomColors.Line)
                         ReleaseSectionTitle("关联地点", "PLACES")
                         places.forEach { place ->
                             ReleaseArchiveRow(place.name, place.relations, { onPlace(place.id) }) {
