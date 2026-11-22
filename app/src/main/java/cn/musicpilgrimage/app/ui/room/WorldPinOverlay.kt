@@ -1,25 +1,23 @@
 package cn.musicpilgrimage.app.ui.room
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
+import android.graphics.Path as AndroidPath
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.graphics.Typeface
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
+import android.view.View
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas as GraphicsCanvas
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -36,32 +34,217 @@ private val VisitedEnamel = intArrayOf(59, 68, 63)
 private val IvoryEnamel = intArrayOf(245, 242, 234)
 private val IvoryEdge = intArrayOf(196, 191, 178)
 
-@Composable
-internal fun WorldGlobeLighting(controller: NativeWorldController, modifier: Modifier = Modifier) {
-    Spacer(modifier.drawWithCache {
-        val bounds = controller.activeGlobeBounds
-        val hud = controller.hudState
-        val zoom = hud.zoom
-        if (!controller.hasVisual || bounds == null || zoom >= 4.0) return@drawWithCache onDrawBehind { }
-        val overviewY = (size.height - WorldMapMath.baseBottomPaddingPx(size.width.toInt(), size.height.toInt())) / 2f
-        if (abs(zoom - hud.globeZoom) > 0.005 || abs(bounds.y - overviewY) > 0.5f) {
-            return@drawWithCache onDrawBehind { drawGlobeShadowAndRim(bounds, zoom, density) }
-        }
+/**
+ * Native overlay view mounted directly above `MapView` inside the same host container.
+ * Updating it from Mapbox's camera callback avoids Compose recomposition latency so
+ * the sphere lighting and ground shadow stay locked to the globe during zoom transitions.
+ */
+internal class GlobeLightingView(context: Context) : View(context) {
+    private val density = context.resources.displayMetrics.density
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val clipPath = AndroidPath()
+    private var bounds: GlobeBounds? = null
+    private var zoom: Double = 0.0
+    private var globeZoom: Double = 0.0
+    private var overviewY: Float = 0f
+    private var visibleVisual: Boolean = false
+    private var cachedBitmap: Bitmap? = null
+    private var cachedLeft: Float = 0f
+    private var cachedTop: Float = 0f
+    private var cachedBounds: GlobeBounds? = null
 
-        // The overview lighting stays fixed while the texture rotates beneath it.
-        val padH = ceil(max(24f * density, bounds.radius * 0.24f))
+    init {
+        isClickable = false
+        isFocusable = false
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    fun updateState(
+        hasVisual: Boolean,
+        bounds: GlobeBounds?,
+        zoom: Double,
+        globeZoom: Double,
+        overviewY: Float,
+    ) {
+        val active = hasVisual && bounds != null && (zoom - globeZoom) < 0.25
+        val changed = visibleVisual != active ||
+            this.bounds != bounds ||
+            (active && (abs(this.zoom - zoom) > 1e-4 || abs(this.globeZoom - globeZoom) > 1e-4))
+        visibleVisual = active
+        this.bounds = if (active) bounds else null
+        this.zoom = zoom
+        this.globeZoom = globeZoom
+        this.overviewY = overviewY
+        if (changed) invalidate()
+    }
+
+    fun release() {
+        cachedBitmap?.recycle()
+        cachedBitmap = null
+        cachedBounds = null
+    }
+
+    override fun onDraw(canvas: AndroidCanvas) {
+        val currentBounds = bounds ?: return
+        if (!visibleVisual) return
+        val deltaZoom = (zoom - globeZoom).coerceAtLeast(0.0).toFloat()
+        if (deltaZoom >= 0.25f) return
+
+        val atOverview = deltaZoom < 0.005f && abs(currentBounds.y - overviewY) <= 0.5f
+        if (atOverview) {
+            val bitmap = ensureOverviewCache(currentBounds)
+            if (bitmap != null) {
+                canvas.drawBitmap(bitmap, cachedLeft, cachedTop, null)
+                return
+            }
+        }
+        drawGlobeLighting(canvas, currentBounds, deltaZoom)
+    }
+
+    private fun ensureOverviewCache(currentBounds: GlobeBounds): Bitmap? {
+        val existing = cachedBitmap
+        if (existing != null && !existing.isRecycled && cachedBounds == currentBounds) {
+            return existing
+        }
+        existing?.recycle()
+        val padH = ceil(max(24f * density, currentBounds.radius * 0.24f))
         val padTop = ceil(16f * density)
         val padBottom = ceil(56f * density)
-        val left = floor(bounds.x - bounds.radius - padH)
-        val top = floor(bounds.y - bounds.radius - padTop)
-        val width = ceil(2f * bounds.radius + 2f * padH + 2f).toInt()
-        val height = ceil(2f * bounds.radius + padTop + padBottom + 2f).toInt()
-        val lighting = ImageBitmap(width, height)
-        CanvasDrawScope().draw(this, layoutDirection, GraphicsCanvas(lighting), Size(width.toFloat(), height.toFloat())) {
-            drawGlobeShadowAndRim(bounds.copy(x = bounds.x - left, y = bounds.y - top), zoom, density)
+        val left = floor(currentBounds.x - currentBounds.radius - padH)
+        val top = floor(currentBounds.y - currentBounds.radius - padTop)
+        val width = ceil(2f * currentBounds.radius + 2f * padH + 2f).toInt().coerceAtLeast(1)
+        val height = ceil(2f * currentBounds.radius + padTop + padBottom + 2f).toInt().coerceAtLeast(1)
+        val bitmap = runCatching { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888) }.getOrNull()
+            ?: return null
+        val offscreen = AndroidCanvas(bitmap)
+        drawGlobeLighting(
+            offscreen,
+            currentBounds.copy(x = currentBounds.x - left, y = currentBounds.y - top),
+            deltaZoom = 0f,
+        )
+        cachedBitmap = bitmap
+        cachedLeft = left
+        cachedTop = top
+        cachedBounds = currentBounds
+        return bitmap
+    }
+
+    private fun drawGlobeLighting(canvas: AndroidCanvas, b: GlobeBounds, deltaZoom: Float) {
+        val r = (b.radius - WorldMapMath.globeClipInsetPx(density) * 0.45f).coerceAtLeast(1f)
+
+        // 1. Two-layer floating ground shadow; fades out quickly as soon as the user zooms past overview.
+        val shadowAlpha = 1f - WorldMapMath.smoothstep(0f, 0.16f, deltaZoom)
+        if (shadowAlpha > 0.01f) {
+            drawEllipticalShadow(
+                canvas = canvas,
+                cx = b.x + r * 0.12f,
+                cy = b.y + r + 15f * density,
+                width = r * 1.44f,
+                height = 32f * density,
+                colors = intArrayOf(
+                    argb(0x28, 0x34, 0x38, 0.22f * shadowAlpha),
+                    argb(0x28, 0x34, 0x38, 0.10f * shadowAlpha),
+                    0x00000000,
+                ),
+                stops = floatArrayOf(0f, 0.46f, 0.82f),
+            )
+            drawEllipticalShadow(
+                canvas = canvas,
+                cx = b.x + r * 0.06f,
+                cy = b.y + r + 10f * density,
+                width = r * 0.82f,
+                height = 13f * density,
+                colors = intArrayOf(
+                    argb(0x1A, 0x23, 0x26, 0.34f * shadowAlpha),
+                    argb(0x1A, 0x23, 0x26, 0.15f * shadowAlpha),
+                    0x00000000,
+                ),
+                stops = floatArrayOf(0f, 0.48f, 0.86f),
+            )
         }
-        onDrawBehind { drawImage(lighting, topLeft = Offset(left, top)) }
-    })
+
+        // 2. Crisp haze-free spherical shading; fades out smoothly before the zoomed globe reaches screen edges.
+        val lightStrength = 1f - WorldMapMath.smoothstep(0f, 0.24f, deltaZoom)
+        if (lightStrength > 0.01f) {
+            canvas.save()
+            clipPath.reset()
+            clipPath.addCircle(b.x, b.y, r, AndroidPath.Direction.CW)
+            canvas.clipPath(clipPath)
+
+            // 2a. Compact soft silk highlight in the top-left crown.
+            paint.shader = RadialGradient(
+                b.x - r * 0.36f,
+                b.y - r * 0.38f,
+                max(1f, r * 0.36f),
+                intArrayOf(
+                    argb(0xFF, 0xFF, 0xFF, 0.16f * lightStrength),
+                    argb(0xFF, 0xFF, 0xFF, 0.05f * lightStrength),
+                    0x00FFFFFF,
+                ),
+                floatArrayOf(0f, 0.48f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(b.x, b.y, r, paint)
+
+            // 2b. Restrained bottom-right terminator shading; lit hemisphere stays 100% clear.
+            paint.shader = RadialGradient(
+                b.x - r * 0.34f,
+                b.y - r * 0.36f,
+                max(1f, r * 1.38f),
+                intArrayOf(
+                    0x00000000,
+                    0x00000000,
+                    argb(0x0A, 0x18, 0x22, 0.08f * lightStrength),
+                    argb(0x07, 0x13, 0x1C, 0.18f * lightStrength),
+                    argb(0x05, 0x0E, 0x16, 0.26f * lightStrength),
+                ),
+                floatArrayOf(0f, 0.52f, 0.72f, 0.88f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(b.x, b.y, r, paint)
+
+            // 2c. Very subtle perimeter limb turn without darkening the silhouette into a black ring.
+            paint.shader = RadialGradient(
+                b.x,
+                b.y,
+                max(1f, r),
+                intArrayOf(
+                    0x00000000,
+                    0x00000000,
+                    argb(0x09, 0x17, 0x20, 0.03f * lightStrength),
+                    argb(0x06, 0x11, 0x18, 0.08f * lightStrength),
+                ),
+                floatArrayOf(0f, 0.82f, 0.93f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+            canvas.drawCircle(b.x, b.y, r, paint)
+
+            paint.shader = null
+            canvas.restore()
+        }
+    }
+
+    private fun drawEllipticalShadow(
+        canvas: AndroidCanvas,
+        cx: Float,
+        cy: Float,
+        width: Float,
+        height: Float,
+        colors: IntArray,
+        stops: FloatArray,
+    ) {
+        val radius = max(1f, width * 0.5f)
+        canvas.save()
+        canvas.translate(cx, cy)
+        canvas.scale(1f, height / max(1f, width))
+        paint.shader = RadialGradient(0f, 0f, radius, colors, stops, Shader.TileMode.CLAMP)
+        canvas.drawCircle(0f, 0f, radius, paint)
+        paint.shader = null
+        canvas.restore()
+    }
+
+    private fun argb(r: Int, g: Int, b: Int, alpha: Float): Int =
+        android.graphics.Color.argb((alpha * 255f).roundToInt().coerceIn(0, 255), r, g, b)
 }
 
 internal fun renderWorldPinArtwork(
@@ -182,110 +365,6 @@ internal fun renderWorldPinContactShadow(
         )
     }
     return bitmap
-}
-
-private fun DrawScope.drawGlobeShadowAndRim(bounds: GlobeBounds, zoom: Double, density: Float) {
-    // Inset slightly inside the rendered sphere edge so dark shading never bleeds onto the light paper.
-    val r = (bounds.radius - WorldMapMath.globeClipInsetPx(density) * 0.45f).coerceAtLeast(1f)
-    val c = Offset(bounds.x, bounds.y)
-
-    // 1. Two-layer floating ground shadow (top-left key light -> shadow offsets subtly to bottom-right).
-    val shadowAlpha = ((3.2 - zoom) / 2.0).toFloat().coerceIn(0f, 1f)
-    if (shadowAlpha > 0.01f) {
-        // Soft wide penumbra.
-        val penumbraW = r * 1.46f
-        val penumbraH = 34f * density
-        val px = bounds.x + r * 0.13f
-        val py = bounds.y + r + 15f * density
-        withTransform({
-            translate(px, py)
-            scale(scaleX = 1f, scaleY = penumbraH / max(1f, penumbraW), pivot = Offset.Zero)
-        }) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    0f to Color(0xFF283438).copy(alpha = 0.24f * shadowAlpha),
-                    0.46f to Color(0xFF283438).copy(alpha = 0.11f * shadowAlpha),
-                    0.82f to Color.Transparent,
-                    center = Offset.Zero,
-                    radius = penumbraW * 0.5f,
-                ),
-                radius = penumbraW * 0.5f,
-                center = Offset.Zero,
-            )
-        }
-
-        // Tighter core umbra grounding the physical sphere above the Swiss paper surface.
-        val umbraW = r * 0.84f
-        val umbraH = 14f * density
-        val ux = bounds.x + r * 0.07f
-        val uy = bounds.y + r + 10f * density
-        withTransform({
-            translate(ux, uy)
-            scale(scaleX = 1f, scaleY = umbraH / max(1f, umbraW), pivot = Offset.Zero)
-        }) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    0f to Color(0xFF1A2326).copy(alpha = 0.36f * shadowAlpha),
-                    0.48f to Color(0xFF1A2326).copy(alpha = 0.16f * shadowAlpha),
-                    0.86f to Color.Transparent,
-                    center = Offset.Zero,
-                    radius = umbraW * 0.5f,
-                ),
-                radius = umbraW * 0.5f,
-                center = Offset.Zero,
-            )
-        }
-    }
-
-    val lightStrength = ((4.0 - zoom) / 2.8).toFloat().coerceIn(0f, 1f)
-    if (lightStrength > 0.01f) {
-        val spherePath = Path().apply {
-            addOval(Rect(c.x - r, c.y - r, c.x + r, c.y + r))
-        }
-        clipPath(spherePath) {
-            // 2a. Compact soft silk highlight in the top-left crown; leaves the rest of the map crisp and haze-free.
-            drawCircle(
-                brush = Brush.radialGradient(
-                    0f to Color.White.copy(alpha = 0.15f * lightStrength),
-                    0.48f to Color.White.copy(alpha = 0.05f * lightStrength),
-                    1f to Color.Transparent,
-                    center = Offset(c.x - r * 0.36f, c.y - r * 0.38f),
-                    radius = r * 0.35f,
-                ),
-                radius = r,
-                center = c,
-            )
-
-            // 2b. Transparent shadow-side gradient (bottom-right terminator) keeping the lit hemisphere 100% clear.
-            drawCircle(
-                brush = Brush.radialGradient(
-                    0f to Color.Transparent,
-                    0.48f to Color.Transparent,
-                    0.68f to Color(0xFF0A1822).copy(alpha = 0.14f * lightStrength),
-                    0.86f to Color(0xFF07131C).copy(alpha = 0.32f * lightStrength),
-                    1f to Color(0xFF050E16).copy(alpha = 0.44f * lightStrength),
-                    center = Offset(c.x - r * 0.32f, c.y - r * 0.34f),
-                    radius = r * 1.36f,
-                ),
-                radius = r,
-                center = c,
-            )
-
-            // 2c. Gentle limb darkening around the outer perimeter so the sphere turns smoothly away without white haze.
-            drawCircle(
-                brush = Brush.radialGradient(
-                    0f to Color.Transparent,
-                    0.78f to Color.Transparent,
-                    0.91f to Color(0xFF091720).copy(alpha = 0.09f * lightStrength),
-                    1f to Color(0xFF061118).copy(alpha = 0.22f * lightStrength),
-                    center = c,
-                    radius = r,
-                ),
-                radius = r,
-                center = c,
-            )
-        }
-    }
 }
 
 private fun DrawScope.drawEnamelPin(

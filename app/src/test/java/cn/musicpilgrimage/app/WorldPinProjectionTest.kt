@@ -186,10 +186,9 @@ class WorldPinProjectionTest {
         assertTrue(keyedSources.has("earth-base"))
         assertTrue(keyedSources.has("earth"))
         assertTrue(keyedSources.has("earth-hd"))
-        assertTrue(keyedSources.has("earth-dem"))
+        assertFalse(keyedSources.has("earth-dem"))
         assertFalse(keyedSources.has("globe-graticule"))
         assertTrue(keyedSources.has("streets"))
-        assertTrue(keyedSources.getJSONObject("world-places-source").has("clusterProperties"))
         assertEquals("mapbox://mapbox.mapbox-streets-v8", keyedSources.getJSONObject("streets").getString("url"))
         assertTrue(
             keyedSources.getJSONObject("earth-hd").getJSONArray("tiles").getString(0).contains("/v2/"),

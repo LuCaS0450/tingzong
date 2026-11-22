@@ -212,6 +212,18 @@ internal fun SwissWorldWall(
                                 (ctrl.mapView.parent as? ViewGroup)?.removeView(ctrl.mapView)
                                 host.addView(ctrl.mapView)
                             }
+                            if (ctrl.lightingView.parent !== host) {
+                                (ctrl.lightingView.parent as? ViewGroup)?.removeView(ctrl.lightingView)
+                                host.addView(
+                                    ctrl.lightingView,
+                                    FrameLayout.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ),
+                                )
+                            } else if (host.indexOfChild(ctrl.lightingView) < host.indexOfChild(ctrl.mapView)) {
+                                ctrl.lightingView.bringToFront()
+                            }
                         }
                     },
                 )
@@ -221,11 +233,6 @@ internal fun SwissWorldWall(
                         onRetry = ctrl::retryTiles,
                         interactive = active,
                         bottomInset = summaryInset,
-                    )
-                } else {
-                    WorldGlobeLighting(
-                        controller = ctrl,
-                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }

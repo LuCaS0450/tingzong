@@ -355,11 +355,9 @@ internal class NativeWorldController(
     private var artwork: Map<String, Bitmap> = emptyMap()
     private var firstFrameSubscription: Cancelable? = null
     private var exposeAccessiblePins = false
-    private var lastPinDepthLat = Double.NaN
-    private var lastPinDepthLon = Double.NaN
-    private var lastPinDepthZoom = Double.NaN
 
     val mapView: MapView
+    val lightingView: GlobeLightingView
     private val map: MapboxMap
     private val mapTexture: WorldMapTexture?
 
@@ -407,6 +405,7 @@ internal class NativeWorldController(
         // This view belongs to RoomBrowseState and can outlive a navigation entry.
         val plugins = MapInitOptions.defaultPluginList.filterNot { it.id == Plugin.MAPBOX_LIFECYCLE_PLUGIN_ID }
         mapView = MapView(context, MapInitOptions(context, mapOptions = options, plugins = plugins, styleUri = null, textureView = true))
+        lightingView = GlobeLightingView(context)
         mapTexture = WorldMapTexture.retainIn(mapView)
         map = mapView.mapboxMap
         mapView.scalebar.enabled = false
@@ -450,6 +449,10 @@ internal class NativeWorldController(
             false
         }
         map.setBounds(CameraBoundsOptions.Builder().minZoom(0.0).maxZoom(18.0).minPitch(0.0).maxPitch(0.0).build())
+        subscriptions += map.subscribeCameraChanged {
+            if (destroyed || !started) return@subscribeCameraChanged
+            syncGlobeLighting(it.cameraState)
+        }
         subscriptions += map.subscribeCameraChangedCoalesced {
             if (destroyed || !started) return@subscribeCameraChangedCoalesced
             // Present moving map frames even when the Compose overlays do not change.
@@ -461,6 +464,7 @@ internal class NativeWorldController(
         firstFrameSubscription = map.subscribeRenderFrameFinished {
             if (!hasVisual && ready && (localEarthLoaded || !satelliteVisible)) {
                 hasVisual = true
+                syncGlobeLighting(map.cameraState)
                 firstFrameSubscription?.cancel()
                 firstFrameSubscription = null
                 flushPendingFocus()
@@ -548,13 +552,9 @@ internal class NativeWorldController(
             WorldMapboxPins.installArtwork(loaded, artwork, density)
             WorldMapboxPins.updateData(loaded, entries, selectedId, visits)
             WorldMapboxPins.setSelectionRingVisible(loaded, selectionRingZoom != null)
-            lastPinDepthLat = Double.NaN
-            lastPinDepthLon = Double.NaN
-            lastPinDepthZoom = Double.NaN
             ready = true
             // Bind the tile cover to the measured viewport and the restored camera.
             map.setCamera(camera)
-            syncPinGlobeDepth(map.cameraState, force = true)
             map.triggerRepaint()
             syncHud(map.cameraState)
             scheduleStreetCheck()
@@ -750,7 +750,7 @@ internal class NativeWorldController(
 
     private fun syncHud(camera: CameraState) {
         if (stageWidth <= 0 || stageHeight <= 0) return
-        syncPinGlobeDepth(camera, force = false)
+        syncGlobeLighting(camera)
         val zoom = camera.zoom
         if (!focusingSelection) selectionRingZoom?.let { previous ->
             if (zoom < previous - 0.025) updateSelectionRing(null)
@@ -815,24 +815,16 @@ internal class NativeWorldController(
         currentStyle.setStyleLayerProperty("earth", "visibility", visibility)
     }
 
-    private fun syncPinGlobeDepth(camera: CameraState, force: Boolean) {
-        val currentStyle = style ?: return
-        val lat = camera.center.latitude()
-        val lon = WorldMapMath.wrapLongitude(camera.center.longitude())
+    private fun syncGlobeLighting(camera: CameraState) {
+        if (stageWidth <= 0 || stageHeight <= 0) return
         val zoom = camera.zoom
-        if (!force && !lastPinDepthZoom.isNaN()) {
-            val wasFlat = lastPinDepthZoom >= 4.2
-            val isFlat = zoom >= 4.2
-            if (wasFlat && isFlat) return
-            val latDelta = abs(lat - lastPinDepthLat)
-            val lonDelta = abs(WorldMapMath.wrapLongitude(lon - lastPinDepthLon))
-            val zoomDelta = abs(zoom - lastPinDepthZoom)
-            if (wasFlat == isFlat && latDelta < 2.0 && lonDelta < 2.0 && zoomDelta < 0.06) return
-        }
-        lastPinDepthLat = lat
-        lastPinDepthLon = lon
-        lastPinDepthZoom = zoom
-        WorldMapboxPins.updateGlobeDepth(currentStyle, lat, lon, zoom)
+        val globeY = (stageHeight - camera.padding.bottom.toFloat()) / 2f
+        val overviewY = (stageHeight - WorldMapMath.baseBottomPaddingPx(stageWidth, stageHeight)) / 2f
+        val bounds = if (zoom - overviewZoom < 0.25) WorldMapMath.globeBounds(
+            zoom + MapboxGlobeZoomOffset, 0.0,
+            stageWidth / 2f, globeY, stageHeight.toFloat(), density,
+        ) else null
+        lightingView.updateState(hasVisual, bounds, zoom, overviewZoom, overviewY)
     }
 
     private fun scheduleStreetCheck(delay: Long = 90) {
@@ -1141,6 +1133,7 @@ internal class NativeWorldController(
         tapQuery?.cancel()
         scope.cancel()
         mapTexture?.close()
+        lightingView.release()
         mapView.onDestroy()
         artwork.values.forEach(Bitmap::recycle)
         artwork = emptyMap()

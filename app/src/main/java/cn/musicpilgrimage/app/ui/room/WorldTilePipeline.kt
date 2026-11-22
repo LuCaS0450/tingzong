@@ -845,17 +845,6 @@ internal object WorldTilePipeline {
                     },
                 )
             }
-            if (includeStreets) {
-                put(
-                    "earth-dem",
-                    JSONObject().apply {
-                        put("type", "raster-dem")
-                        put("url", "mapbox://mapbox.mapbox-terrain-dem-v1")
-                        put("tileSize", 512)
-                        put("maxzoom", 12)
-                    },
-                )
-            }
             if (includeStreets) put("streets", JSONObject().put("type", "vector")
                 .put("url", "mapbox://mapbox.mapbox-streets-v8"))
             WorldMapboxPins.appendSources(this)
@@ -922,30 +911,6 @@ internal object WorldTilePipeline {
                                 )
                                 put("raster-fade-duration", 0)
                                 put("raster-resampling", "linear")
-                            },
-                        )
-                    },
-                )
-            }
-            if (includeStreets) {
-                put(
-                    JSONObject().apply {
-                        put("id", "earth-relief")
-                        put("type", "hillshade")
-                        put("source", "earth-dem")
-                        put("maxzoom", 8)
-                        put(
-                            "paint",
-                            JSONObject().apply {
-                                put("hillshade-illumination-direction", 315)
-                                put("hillshade-illumination-anchor", "viewport")
-                                put(
-                                    "hillshade-exaggeration",
-                                    exprInterpolateLinearZoom(0.5 to 0.28, 3.5 to 0.34, 5.5 to 0.24, 7.5 to 0.0),
-                                )
-                                put("hillshade-shadow-color", "#142228")
-                                put("hillshade-highlight-color", "#fffdf6")
-                                put("hillshade-accent-color", "#223338")
                             },
                         )
                     },
