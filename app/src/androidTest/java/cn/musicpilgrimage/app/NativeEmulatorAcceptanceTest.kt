@@ -329,7 +329,7 @@ class NativeEmulatorAcceptanceTest {
         val name=services.catalog.value.places.first{it.id==f.getString("location")}.name
         compose.onNodeWithText(name,substring=false).performScrollTo().performClick();waitTag("room-place-detail")
         waitTag("room-community")
-        compose.onNodeWithTag("room-community").performScrollToNode(hasText("写留言"))
+        compose.onNodeWithTag("room-community").performScrollToNode(hasTestTag("place-community-message"))
     }
 
     @Test fun realCommunityMessageEditPeerInteractionsProfileAndDelete()=runBlocking {
@@ -340,7 +340,7 @@ class NativeEmulatorAcceptanceTest {
         }
         openCommunity(f)
         val body="自动验收临时留言 ${f.getString("nonce").take(6)}（完成后删除）"
-        compose.onNodeWithText("写留言").performScrollTo().performClick();waitTag("room-record-editor")
+        compose.onNodeWithTag("place-community-message").performScrollTo().performClick();waitTag("room-record-editor")
         compose.onNodeWithTag("room-record-body").performTextReplacement(body)
         saveRecord();waitTag("room-community")
         val row=services.repositories.content.list(f.getString("location"),"message",true).single{it.body==body}

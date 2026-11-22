@@ -144,19 +144,23 @@ class MusicCommunityUiTest {
         val privateVisit=item("private-visit","visit").also{it.raw.put("visibility","private")}
         var existingVisit by mutableStateOf<ContentItem?>(null)
         val openedVisits=mutableListOf<ContentItem?>()
+        var openedMessages=0
         show("地点社区") {
             var tab by remember{mutableIntStateOf(0)}
             RoomCommunityFeedContent("fixture-owner",listOf(message,own),true,false,null,null,tab,{tab=it},
-                {},existingVisit,{openedVisits.add(it)},{},{},{Text("地点与音乐")}) {row->
+                {openedMessages++},existingVisit,{openedVisits.add(it)},{},{},{Text("地点与音乐")}) {row->
                 RoomContentEntry(row,"fixture-owner",true,false,null,null,null,onEdit={actions.add("edit")},onProfile={},onAction={action,_->actions.add(action)})
             }
         }
-        compose.onNodeWithText("写留言").assertIsDisplayed();compose.onNodeWithText("记录到访").assertIsDisplayed()
-        compose.onNodeWithText("记录到访").performClick()
+        compose.onNodeWithTag("place-community-message").assertTextEquals("留言").assertIsDisplayed().performClick()
+        assertEquals(1,openedMessages)
+        val visit=compose.onNodeWithTag("place-community-visit")
+        visit.assertTextEquals("到访").assertIsDisplayed().performClick()
         compose.runOnIdle{existingVisit=privateVisit}
-        compose.onNodeWithText("编辑到访").performClick()
+        visit.assertTextEquals("到访")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,"已记录"))
+            .performClick()
         assertEquals(listOf(null,privateVisit),openedVisits)
-        compose.onNodeWithText("记录到访").assertDoesNotExist()
         compose.onNodeWithText("我的记录").assertDoesNotExist()
         compose.onNodeWithTag("room-content-message").assertExists();compose.onNodeWithTag("room-content-visit").assertDoesNotExist()
         compose.onNodeWithText(message.body).assertIsDisplayed()

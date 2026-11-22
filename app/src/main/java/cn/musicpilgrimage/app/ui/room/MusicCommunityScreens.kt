@@ -3,19 +3,27 @@ package cn.musicpilgrimage.app.ui.room
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.*
+import cn.musicpilgrimage.app.R
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.ViewModelStatus
@@ -55,25 +63,112 @@ import org.json.JSONObject
     val inset=Modifier.padding(horizontal=25.dp)
     LazyColumn(Modifier.fillMaxSize().testTag("room-community"),state=list,contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         item("archive"){archive()}
-        item("community-heading"){
-            Text("地点社区",inset,fontSize=22.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
+        item("community-heading") {
+            Column(Modifier.fillMaxWidth().then(inset)) {
+                HorizontalDivider(color = RoomColors.Line)
+                PlaceCommunityHeading(owner != null, loaded && !busy, onMessage, visit, onVisit)
+                if (owner != null) PlaceCommunityTabs(tab, onTab)
+            }
         }
         if(owner==null)item("login"){SwissTextButton(onLogin,inset){Text("登录后查看社区")}}
         else {
-            item("publish"){Row(Modifier.fillMaxWidth().then(inset),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                RoomPaper(Modifier.weight(1f)){SwissOutlinedButton(onMessage,Modifier.fillMaxWidth().heightIn(min=48.dp),enabled=loaded&&!busy,shape=androidx.compose.ui.graphics.RectangleShape,colors=ButtonDefaults.outlinedButtonColors(contentColor=RoomColors.Navy)){Text("写留言")}}
-                RoomPaper(Modifier.weight(1f)){SwissOutlinedButton({onVisit(visit)},Modifier.fillMaxWidth().heightIn(min=48.dp),enabled=loaded&&!busy,shape=androidx.compose.ui.graphics.RectangleShape,colors=ButtonDefaults.outlinedButtonColors(contentColor=RoomColors.Navy)){Text(if(visit==null)"记录到访" else "编辑到访")}}
-            }}
-            item("tabs"){RoomCommunityTabs(listOf("留言","到访与复刻"),tab,onTab,inset)}
-            item("status"){Column(inset,verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text("最新发布在前",color=RoomColors.Muted,fontSize=12.sp)
-                if(!loaded&&busy)Text("正在读取社区内容…",color=RoomColors.Muted,fontSize=12.sp)
-                if(error!=null){Text("暂时无法更新社区内容，请重试。",color=MaterialTheme.colorScheme.error,fontSize=13.sp);SwissTextButton(onMore){Text("重试")}}
-                if(notice!=null)Text(notice,color=RoomColors.Navy,fontSize=13.sp)
-            }}
-            if(loaded&&filtered.isEmpty())item("empty"){Text("这里还没有公开内容。",inset,fontSize=14.sp,color=RoomColors.Muted)}
+            if ((!loaded && busy) || error != null || notice != null) item("status") {
+                Column(inset, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!loaded && busy) Text("正在读取社区内容…", color = RoomColors.Muted, fontSize = 12.sp)
+                    if (error != null) {
+                        Text("暂时无法更新社区内容，请重试。", color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                        SwissTextButton(onMore) { Text("重试") }
+                    }
+                    if (notice != null) Text(notice, color = RoomColors.Navy, fontSize = 13.sp)
+                }
+            }
+            if (loaded && error == null && filtered.isEmpty()) item("empty") {
+                Text("这里还没有公开内容。", inset, fontSize = 14.sp, color = RoomColors.Muted)
+            }
             items(filtered,key={it.id}){row->Box(Modifier.animateItem(fadeInSpec=tween(if(motion)140 else 0),fadeOutSpec=tween(if(motion)140 else 0),placementSpec=null).then(inset)){card(row)}}
             if(rows.size>=30)item("more"){SwissTextButton(onMore,inset){Text("加载更多")}}
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PlaceCommunityHeading(
+    showActions: Boolean,
+    actionsEnabled: Boolean,
+    onMessage: () -> Unit,
+    visit: ContentItem?,
+    onVisit: (ContentItem?) -> Unit,
+) {
+    FlowRow(
+        Modifier.fillMaxWidth().padding(top = 9.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            "地点社区",
+            Modifier.align(Alignment.CenterVertically).padding(vertical = 8.dp).semantics { heading() },
+            color = RoomColors.Ink,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        if (showActions) Row(Modifier.align(Alignment.CenterVertically)) {
+            val colors = ButtonDefaults.textButtonColors(contentColor = RoomColors.Ink)
+            val padding = PaddingValues(horizontal = 8.dp)
+            val iconColor = if (actionsEnabled) RoomColors.Red else RoomColors.Muted.copy(alpha = .55f)
+            SwissTextButton(
+                onMessage, Modifier.heightIn(min = 48.dp).testTag("place-community-message"),
+                enabled = actionsEnabled, colors = colors, contentPadding = padding,
+            ) {
+                Icon(painterResource(R.drawable.ic_place_community_message), null, Modifier.size(20.dp), tint = iconColor)
+                Spacer(Modifier.width(5.dp))
+                Text("留言")
+            }
+            SwissTextButton(
+                { onVisit(visit) },
+                Modifier.heightIn(min = 48.dp).testTag("place-community-visit")
+                    .semantics { if (visit != null) stateDescription = "已记录" },
+                enabled = actionsEnabled, colors = colors, contentPadding = padding,
+            ) {
+                Icon(painterResource(R.drawable.ic_place_community_visit), null, Modifier.size(20.dp), tint = iconColor)
+                Spacer(Modifier.width(5.dp))
+                Text("到访")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaceCommunityTabs(selected: Int, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().selectableGroup().drawBehind {
+            val stroke = 1.dp.toPx()
+            val baseline = size.height - stroke / 2f
+            drawLine(RoomColors.Line, Offset(0f, baseline), Offset(size.width, baseline), stroke)
+        },
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        listOf("留言", "到访与复刻").forEachIndexed { index, label ->
+            val active = selected == index
+            Box(
+                Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .selectable(active, role = Role.Tab) { onSelect(index) }
+                    .drawBehind {
+                        if (active) {
+                            val stroke = 2.dp.toPx()
+                            val baseline = size.height - stroke / 2f
+                            drawLine(RoomColors.Red, Offset(0f, baseline), Offset(size.width, baseline), stroke)
+                        }
+                    }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    label,
+                    color = if (active) RoomColors.Ink else RoomColors.Muted,
+                    fontSize = 14.sp,
+                    fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
+                )
+            }
         }
     }
 }
