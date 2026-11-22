@@ -198,7 +198,7 @@ internal fun NativeReleaseArchive(
                         ReleaseSectionTitle("关联地点", "PLACES")
                         places.forEach { place ->
                             ReleaseArchiveRow(place.name, place.location, { onPlace(place.id) }) {
-                                place.photo?.let { PlacePhotoThumbnail(place.id, it) }
+                                place.photo?.let { PlacePhotoThumbnail(place.id, it, Modifier.size(46.dp).coverShadow()) }
                             }
                         }
                         TextButton({ sources = true }) { Text("资料来源 ↗",color = RoomColors.Muted) }

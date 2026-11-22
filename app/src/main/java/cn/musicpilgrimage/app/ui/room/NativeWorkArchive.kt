@@ -100,7 +100,7 @@ internal fun NativeWorkArchive(
                         ReleaseSectionTitle("关联地点", "PLACES")
                         places.forEach { place ->
                             ReleaseArchiveRow(place.name, place.relations, { onPlace(place.id) }) {
-                                place.photo?.let { PlacePhotoThumbnail(place.id, it) }
+                                place.photo?.let { PlacePhotoThumbnail(place.id, it, Modifier.size(46.dp).coverShadow()) }
                             }
                         }
                         SwissTextButton({ sources = true }) { Text("资料来源 ↗", color = RoomColors.Muted) }
