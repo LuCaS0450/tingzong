@@ -2,6 +2,7 @@ package cn.musicpilgrimage.app.ui.room
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -62,16 +64,24 @@ internal fun NativePlaceArchive(
             ArchiveLocator(place, name, locator)
         } else {
             val ratio = photo.width.toFloat().div(photo.height.coerceAtLeast(1)).coerceIn(.35f, 3f)
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val height = (maxWidth / ratio).coerceAtMost(330.dp)
-                ArchiveImage(
-                    "$entryId:place-photo:${place.id}", photo.asset, photo.description,
-                    Modifier.align(Alignment.Center).width((height * ratio).coerceAtMost(maxWidth)).height(height)
-                        .testTag("place-archive-photo"),
-                    fallback = photo.url, credit = "${photo.author} · ${photo.license}",
-                    onSources = onSources, onUnavailable = { useLocator = true },
-                    thumbnail = transitionThumbnail,
-                )
+            Box(
+                Modifier.fillMaxWidth().padding(start = 25.dp, top = 18.dp, end = 25.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier.shadow(3.dp, clip = false)
+                        .background(Color(0xFFFFFCF5))
+                        .border(0.5.dp, Color(0xFFE1DDD2))
+                        .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 5.dp),
+                ) {
+                    ArchiveImage(
+                        "$entryId:place-photo:${place.id}", photo.asset, photo.description,
+                        Modifier.heightIn(max = 330.dp).aspectRatio(ratio).testTag("place-archive-photo"),
+                        fallback = photo.url, credit = "${photo.author} · ${photo.license}",
+                        onSources = onSources, onUnavailable = { useLocator = true },
+                        thumbnail = transitionThumbnail,
+                    )
+                }
             }
         }
         Column(Modifier.fillMaxWidth().padding(horizontal = 25.dp).padding(top = 20.dp, bottom = 10.dp)) {
