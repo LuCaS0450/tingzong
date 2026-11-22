@@ -1,8 +1,11 @@
 package cn.musicpilgrimage.app.ui.room
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.ConnectivityManager
 import android.net.Network
@@ -13,6 +16,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
+import android.view.accessibility.AccessibilityManager
 import android.widget.FrameLayout
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -39,6 +43,7 @@ import com.mapbox.maps.MapInitOptions
 import com.mapbox.maps.MapLoadingErrorType
 import com.mapbox.maps.MapOptions
 import com.mapbox.maps.MapView
+import com.mapbox.maps.MapboxExperimental
 import com.mapbox.maps.MapboxMap
 import com.mapbox.maps.RenderedQueryGeometry
 import com.mapbox.maps.RenderedQueryOptions
@@ -48,6 +53,7 @@ import com.mapbox.maps.SourceDataLoadedType
 import com.mapbox.maps.Style
 import com.mapbox.maps.ViewAnnotationOptions
 import com.mapbox.maps.applyDefaultParams
+import com.mapbox.maps.plugin.Plugin
 import com.mapbox.maps.plugin.animation.MapAnimationOptions
 import com.mapbox.maps.plugin.animation.camera
 import com.mapbox.maps.plugin.animation.easeTo
@@ -294,6 +300,7 @@ internal object WorldTestRegistry {
 }
 
 @Stable
+@OptIn(MapboxExperimental::class)
 internal class NativeWorldController(
     context: Context,
     private val browse: RoomBrowseState,
@@ -304,6 +311,7 @@ internal class NativeWorldController(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
+    private val accessibility = appContext.getSystemService(AccessibilityManager::class.java)
     private val subscriptions = mutableListOf<Cancelable>()
     private val accessibilityPins = mutableMapOf<String, View>()
     private var pinFeatures = emptyMap<String, Feature>()
@@ -315,6 +323,8 @@ internal class NativeWorldController(
     private var byId: Map<String, WorldPlaceEntry> = emptyMap()
     private var visits: Set<String> = emptySet()
     private var selectedId = initialSnapshot?.selected.orEmpty()
+    private var selectionRingZoom = initialSnapshot?.takeIf { it.selectionRingVisible }?.zoom
+    private var focusingSelection = false
     private var summaryOpen = initialSnapshot?.summaryOpen == true
     private var summaryHeight = 0
     private var stageWidth = 0
@@ -343,6 +353,8 @@ internal class NativeWorldController(
     private var satelliteVisible = true
     private var localEarthLoaded = false
     private var artwork: Map<String, Bitmap> = emptyMap()
+    private var firstFrameSubscription: Cancelable? = null
+    private var exposeAccessiblePins = false
 
     val mapView: MapView
     private val map: MapboxMap
@@ -362,6 +374,21 @@ internal class NativeWorldController(
     private val settleCamera = Runnable { onCameraSettled() }
     private val checkStreet = Runnable { checkStreetCoverage() }
     private val loadingTicker = Runnable { refreshLoading() }
+    private val accessibilityListener = AccessibilityManager.AccessibilityStateChangeListener { updateAccessiblePins() }
+    private val memoryCallbacks = object : ComponentCallbacks2 {
+        override fun onConfigurationChanged(newConfig: Configuration) = Unit
+
+        override fun onLowMemory() {
+            if (!destroyed) mapView.onLowMemory()
+        }
+
+        @Suppress("DEPRECATION")
+        override fun onTrimMemory(level: Int) {
+            if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+                level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL
+            ) onLowMemory()
+        }
+    }
     private val networkListener = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) { mainHandler.post(::networkChanged) }
         override fun onLost(network: Network) { mainHandler.post(::networkChanged) }
@@ -371,7 +398,9 @@ internal class NativeWorldController(
         MapboxOptions.accessToken = BuildConfig.MAPBOX_ACCESS_TOKEN
         WorldTilePipeline.configureMapboxTileTransport(appContext)
         val options = MapOptions.Builder().applyDefaultParams(context).constrainMode(ConstrainMode.NONE).build()
-        mapView = MapView(context, MapInitOptions(context, mapOptions = options, styleUri = null, textureView = true))
+        // This view belongs to RoomBrowseState and can outlive a navigation entry.
+        val plugins = MapInitOptions.defaultPluginList.filterNot { it.id == Plugin.MAPBOX_LIFECYCLE_PLUGIN_ID }
+        mapView = MapView(context, MapInitOptions(context, mapOptions = options, plugins = plugins, styleUri = null, textureView = true))
         map = mapView.mapboxMap
         mapView.scalebar.enabled = false
         mapView.compass.enabled = false
@@ -414,15 +443,19 @@ internal class NativeWorldController(
             false
         }
         map.setBounds(CameraBoundsOptions.Builder().minZoom(0.0).maxZoom(18.0).minPitch(0.0).maxPitch(0.0).build())
-        subscriptions += map.subscribeCameraChanged {
-            if (destroyed) return@subscribeCameraChanged
+        subscriptions += map.subscribeCameraChangedCoalesced {
+            if (destroyed || !started) return@subscribeCameraChangedCoalesced
+            // Present moving map frames even when the Compose overlays do not change.
+            mapView.postInvalidateOnAnimation()
             if (touchingMap || cameraTarget != null) isMoving = true
             syncHud(it.cameraState)
             if (!touchingMap && cameraTarget == null) scheduleSettle()
         }
-        subscriptions += map.subscribeRenderFrameFinished {
+        firstFrameSubscription = map.subscribeRenderFrameFinished {
             if (!hasVisual && ready && (localEarthLoaded || !satelliteVisible)) {
                 hasVisual = true
+                firstFrameSubscription?.cancel()
+                firstFrameSubscription = null
                 flushPendingFocus()
                 scheduleStreetCheck()
                 refreshAccessiblePins()
@@ -464,6 +497,7 @@ internal class NativeWorldController(
         mapView.doOnLayout { layout ->
             layout.post { onViewportSized(layout.width, layout.height) }
         }
+        appContext.registerComponentCallbacks(memoryCallbacks)
     }
 
     fun onViewportSized(widthPx: Int, heightPx: Int) {
@@ -506,6 +540,7 @@ internal class NativeWorldController(
             style = loaded
             WorldMapboxPins.installArtwork(loaded, artwork, density)
             WorldMapboxPins.updateData(loaded, entries, selectedId, visits)
+            WorldMapboxPins.setSelectionRingVisible(loaded, selectionRingZoom != null)
             ready = true
             // Bind the tile cover to the measured viewport and the restored camera.
             map.setCamera(camera)
@@ -549,13 +584,16 @@ internal class NativeWorldController(
         this.entries = entries
         if (dataChanged) byId = entries.associateBy { it.place.id }
         this.visits = visits
+        if (selectedId != nextSelected) updateSelectionRing(null)
         selectedId = nextSelected
         summaryOpen = nextSummary
         summaryHeight = summaryHeightPx
         if (paddingChanged) positionMapCredits()
         if (motionEnabled && !motion) cameraTarget?.let { target ->
+            val completingSelection = focusingSelection
             cancelCameraAnimation()
             map.setCamera(target)
+            if (completingSelection && selectionRingZoom != null) selectionRingZoom = map.cameraState.zoom
         }
         motionEnabled = motion
         if (focus != null && focus.token > lastAppliedFocusToken) pendingFocus = focus
@@ -587,6 +625,7 @@ internal class NativeWorldController(
             place.latitude, place.longitude, zoom,
             if (focus.kind == WorldFocusKind.Pin) 360 else 750,
             fly = focus.kind != WorldFocusKind.Pin,
+            focusSelection = true,
         )
     }
 
@@ -596,12 +635,19 @@ internal class NativeWorldController(
         mapView.attribution.updateSettings { marginBottom = bottom }
     }
 
-    private fun moveCamera(lat: Double, lon: Double, zoom: Double, duration: Int, fly: Boolean = false) {
+    private fun moveCamera(
+        lat: Double, lon: Double, zoom: Double, duration: Int, fly: Boolean = false, focusSelection: Boolean = false,
+    ) {
         if (destroyed || !ready) return
         val options = cameraOptions(lat, lon, zoom)
         cancelCameraAnimation()
+        if (focusSelection) {
+            focusingSelection = true
+            updateSelectionRing(map.cameraState.zoom)
+        }
         if (!motionEnabled || duration <= 0) {
             map.setCamera(options)
+            finishSelectionFocus()
             syncHud(map.cameraState)
             onCameraSettled()
             return
@@ -614,6 +660,7 @@ internal class NativeWorldController(
             override fun onAnimationEnd(animation: Animator) {
                 if (sequence != animationSequence) return
                 cameraTarget = null
+                finishSelectionFocus()
                 onCameraSettled()
             }
         }
@@ -622,10 +669,23 @@ internal class NativeWorldController(
 
     private fun cancelCameraAnimation() {
         animationSequence++
+        finishSelectionFocus()
         if (cameraTarget != null) {
             cameraTarget = null
             mapView.camera.cancelAllAnimators()
         }
+    }
+
+    private fun finishSelectionFocus() {
+        if (!focusingSelection) return
+        focusingSelection = false
+        if (selectionRingZoom != null) selectionRingZoom = map.cameraState.zoom
+    }
+
+    private fun updateSelectionRing(zoom: Double?) {
+        val visibilityChanged = (selectionRingZoom == null) != (zoom == null)
+        selectionRingZoom = zoom
+        if (visibilityChanged) style?.let { WorldMapboxPins.setSelectionRingVisible(it, zoom != null) }
     }
 
     fun zoomBy(delta: Double) = zoomTo(map.cameraState.zoom + delta, 280)
@@ -667,7 +727,7 @@ internal class NativeWorldController(
     }
 
     private fun onCameraSettled() {
-        if (!ready || destroyed || touchingMap || cameraTarget != null) return
+        if (!ready || !started || destroyed || touchingMap || cameraTarget != null) return
         mainHandler.removeCallbacks(settleCamera)
         isMoving = false
         syncHud(map.cameraState)
@@ -679,10 +739,19 @@ internal class NativeWorldController(
 
     private fun syncHud(camera: CameraState) {
         if (stageWidth <= 0 || stageHeight <= 0) return
-        val lat = camera.center.latitude()
         val zoom = camera.zoom
+        if (!focusingSelection) selectionRingZoom?.let { previous ->
+            if (zoom < previous - 0.025) updateSelectionRing(null)
+            else if (zoom > previous) selectionRingZoom = zoom
+        }
         val beyondGlobe = zoom >= 4.0
-        val scale = if (beyondGlobe && !summaryOpen) WorldMapMath.scaleBarMetric(zoom, lat, density) else null
+        val globeY = (stageHeight - camera.padding.bottom.toFloat()) / 2f
+        if (!beyondGlobe && zoom == hudState.zoom && overviewZoom == hudState.globeZoom &&
+            activeGlobeBounds?.x == stageWidth / 2f && activeGlobeBounds?.y == globeY
+        ) return
+        val scale = if (beyondGlobe && !summaryOpen) {
+            WorldMapMath.scaleBarMetric(zoom, camera.center.latitude(), density)
+        } else null
         val previousStreet = hudState.zoom >= StreetZoom
         val onStreet = zoom >= StreetZoom
         if (onStreet && (!previousStreet || streetCameraChanged(camera))) {
@@ -702,7 +771,7 @@ internal class NativeWorldController(
         )
         activeGlobeBounds = if (zoom < 4.0) WorldMapMath.globeBounds(
             zoom + MapboxGlobeZoomOffset, 0.0,
-            stageWidth / 2f, (stageHeight - camera.padding.bottom.toFloat()) / 2f, stageHeight.toFloat(), density,
+            stageWidth / 2f, globeY, stageHeight.toFloat(), density,
         ) else null
         updateSatelliteVisibility(onStreet)
         if (previousStreet != onStreet) {
@@ -869,13 +938,14 @@ internal class NativeWorldController(
     }
 
     private fun refreshAccessiblePins() {
-        if (destroyed || !ready || !hasVisual || isMoving || hudState.streetOffline) return
+        if (destroyed || !started || !ready || !hasVisual || isMoving || hudState.streetOffline) return
+        if (!exposeAccessiblePins && !BuildConfig.DEBUG) return
         pinQuery?.cancel()
         pinQuery = map.queryRenderedFeatures(
             RenderedQueryGeometry(visibleStage()),
             RenderedQueryOptions(WorldMapboxPins.layers, null),
         ) { result ->
-            if (destroyed || isMoving || hudState.streetOffline) return@queryRenderedFeatures
+            if (destroyed || !started || isMoving || hudState.streetOffline) return@queryRenderedFeatures
             val features = result.value.orEmpty().map { it.queriedFeature.feature }
             val visible = features.mapNotNull { feature ->
                 val id = when {
@@ -886,6 +956,7 @@ internal class NativeWorldController(
                 id to feature
             }.toMap()
             pinFeatures = visible
+            if (!exposeAccessiblePins) return@queryRenderedFeatures
             for (key in accessibilityPins.keys - visible.keys) {
                 accessibilityPins.remove(key)?.let(mapView.viewAnnotationManager::removeViewAnnotation)
             }
@@ -914,8 +985,28 @@ internal class NativeWorldController(
         }
     }
 
+    private fun updateAccessiblePins() {
+        if (destroyed || !started) return
+        val enabled = accessibility?.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            .orEmpty().isNotEmpty()
+        if (enabled == exposeAccessiblePins) return
+        exposeAccessiblePins = enabled
+        if (enabled) {
+            refreshAccessiblePins()
+        } else {
+            accessibilityPins.values.forEach(mapView.viewAnnotationManager::removeViewAnnotation)
+            accessibilityPins.clear()
+        }
+    }
+
     private fun updateRegionAndCityLabels() {
         if (!ready) return
+        if (!hudState.compactHeader) {
+            if (hudState.regionName.isNotEmpty() || hudState.cityName.isNotEmpty()) {
+                hudState = hudState.copy(regionName = "", cityName = "")
+            }
+            return
+        }
         val camera = map.cameraState
         val lat = camera.center.latitude()
         val lon = camera.center.longitude()
@@ -946,7 +1037,7 @@ internal class NativeWorldController(
         val current = map.cameraState
         browse.world(WorldCameraSnapshot(
             WorldMapMath.wrapLongitude(current.center.longitude()), current.center.latitude(), current.zoom,
-            selectedId, summaryOpen,
+            selectedId, summaryOpen, selectionRingZoom != null,
         ))
     }
 
@@ -976,7 +1067,13 @@ internal class NativeWorldController(
             connectivity?.registerDefaultNetworkCallback(networkListener)
             observingNetwork = connectivity != null
         }
+        accessibility?.addAccessibilityStateChangeListener(accessibilityListener)
+        updateAccessiblePins()
         networkChanged()
+        if (ready) {
+            syncHud(map.cameraState)
+            map.triggerRepaint()
+        }
     }
 
     fun onPause() {
@@ -985,22 +1082,28 @@ internal class NativeWorldController(
         mainHandler.removeCallbacks(loadingTicker)
         mainHandler.removeCallbacks(settleCamera)
         mainHandler.removeCallbacks(checkStreet)
+        accessibility?.removeAccessibilityStateChangeListener(accessibilityListener)
         if (observingNetwork) connectivity?.unregisterNetworkCallback(networkListener)
         observingNetwork = false
+        touchingMap = false
+        tapPoint = null
+        isMoving = false
+        cancelCameraAnimation()
+        tapQuery?.cancel()
+        pinQuery?.cancel()
+        streetQuery?.cancel()
         persistCamera()
         mapView.onStop()
-    }
-
-    fun onLowMemory() {
-        if (!destroyed) mapView.onLowMemory()
     }
 
     fun destroy() {
         if (destroyed) return
         onPause()
         destroyed = true
+        appContext.unregisterComponentCallbacks(memoryCallbacks)
         onTapEvent = null
         subscriptions.forEach(Cancelable::cancel)
+        firstFrameSubscription?.cancel()
         pinQuery?.cancel()
         streetQuery?.cancel()
         tapQuery?.cancel()

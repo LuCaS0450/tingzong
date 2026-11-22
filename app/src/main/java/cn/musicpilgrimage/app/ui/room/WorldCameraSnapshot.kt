@@ -6,9 +6,11 @@ import org.json.JSONObject
 internal data class WorldCameraSnapshot(
     val longitude: Double, val latitude: Double, val zoom: Double,
     val selected: String = "", val summaryOpen: Boolean = false,
+    val selectionRingVisible: Boolean = summaryOpen,
 ) {
     fun json() = JSONObject().put("version", 2).put("longitude", longitude).put("latitude", latitude)
         .put("zoom", zoom).put("selected", selected).put("summaryOpen", summaryOpen)
+        .put("selectionRingVisible", selectionRingVisible)
 
     companion object {
         fun parse(value: JSONObject?): WorldCameraSnapshot? {
@@ -23,9 +25,9 @@ internal data class WorldCameraSnapshot(
                 // The old globe zoom was relative to latitude. Preserve the apparent size on restore.
                 WorldMapMath.visualZoom(zoom, lat) - MapboxGlobeZoomOffset * WorldMapMath.globenessForZoom(zoom)
             } else zoom
-            return WorldCameraSnapshot(
-                lon, lat, restoredZoom, selected, value.optBoolean("summaryOpen") && selected.isNotBlank(),
-            )
+            val summaryOpen = value.optBoolean("summaryOpen") && selected.isNotBlank()
+            val selectionRingVisible = value.optBoolean("selectionRingVisible", summaryOpen) && selected.isNotBlank()
+            return WorldCameraSnapshot(lon, lat, restoredZoom, selected, summaryOpen, selectionRingVisible)
         }
     }
 }

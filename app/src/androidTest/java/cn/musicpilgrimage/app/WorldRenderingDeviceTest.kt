@@ -34,16 +34,7 @@ class WorldRenderingDeviceTest {
 
     @Test
     fun globeAndLuoyangRenderWithoutZoomingAgain() {
-        compose.waitUntil(30_000) {
-            compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
-        }
-        compose.onNodeWithTag("wall-tab-1").performClick()
-        compose.waitUntil(20_000) {
-            compose.runOnUiThread {
-                WorldTestRegistry.activeController?.diagnostics()?.let { it.hasVisual && it.visiblePinsCount > 0 } == true
-            }
-        }
-        val controller = requireNotNull(WorldTestRegistry.activeController)
+        val controller = openWorld()
         val output = File(instrumentation.targetContext.filesDir, "world-render-review").apply { mkdirs() }
         compose.waitForIdle()
         captureInitialGlobe(controller, output)
@@ -96,7 +87,61 @@ class WorldRenderingDeviceTest {
         capture(output, "luoyang")
     }
 
-    private fun captureInitialGlobe(controller: NativeWorldController, output: File) {
+    @Test
+    fun leavingWorldForOtherTabsRestoresPaintedGlobeAndStreetAtTheSameCamera() {
+        var controller = openWorld()
+        val output = File(instrumentation.targetContext.filesDir, "world-tab-review").apply { mkdirs() }
+        val globe = compose.runOnUiThread {
+            controller.jumpTo(19.0, 42.0, 1.15)
+            controller.diagnostics()
+        }
+        captureInitialGlobe(controller, output, "globe-before")
+        for (tab in listOf("wall-tab-0", "wall-tab-2")) {
+            leaveWorld(tab)
+            controller = openWorld()
+            captureInitialGlobe(controller, output, "globe-after-$tab")
+            val restored = compose.runOnUiThread { controller.diagnostics() }
+            assertEquals(globe.longitude, restored.longitude, 0.01)
+            assertEquals(globe.latitude, restored.latitude, 0.01)
+            assertEquals(globe.zoom, restored.zoom, 0.005)
+        }
+
+        val street = compose.runOnUiThread {
+            controller.jumpTo(52.3731, 4.89, 15.0)
+            controller.diagnostics()
+        }
+        captureStreet(controller, output, "street-before")
+        leaveWorld("wall-tab-2")
+        controller = openWorld()
+        captureStreet(controller, output, "street-after")
+        val restored = compose.runOnUiThread { controller.diagnostics() }
+        assertEquals(street.longitude, restored.longitude, 0.01)
+        assertEquals(street.latitude, restored.latitude, 0.01)
+        assertEquals(street.zoom, restored.zoom, 0.005)
+    }
+
+    private fun leaveWorld(tab: String) {
+        compose.onNodeWithTag(tab).performClick()
+        compose.waitUntil(8_000) {
+            WorldTestRegistry.activeController == null &&
+                compose.onAllNodes(hasTestTag("world-wall")).fetchSemanticsNodes().isEmpty()
+        }
+    }
+
+    private fun openWorld(): NativeWorldController {
+        compose.waitUntil(30_000) {
+            compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("wall-tab-1").performClick()
+        compose.waitUntil(20_000) {
+            compose.runOnUiThread {
+                WorldTestRegistry.activeController?.diagnostics()?.let { it.hasVisual && it.visiblePinsCount > 0 } == true
+            }
+        }
+        return requireNotNull(WorldTestRegistry.activeController)
+    }
+
+    private fun captureInitialGlobe(controller: NativeWorldController, output: File, name: String = "globe") {
         val location = IntArray(2)
         val (centerX, centerY, sampleOffset) = compose.runOnUiThread {
             val view = controller.mapView
@@ -104,18 +149,43 @@ class WorldRenderingDeviceTest {
             val camera = view.mapboxMap.cameraState
             Triple(location[0] + view.width / 2, location[1] + ((view.height - camera.padding.bottom) / 2).toInt(), view.width / 7)
         }
-        compose.waitUntil(8_000) {
+        capturePainted(output, name) { bitmap ->
+            listOf(-1, 1).all { vertical ->
+                (-1..1).any { horizontal ->
+                    val pixel = bitmap.getPixel(centerX + horizontal * sampleOffset, centerY + vertical * sampleOffset)
+                    val channels = listOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
+                    channels.max() - channels.min() >= 30
+                }
+            }
+        }
+    }
+
+    private fun captureStreet(controller: NativeWorldController, output: File, name: String) {
+        compose.waitUntil(20_000) { streetSegments(controller).let { it.size == 4 && it.all { count -> count > 0 } } }
+        val location = IntArray(2)
+        val (width, height) = compose.runOnUiThread {
+            val view = controller.mapView
+            view.getLocationOnScreen(location)
+            view.width to view.height
+        }
+        capturePainted(output, name) { bitmap ->
+            // This view has Amsterdam's canals, rendered pale blue by the street style.
+            (height / 8 until height * 5 / 8 step 14).any { y ->
+                (width / 8 until width * 7 / 8 step 14).any { x ->
+                    val color = bitmap.getPixel(location[0] + x, location[1] + y)
+                    Color.red(color) in 170..201 && Color.green(color) in 200..225 && Color.blue(color) in 207..232
+                }
+            }
+        }
+    }
+
+    private fun capturePainted(output: File, name: String, isPainted: (Bitmap) -> Boolean) {
+        compose.waitUntil(10_000) {
             val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return@waitUntil false
             try {
-                val bothHemispheresPainted = listOf(-1, 1).all { vertical ->
-                    (-1..1).any { horizontal ->
-                        val pixel = bitmap.getPixel(centerX + horizontal * sampleOffset, centerY + vertical * sampleOffset)
-                        val channels = listOf(Color.red(pixel), Color.green(pixel), Color.blue(pixel))
-                        channels.max() - channels.min() >= 30
-                    }
-                }
-                if (bothHemispheresPainted) save(bitmap, output, "globe")
-                bothHemispheresPainted
+                val painted = isPainted(bitmap)
+                if (painted) save(bitmap, output, name)
+                painted
             } finally {
                 bitmap.recycle()
             }

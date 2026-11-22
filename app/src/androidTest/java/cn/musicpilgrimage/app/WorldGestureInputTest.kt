@@ -17,6 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import cn.musicpilgrimage.app.ui.room.NativeWorldController
 import cn.musicpilgrimage.app.ui.room.WorldDiagnosticsSnapshot
 import cn.musicpilgrimage.app.ui.room.WorldMapMath
+import cn.musicpilgrimage.app.ui.room.WorldMapboxPins
 import cn.musicpilgrimage.app.ui.room.WorldTestRegistry
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -185,6 +186,84 @@ class WorldGestureInputTest {
     private fun shell(command: String): String =
         ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command))
             .bufferedReader().use { it.readText().trim() }
+
+    @Test
+    fun bothZoomOutControlsHideTheSelectedRingAndKeepOnePinShape() {
+        compose.waitUntil(30_000) {
+            compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("wall-tab-1").performClick()
+        compose.waitUntil(20_000) { WorldTestRegistry.activeController?.let { diag(it).hasVisual } == true }
+        val ctrl = controller()
+
+        fun pickPlace() {
+            compose.onNodeWithTag("world-place-list").performClick()
+            compose.onNodeWithTag("world-place-query").performTextInput("蓝色列车餐厅")
+            compose.onNode(hasText("蓝色列车餐厅") and !hasTestTag("world-place-query")).performClick()
+            idle(ctrl)
+            compose.onNodeWithTag("world-summary-close").performClick()
+            compose.waitUntil(4_000) {
+                compose.onAllNodes(hasTestTag("world-summary-close")).fetchSemanticsNodes().isEmpty()
+            }
+            idle(ctrl)
+        }
+
+        fun layerValue(layer: String, property: String): Any? = compose.runOnUiThread {
+            requireNotNull(ctrl.mapView.mapboxMap.style).getStyleLayerProperty(layer, property).value.contents
+        }
+
+        fun ringOpacity(): Double =
+            (layerValue(WorldMapboxPins.SELECTION_RING_LAYER, "icon-opacity") as Number).toDouble()
+
+        pickPlace()
+        val before = diag(ctrl)
+        val pinImage = layerValue(WorldMapboxPins.SELECTION_LAYER, "icon-image") as String
+        assertEquals(1.0, ringOpacity(), 0.0)
+        saveScreenshot("world-selection-before")
+        compose.onNodeWithTag("world-zoom-out").performClick()
+        val afterMinus = idle(ctrl)
+        assertTrue(afterMinus.zoom < before.zoom)
+        assertEquals(before.selected, afterMinus.selected)
+        assertEquals(0.0, ringOpacity(), 0.0)
+        assertEquals(pinImage, layerValue(WorldMapboxPins.SELECTION_LAYER, "icon-image"))
+        saveScreenshot("world-selection-minus")
+
+        pickPlace()
+        val beforePinch = diag(ctrl)
+        assertEquals(1.0, ringOpacity(), 0.0)
+        val location = IntArray(2)
+        val (x, y) = compose.runOnUiThread {
+            ctrl.mapView.getLocationOnScreen(location)
+            location[0] + ctrl.mapView.width / 2f to location[1] + ctrl.mapView.height / 2f
+        }
+        pinch(x, y, 165f, 45f)
+        val afterPinch = idle(ctrl)
+        assertTrue(afterPinch.zoom < beforePinch.zoom)
+        assertEquals(before.selected, afterPinch.selected)
+        assertEquals(0.0, ringOpacity(), 0.0)
+        saveScreenshot("world-selection-pinch")
+
+        compose.onNodeWithTag("world-mini-globe").performClick()
+        val globe = idle(ctrl)
+        assertTrue(globe.zoom < 2.0)
+        assertEquals(before.selected, globe.selected)
+        assertEquals(0.0, ringOpacity(), 0.0)
+        assertEquals(pinImage, layerValue(WorldMapboxPins.SELECTION_LAYER, "icon-image"))
+        saveScreenshot("world-selection-globe")
+    }
+
+    private fun saveScreenshot(name: String) {
+        compose.waitForIdle()
+        SystemClock.sleep(220)
+        val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            File(instrumentation.targetContext.filesDir, "$name.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        } finally {
+            bitmap.recycle()
+        }
+    }
 
     @Test
     fun zoomRailKeepsItsScreenPositionAcrossLevelLabels() {

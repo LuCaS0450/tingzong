@@ -3,23 +3,28 @@ package cn.musicpilgrimage.app.ui.room
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Typeface
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas as GraphicsCanvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -30,12 +35,27 @@ private val IvoryEdge = intArrayOf(196, 191, 178)
 
 @Composable
 internal fun WorldGlobeLighting(controller: NativeWorldController, modifier: Modifier = Modifier) {
-    val density = LocalDensity.current.density
-    Canvas(modifier) {
+    Spacer(modifier.drawWithCache {
         val bounds = controller.activeGlobeBounds
-        val zoom = controller.hudState.zoom
-        if (controller.hasVisual && bounds != null && zoom < 4.0) drawGlobeShadowAndRim(bounds, zoom, density)
-    }
+        val hud = controller.hudState
+        val zoom = hud.zoom
+        if (!controller.hasVisual || bounds == null || zoom >= 4.0) return@drawWithCache onDrawBehind { }
+        val overviewY = (size.height - WorldMapMath.baseBottomPaddingPx(size.width.toInt(), size.height.toInt())) / 2f
+        if (abs(zoom - hud.globeZoom) > 0.005 || abs(bounds.y - overviewY) > 0.5f) {
+            return@drawWithCache onDrawBehind { drawGlobeShadowAndRim(bounds, zoom, density) }
+        }
+
+        // The overview lighting stays fixed while the texture rotates beneath it.
+        val left = floor(bounds.x - bounds.radius - 2f)
+        val top = floor(bounds.y - bounds.radius - 2f)
+        val width = ceil(2f * bounds.radius + 5f).toInt()
+        val height = ceil(2f * bounds.radius + 28f * density + 5f).toInt()
+        val lighting = ImageBitmap(width, height)
+        CanvasDrawScope().draw(this, layoutDirection, GraphicsCanvas(lighting), Size(width.toFloat(), height.toFloat())) {
+            drawGlobeShadowAndRim(bounds.copy(x = bounds.x - left, y = bounds.y - top), zoom, density)
+        }
+        onDrawBehind { drawImage(lighting, topLeft = Offset(left, top)) }
+    })
 }
 
 internal fun renderWorldPinArtwork(
@@ -46,9 +66,9 @@ internal fun renderWorldPinArtwork(
     cluster: Boolean = false,
     showClusterText: Boolean = false,
 ): Bitmap {
-    val bitmapSize = (60f * density).roundToInt()
+    val bitmap = worldPinBitmap(density)
+    val bitmapSize = bitmap.width
     val center = bitmapSize / 2f
-    val bitmap = Bitmap.createBitmap(bitmapSize, bitmapSize, Bitmap.Config.ARGB_8888)
     val zoom = if (snapToStreet) 11.0 else if (showClusterText) 3.0 else 1.0
     val pointRadius = if (snapToStreet) 6.4f else 5.0f
     val radius = if (cluster) 7.6f else if (selected) pointRadius + 2.4f else pointRadius
@@ -74,8 +94,29 @@ internal fun renderWorldPinArtwork(
         GraphicsCanvas(bitmap.asImageBitmap()),
         Size(bitmapSize.toFloat(), bitmapSize.toFloat()),
     ) {
-        drawEnamelPin(artwork, zoom, density, 1f, false, countPaint, drawClusterCount = false)
+        drawEnamelPin(artwork, zoom, density, countPaint, drawClusterCount = false)
     }
+    return bitmap
+}
+
+private fun worldPinBitmap(density: Float): Bitmap {
+    val size = (60f * density).roundToInt()
+    return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+}
+
+internal fun renderWorldSelectionRing(density: Float): Bitmap {
+    val bitmap = worldPinBitmap(density)
+    val center = bitmap.width / 2f
+    val canvas = android.graphics.Canvas(bitmap)
+    val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color(247, 246, 242).copy(alpha = 0.92f).toArgb()
+        strokeWidth = 2.2f * density
+    }
+    canvas.drawCircle(center, center, 10.4f * density, ring)
+    ring.color = shadedColor(RedEnamel, 1f, 0f, 0.92f).toArgb()
+    ring.strokeWidth = 1.15f * density
+    canvas.drawCircle(center, center, 9.1f * density, ring)
     return bitmap
 }
 
@@ -149,8 +190,6 @@ private fun DrawScope.drawEnamelPin(
     pin: ProjectedPin,
     zoom: Double,
     density: Float,
-    selectionProgress: Float,
-    motion: Boolean,
     countPaint: Paint,
     drawClusterCount: Boolean,
 ) {
@@ -183,32 +222,8 @@ private fun DrawScope.drawEnamelPin(
         )
     }
 
-    // 2. Ground anchor: double target ring + ripple for selection, metal washer in street view.
-    if (isSelected) {
-        val pulse = if (!motion) 1f else WorldMapMath.smoothstep(0f, 1f, selectionProgress)
-        val flare = if (!motion) 0f else (1f - selectionProgress).coerceIn(0f, 1f)
-        val targetRingR = (8.2f + 2.2f * stand) * density
-        val ringR = WorldMapMath.mix(3.8f * density, targetRingR, pulse) + flare * 1.6f * density
-        if (flare > 0.02f) {
-            val rippleR = WorldMapMath.mix(ringR, ringR + 8.5f * density, 1f - flare)
-            drawGroundEllipse(
-                pin.x, pin.y, rippleR * pin.ratio, rippleR, angleDeg,
-                shadedColor(RedEnamel, pin.light, 0f, 0.55f * flare * flare * opacity),
-                strokeWidth = 1.1f * density,
-            )
-        }
-        drawGroundEllipse(
-            pin.x, pin.y, ringR * pin.ratio, ringR, angleDeg,
-            Color(247, 246, 242).copy(alpha = 0.92f * opacity),
-            strokeWidth = 2.2f * density,
-        )
-        val innerR = max(1f, ringR - 1.3f * density)
-        drawGroundEllipse(
-            pin.x, pin.y, innerR * pin.ratio, innerR, angleDeg,
-            shadedColor(RedEnamel, pin.light, 0f, 0.92f * opacity),
-            strokeWidth = 1.15f * density,
-        )
-    } else if (stand > 0.15f) {
+    // 2. Small metal washer for unselected street pins.
+    if (!isSelected && stand > 0.15f) {
         val padR = (1.5f + 0.8f * stand) * density
         withTransform({
             translate(pin.x, pin.y)
@@ -366,28 +381,6 @@ private fun DrawScope.drawEnamelPin(
             val baseline = pin.hy - (countPaint.descent() + countPaint.ascent()) / 2f
             drawContext.canvas.nativeCanvas.drawText(pin.pointCount.toString(), pin.hx, baseline, countPaint)
         }
-    }
-}
-
-private fun DrawScope.drawGroundEllipse(
-    cx: Float,
-    cy: Float,
-    rx: Float,
-    ry: Float,
-    angleDeg: Float,
-    color: Color,
-    strokeWidth: Float,
-) {
-    withTransform({
-        translate(cx, cy)
-        rotate(angleDeg, pivot = Offset.Zero)
-    }) {
-        drawOval(
-            color = color,
-            topLeft = Offset(-rx, -ry),
-            size = Size(rx * 2f, ry * 2f),
-            style = Stroke(strokeWidth),
-        )
     }
 }
 

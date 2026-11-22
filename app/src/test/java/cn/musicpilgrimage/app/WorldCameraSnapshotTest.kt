@@ -29,6 +29,11 @@ class WorldCameraSnapshotTest {
         assertFalse(WorldCameraSnapshot.parse(state.json().put("summaryOpen", true))!!.summaryOpen)
     }
 
+    @Test fun zoomedOutSelectionKeepsTheRingHiddenWhenRestored() {
+        val state = WorldCameraSnapshot(2.37, 48.84, 9.5, "le-train-bleu", true, selectionRingVisible = false)
+        assertEquals(state, WorldCameraSnapshot.parse(state.json()))
+    }
+
     @Test fun corruptAndOutOfRangePersistedCamerasAreRejected() {
         assertNull(WorldCameraSnapshot.parse(JSONObject()))
         val valid = WorldCameraSnapshot(2.37, 48.84, 15.0).json()
