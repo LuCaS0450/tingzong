@@ -550,4 +550,81 @@ class PrototypeMainNavigationUiTest {
         compose.onNodeWithTag("wall-tab-0").assertIsDisplayed()
         compose.onNodeWithTag("wall-tab-3").assertIsDisplayed()
     }
+
+    @ExtendedDeviceTest
+    @Test
+    fun detailBackFollowsAndReversesForSlideAndCoverZoom() {
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("room-search-button").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("room-search-button").performClick()
+        val search = compose.onNodeWithTag("room-search")
+        search.assertIsDisplayed()
+        Espresso.closeSoftKeyboard()
+        val windowWidth = compose.activity.resources.displayMetrics.widthPixels.toFloat()
+
+        fun event(progress: Float) = BackEventCompat(windowWidth * progress, 420f, progress, BackEventCompat.EDGE_LEFT)
+        fun progress(value: Float) {
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.dispatchOnBackProgressed(event(value)) }
+            compose.mainClock.advanceTimeBy(64)
+        }
+        fun start() {
+            compose.runOnUiThread {
+                val dispatcher = compose.activity.onBackPressedDispatcher
+                dispatcher.dispatchOnBackStarted(event(0f))
+                dispatcher.dispatchOnBackProgressed(event(0f))
+            }
+            compose.mainClock.advanceTimeBy(48)
+        }
+        fun cancel() {
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.dispatchOnBackCancelled() }
+            compose.mainClock.autoAdvance = true
+            compose.waitForIdle()
+        }
+
+        try {
+            val searchLeft = search.fetchSemanticsNode().boundsInRoot.left
+            compose.mainClock.autoAdvance = false
+            start()
+            progress(.55f)
+            val halfway = search.fetchSemanticsNode().boundsInRoot.left - searchLeft
+            assertTrue("The page should follow the gesture at half progress, measured $halfway", halfway / windowWidth in 0.47f..0.64f)
+            progress(.25f)
+            val reversed = search.fetchSemanticsNode().boundsInRoot.left - searchLeft
+            assertTrue("Reversing the gesture must move the page back, measured $reversed", reversed / windowWidth in 0.17f..0.34f)
+            cancel()
+            assertTrue(kotlin.math.abs(search.fetchSemanticsNode().boundsInRoot.left - searchLeft) < 2f)
+
+            compose.onNodeWithTag("room-search-input").performTextInput("Stay Alive")
+            val songResult = SemanticsMatcher("search result for Stay Alive") { node ->
+                node.config.getOrElse(SemanticsProperties.TestTag) { "" }.startsWith("room-work-")
+            } and hasText("Stay Alive")
+            compose.waitUntil(10_000) { compose.onAllNodes(songResult).fetchSemanticsNodes().isNotEmpty() }
+            compose.waitForIdle()
+            compose.onNodeWithContentDescription("Stay Alive · 专辑封面", useUnmergedTree = true).assertIsDisplayed()
+            compose.onNode(songResult).performClick()
+            val work = compose.onNodeWithTag("native-work-archive")
+            work.assertIsDisplayed()
+            val full = work.fetchSemanticsNode().boundsInRoot
+
+            compose.mainClock.autoAdvance = false
+            start()
+            progress(.58f)
+            val contracted = work.fetchSemanticsNode().boundsInRoot
+            assertTrue("The artwork transition must contract vertically, measured $contracted", contracted.height < full.height * .87f)
+            progress(.28f)
+            val reopened = work.fetchSemanticsNode().boundsInRoot
+            assertTrue("The work must expand as the gesture reverses", reopened.height > contracted.height)
+            cancel()
+            work.assertIsDisplayed()
+
+            start()
+            progress(.56f)
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+            search.assertIsDisplayed()
+            compose.onNode(songResult).assertIsDisplayed()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
 }

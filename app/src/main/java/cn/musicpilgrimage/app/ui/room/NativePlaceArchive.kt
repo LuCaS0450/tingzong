@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.Place
+import cn.musicpilgrimage.app.ui.LocalDetailZoom
 import cn.musicpilgrimage.app.ui.LocalRouteEntryId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,6 +54,7 @@ internal fun NativePlaceArchive(
 ) {
     val name = archive.optString("name")
     val entryId = LocalRouteEntryId.current
+    val transitionThumbnail = LocalDetailZoom.current?.thumbnailFor(entryId, photo?.asset)
     var useLocator by remember(place.id, photo) { mutableStateOf(photo == null) }
     val locator = archive.optString("locator").takeIf { it.isNotBlank() }
     Column(Modifier.fillMaxWidth().testTag("native-place-archive")) {
@@ -68,6 +70,7 @@ internal fun NativePlaceArchive(
                         .testTag("place-archive-photo"),
                     fallback = photo.url, credit = "${photo.author} · ${photo.license}",
                     onSources = onSources, onUnavailable = { useLocator = true },
+                    thumbnail = transitionThumbnail,
                 )
             }
         }

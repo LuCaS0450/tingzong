@@ -134,7 +134,7 @@ internal fun releaseCoverModel(context:android.content.Context,art:ReleaseArtwor
         else if(artwork?.approved==true) AsyncImage(request,"$title · 专辑封面",
             Modifier.fillMaxSize(),contentScale=ContentScale.Fit,onError={failed=true;loaded=false;decodedCover=null},onSuccess={
                 failed=false;loaded=true
-                if(archiveResolution)decodedCover=(it.result.drawable as? BitmapDrawable)?.bitmap?.asImageBitmap()
+                if(onImageReady!=null)decodedCover=(it.result.drawable as? BitmapDrawable)?.bitmap?.asImageBitmap()
             })
         if(artwork?.approved!=true || (failed&&pinnedCover==null)) Icon(Icons.Outlined.Album,if(failed)"封面暂时无法加载" else "封面待补",Modifier.size(28.dp),tint=RoomColors.Muted)
         val failureAction by rememberUpdatedState(onLoadFailure)

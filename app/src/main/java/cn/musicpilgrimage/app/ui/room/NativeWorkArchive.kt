@@ -13,7 +13,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -21,8 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.MusicWork
+import cn.musicpilgrimage.app.ui.LocalDetailZoom
 import cn.musicpilgrimage.app.ui.LocalRouteEntryId
-import coil.compose.AsyncImage
 
 @Composable
 internal fun NativeWorkArchive(
@@ -38,6 +37,7 @@ internal fun NativeWorkArchive(
     val media = remember(context) { SwissDetailMedia(context) }
     val entryId = LocalRouteEntryId.current
     val art = work.artwork
+    val transitionThumbnail = LocalDetailZoom.current?.thumbnailFor(entryId, art?.id)
     val cover = remember(media, art) { media.artwork(art) }
     val reason = remember(work.places, context) { archiveAdmissionReason(work.places) { PlaceEditorialCopy.name(context, it) } }
     val places = remember(work.places, media) { work.places.map(media::archiveLink) }
@@ -60,6 +60,7 @@ internal fun NativeWorkArchive(
                             Modifier.padding(top = unit * 16).fillMaxWidth().aspectRatio(ratio).testTag("work-archive-cover"),
                             fallback = art?.imageUrl, credit = art?.imageCredit?.replace(Regex("https?://\\S+"), "")?.trim(' ', '·'),
                             onSources = { sources = true },
+                            thumbnail = transitionThumbnail,
                         )
                     }
                     Column(Modifier.fillMaxWidth().padding(horizontal = unit * 22).padding(top = 22.dp, bottom = 30.dp)) {
@@ -102,7 +103,7 @@ internal fun NativeWorkArchive(
                             val label = relations?.let { (0 until it.length()).joinToString(" · ") { index -> relations.optString(index) } }.orEmpty()
                             val photo = place.optString("image")
                             ReleaseArchiveRow(place.optString("name"), label, { onPlace(place.optString("id")) }) {
-                                if (photo.isNotBlank()) AsyncImage(photo, null, Modifier.size(46.dp), contentScale = ContentScale.Crop)
+                                RelatedPlaceThumbnail(place.optString("id"), photo)
                             }
                         }
                         SwissTextButton({ sources = true }) { Text("资料来源 ↗", color = RoomColors.Muted) }

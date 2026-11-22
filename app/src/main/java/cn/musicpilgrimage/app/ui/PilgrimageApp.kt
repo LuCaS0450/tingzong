@@ -89,6 +89,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
  destination:NavBackStackEntry,performanceImmersive:Boolean,headerEnabled:Boolean,onBack:()->Unit,
  collapsingTitleVisible:Boolean=true,
  onChooseModule:((String)->Unit)?=null,
+ selectedWallTab:Int?=null,
  content:@Composable ()->Unit,
 ) {
  val route=destination.destination.route
@@ -126,7 +127,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
     if(title!=null)RoomHeader(title,onBack=onBack,onSpace={},enabled=headerEnabled,titleAlpha=headerTitleAlpha,titleAccessibilityVisible=collapsingTitleVisible)
     Box(Modifier.fillMaxWidth().weight(1f)){content()}
     if(tabIndex!=null) {
-     SwissWallTabs(tabIndex,onChooseModule?:{},enabled=active,includeTestTags=active)
+     SwissWallTabs(selectedWallTab?:tabIndex,onChooseModule?:{},enabled=active,includeTestTags=active)
     }
    }
   }
@@ -309,9 +310,11 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    var recordGuardOwner by remember{mutableStateOf<FormViewModel?>(null)}
    LaunchedEffect(route){if(route!="form/{kind}/{target}"){recordGuardOwner=null;recordLeaveGuard=null;recordSaving=false;recordDirty=false}}
    val coverCoordinator=remember{CoverTransitionCoordinator()}
+   val detailZoom=remember{DetailZoomCoordinator()}
    val sheetCoordinator=remember{AppSheetCoordinator()}
    val photoViewerCoordinator=remember{AppPhotoViewerCoordinator()}
    val haptics=rememberAppHaptics()
+   val motion=LocalPhysicalMotion.current
    val density=LocalDensity.current
    var settingsTitleCollapsed by remember{mutableStateOf(false)}
    LaunchedEffect(route){
@@ -363,17 +366,21 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    LaunchedEffect(entry?.id) {if(addTripEntry!=null&&addTripEntry!=entry?.id)closeAddTrip()}
    val musicFavorites=storedMusicFavorites.takeIf{it.owner==libraryOwner} ?: MusicFavorites()
    val archiveState=storedArchive.takeIf{it.owner==owner} ?: MusicArchiveState(owner=owner,loading=owner!=null)
-   fun navigateTo(path:String,placeEntry:Bundle?=null) {
+   fun navigateTo(path:String,placeEntry:Bundle?=null,useThumbnail:Boolean=false) {
     if(runCatching{nav.getBackStackEntry(path).id}.getOrNull()==nav.currentBackStackEntry?.id)return
+    val anchor=if(motion&&useThumbnail)detailZoom.capture(nav.currentBackStackEntry?.id,path)else null
     focus.clearFocus();keyboard?.hide();nav.navigate(path){launchSingleTop=true}
-    placeEntry?.let{nav.currentBackStackEntry?.savedStateHandle?.set(PlaceArchiveEntry,it)}
+    nav.currentBackStackEntry?.let { target ->
+     if(placeEntry!=null)target.savedStateHandle[PlaceArchiveEntry]=placeEntry
+     if(anchor!=null)detailZoom.bind(target,anchor)
+    }
    }
    val navigate:(String)->Unit={navigateTo(it)}
-   fun followMusicArchiveLink(source:NavBackStackEntry,target:String,origin:Bundle?=null) {
+   fun followMusicArchiveLink(source:NavBackStackEntry,target:String,origin:Bundle?=null,useThumbnail:Boolean=false) {
     if(nav.currentBackStackEntry!=source)return
     if(runCatching{nav.getBackStackEntry(target)}.getOrNull()!=null) {
      nav.popBackStack(target,inclusive=false)
-    }else navigateTo(target,origin)
+    }else navigateTo(target,origin,useThumbnail)
    }
    fun openArchivePlace(source:NavBackStackEntry,id:String,links:List<MusicPlaceLink>) {
     if(nav.currentBackStackEntry!=source)return
@@ -381,7 +388,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
     val origin=Bundle().apply {
      putStringArrayList("scenes",ArrayList(link.scenes.map(Scene::id)))
     }
-    followMusicArchiveLink(source,"place/${Uri.encode(id)}",origin)
+    followMusicArchiveLink(source,"place/${Uri.encode(id)}",origin,useThumbnail=true)
    }
    fun leaveProfile(action:()->Unit) {
     if(route=="form/{kind}/{target}"&&recordSaving)return
@@ -419,7 +426,6 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    LaunchedEffect(owner,navigationReady,route,recovery) {
     if(navigationReady&&owner!=null&&!recovery&&route=="auth")finishAuth()
    }
-   val motion=LocalPhysicalMotion.current
    LaunchedEffect(motion) {
     if(!motion)coverCoordinator.cancelAll()
    }
@@ -499,31 +505,45 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    var transitionTopEntryId by remember{mutableStateOf<String?>(null)}
    var transitionUnderEntryId by remember{mutableStateOf<String?>(null)}
    var transitionUseMorph by remember{mutableStateOf(false)}
+   var transitionInteractive by remember{mutableStateOf(false)}
+   var detailTransition by remember{mutableStateOf<DetailNavigationTransition?>(null)}
 
    fun NavGraphBuilder.page(
     path:String,arguments:List<NamedNavArgument> = emptyList(),
     content:@Composable AnimatedContentScope.(NavBackStackEntry)->Unit,
    ) {
     composable(path,arguments=arguments){destination->
-     val isUnderneath=motion&&transitionMotion==AppRouteMotion.Detail&&!transitionUseMorph&&destination.id==transitionUnderEntryId
-     val isTopPane=motion&&transitionMotion==AppRouteMotion.Detail&&!transitionUseMorph&&destination.id==transitionTopEntryId&&transition.currentState!=transition.targetState
+     val detail=detailTransition?.takeIf{motion&&(destination.id==it.top||destination.id==it.under)}
+     val moving=transition.currentState!=transition.targetState
+     val slide=motion&&transitionMotion==AppRouteMotion.Detail&&!transitionUseMorph&&detail==null
+     val isUnderneath=slide&&destination.id==transitionUnderEntryId
+     val isTopPane=slide&&destination.id==transitionTopEntryId&&moving
      val scrimAlpha by transition.animateFloat(
-      transitionSpec={tween(SubpageTransitionMillis,easing=AppNavEasing)},
+      transitionSpec={detailMotionSpec(transitionInteractive,visibilityThreshold=0.002f)},
       label="under-scrim",
      ) { state ->
-      if(isUnderneath&&(state==EnterExitState.PreEnter||state==EnterExitState.PostExit)) 0.08f else 0f
+      if(isUnderneath&&state!=EnterExitState.Visible) DetailScrimAlpha else 0f
      }
+     val foreground=destination.id==detail?.top
+     val openness=detail?.let {
+      transition.animateFloat({it.progressSpec},label="detail-progress") { state ->
+       if((state==EnterExitState.Visible)==foreground)1f else 0f
+      }
+     }
+     val detailLayer=if(detail!=null&&openness!=null&&moving) {
+      if(foreground)detail.foreground(openness)else detail.background(openness)
+     }else Modifier
      CompositionLocalProvider(
       LocalRouteActive provides (entry?.id==destination.id),
       LocalRouteIsCurrent provides {nav.currentBackStackEntry?.id==destination.id},
       LocalRouteEntryId provides destination.id,
      ) {
-      Box(Modifier.fillMaxSize().drawWithContent {
+      Box(Modifier.fillMaxSize().then(detailLayer).drawWithContent {
        drawContent()
        if(isTopPane) {
-        val shadowWidth=with(density){12.dp.toPx()}
+        val shadowWidth=with(density){16.dp.toPx()}
         drawRect(
-         brush=Brush.horizontalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=0.09f)),startX=-shadowWidth,endX=0f),
+         brush=Brush.horizontalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=0.14f)),startX=-shadowWidth,endX=0f),
          topLeft=Offset(-shadowWidth,0f),
          size=Size(shadowWidth,size.height),
         )
@@ -536,8 +556,13 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
         destination,performanceImmersive,!(path=="edit-profile"&&draft.saving)&&!recordSaving,back,
         collapsingTitleVisible=if(path=="settings")settingsTitleCollapsed else true,
         onChooseModule=chooseModule,
+        selectedWallTab=if(transitionMotion==AppRouteMotion.Tab)wallSection else null,
        ) {
         content(destination)
+       }
+       if(detail!=null&&openness!=null&&moving) {
+        val decoration=if(foreground)detail.foregroundDecoration(openness)else detail.backgroundDecoration(openness)
+        Box(Modifier.matchParentSize().then(decoration))
        }
       }
      }
@@ -546,13 +571,16 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
 
    CompositionLocalProvider(
     LocalCoverCoordinator provides coverCoordinator,
+    LocalDetailZoom provides detailZoom,
     LocalSheetCoordinator provides sheetCoordinator,
     LocalPhotoViewerCoordinator provides photoViewerCoordinator,
     LocalAppHaptics provides haptics,
    ) {
    val orientation=LocalConfiguration.current.orientation
    RoomWall(Modifier.fillMaxSize().onGloballyPositioned {
-    coverCoordinator.updateViewportBounds(it.boundsInRoot(),orientation)
+    val viewport=it.boundsInRoot()
+    coverCoordinator.updateViewportBounds(viewport,orientation)
+    detailZoom.viewport=viewport
    }) {
     Box(
      Modifier
@@ -571,26 +599,36 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
       val albumRoute=if(targetState.destination.route=="album/{id}")"album/${Uri.encode(targetState.arguments?.getString("id").orEmpty())}" else null
       val morphing=albumRoute!=null&&coverCoordinator.isEntering(albumRoute)
       transitionMotion=m;transitionTopEntryId=targetState.id;transitionUnderEntryId=initialState.id;transitionUseMorph=morphing
-      if(!motion)EnterTransition.None else if(morphing)m.morphEnter() else m.enter(initialAlpha=if(m==AppRouteMotion.Tab)0f else .55f)
+      transitionInteractive=false
+      detailTransition=if(motion&&m==AppRouteMotion.Detail&&!morphing)detailZoom.transition(targetState.id,initialState.id,returning=false,interactive=false)else null
+      when {
+       !motion||detailTransition!=null -> EnterTransition.None
+       morphing -> m.morphEnter()
+       else -> m.enter(initialAlpha=if(m==AppRouteMotion.Tab)0f else .55f)
+      }
      },
      exitTransition={
       if(!motion)ExitTransition.None else if(transitionUseMorph)AppRouteMotion.Detail.morphExitUnder()
+      else if(detailTransition!=null)ExitTransition.KeepUntilTransitionsFinished
       else routeMotion(initialState.destination.route,targetState.destination.route).exit()
      },
      popEnterTransition={
       val m=routeMotion(initialState.destination.route,targetState.destination.route)
       val albumRoute=if(initialState.destination.route=="album/{id}")"album/${Uri.encode(initialState.arguments?.getString("id").orEmpty())}" else null
       val fromAlbumMorph=albumRoute!=null&&coverCoordinator.isReturning(albumRoute)
+      val fromAlbumSwipe=albumRoute!=null&&interactivePopProgress>0.01f
       transitionMotion=m;transitionTopEntryId=initialState.id;transitionUnderEntryId=targetState.id;transitionUseMorph=fromAlbumMorph
+      transitionInteractive=nav.currentBackStackEntry?.id==initialState.id
+      detailTransition=if(motion&&m==AppRouteMotion.Detail&&!fromAlbumMorph&&!fromAlbumSwipe)detailZoom.transition(initialState.id,targetState.id,returning=true,interactive=transitionInteractive)else null
       when {
-       !motion -> EnterTransition.None
+       !motion||detailTransition!=null -> EnterTransition.None
        fromAlbumMorph -> m.morphPopEnterUnder()
-       m==AppRouteMotion.Detail && interactivePopProgress>0.01f -> {
+       m==AppRouteMotion.Detail && fromAlbumSwipe -> {
         val remFactor=(1f-interactivePopProgress).coerceIn(0.15f,1f)
         val dur=(SubpageTransitionMillis*remFactor).roundToInt().coerceIn(90,SubpageTransitionMillis)
-        slideInHorizontally(tween(dur,easing=AppNavEasing)){-(it*0.08f*remFactor).roundToInt()}
+        slideInHorizontally(tween(dur,easing=AppNavEasing)){-(it*DetailParallaxFraction*remFactor).roundToInt()}
        }
-       else -> m.popEnter()
+       else -> m.popEnter(transitionInteractive)
       }
      },
      popExitTransition={
@@ -599,13 +637,14 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
       val fromAlbumMorph=albumRoute!=null&&coverCoordinator.isReturning(albumRoute)
       when {
        !motion -> ExitTransition.None
+       detailTransition!=null -> ExitTransition.KeepUntilTransitionsFinished
        fromAlbumMorph -> m.morphPopExit()
-       m==AppRouteMotion.Detail && interactivePopProgress>0.01f -> {
+       m==AppRouteMotion.Detail && albumRoute!=null && interactivePopProgress>0.01f -> {
         val remFactor=(1f-interactivePopProgress).coerceIn(0.15f,1f)
         val dur=(SubpageTransitionMillis*remFactor).roundToInt().coerceIn(90,SubpageTransitionMillis)
         slideOutHorizontally(tween(dur,easing=AppNavEasing)){(it*remFactor).roundToInt()}
        }
-       else -> m.popExit()
+       else -> m.popExit(transitionInteractive)
       }
      }) {
      page("room"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
@@ -626,8 +665,8 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
        )
       }
      }}
-     page("search"){RoomSearch(musicCatalog){navigate("song/${Uri.encode(it.id)}")}}
-     page("release-search/{id}"){e->RoomSearch(musicCatalog,musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.title.orEmpty()){navigate("song/${Uri.encode(it.id)}")}}
+     page("search"){RoomSearch(musicCatalog){navigateTo("song/${Uri.encode(it.id)}",useThumbnail=true)}}
+     page("release-search/{id}"){e->RoomSearch(musicCatalog,musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.title.orEmpty()){navigateTo("song/${Uri.encode(it.id)}",useThumbnail=true)}}
      composable("music-favorites/{kind}"){e->
       val kind=if(e.arguments?.getString("kind")=="releases")"releases" else "songs"
       LaunchedEffect(kind){nav.navigate("archive/$kind"){popUpTo("music-favorites/{kind}"){inclusive=true};launchSingleTop=true}}
@@ -684,7 +723,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
       val initialKind=when(kind){"songs","releases","places"->kind;else->"footprints"}
       val initialFootprint=when(kind){"recreations","messages"->kind;else->"visits"}
       RoomArchive(initialKind,music={selection->
-       RoomMusicFavorites(musicCatalog,musicFavorites,selection,{navigate("song/${Uri.encode(it.id)}")},openRelease,
+       RoomMusicFavorites(musicCatalog,musicFavorites,selection,{navigateTo("song/${Uri.encode(it.id)}",useThumbnail=true)},openRelease,
         {id,release->placeUndo?.let{archive.dismissUndo(it.token)};music.removeFavorite(id,release)},
         {chooseModule("catalogue")})
       },places={

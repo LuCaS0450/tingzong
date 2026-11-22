@@ -94,7 +94,8 @@ import kotlinx.coroutines.delay
                     RoomPaper(Modifier.fillMaxWidth().animateItem(fadeInSpec=tween(if(motion)140 else 0),placementSpec=tween(if(motion)180 else 0),fadeOutSpec=tween(if(motion)110 else 0)).testTag("archive-card-$id")) {
                         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                             Row(Modifier.weight(1f).clickable(role=Role.Button){if(release&&album!=null)onRelease(album)else if(work!=null)onWork(work)}.padding(start=11.dp,top=13.dp,bottom=13.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalAlignment=Alignment.CenterVertically) {
-                                RoomCover(if(release)album?.artwork else work?.artwork,if(release)album?.title.orEmpty() else work?.title.orEmpty(),Modifier.size(62.dp))
+                                if(work!=null)RoomWorkCover(work,Modifier.size(62.dp))
+                                else RoomCover(album?.artwork,album?.title.orEmpty(),Modifier.size(62.dp))
                                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                                     Text(if(release)album?.title?:"作品暂未收录" else work?.title?:"作品暂未收录",fontSize=16.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink,maxLines=1,overflow=TextOverflow.Ellipsis)
                                     Text(if(release)album?.artist.orEmpty() else work?.artist.orEmpty(),fontSize=12.sp,color=RoomColors.Muted,maxLines=1,overflow=TextOverflow.Ellipsis)

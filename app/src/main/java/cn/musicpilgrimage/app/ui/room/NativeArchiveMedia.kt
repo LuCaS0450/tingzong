@@ -2,6 +2,7 @@ package cn.musicpilgrimage.app.ui.room
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.background
@@ -19,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -30,11 +33,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.ui.LocalPhotoViewerCoordinator
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
+import cn.musicpilgrimage.app.ui.rememberDetailZoomSource
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+@Composable
+internal fun RelatedPlaceThumbnail(placeId: String, photo: String) {
+    if (photo.isBlank()) return
+    val zoom = rememberDetailZoomSource("place/${Uri.encode(placeId)}", photo, ContentScale.Crop)
+    val thumbnail = Modifier.size(46.dp)
+    AsyncImage(
+        photo, null, zoom?.position(thumbnail) ?: thumbnail, contentScale = ContentScale.Crop,
+        onSuccess = { zoom?.load(it.result.drawable) }, onError = { zoom?.load(null) },
+    )
+}
 
 @Composable
 internal fun ArchiveFavoriteIcon(favorite: Boolean, description: String?, modifier: Modifier = Modifier) {
@@ -77,6 +92,7 @@ internal fun ArchiveImage(
     onUnavailable: (() -> Unit)? = null,
     fullImage: String? = null,
     fullImageSize: IntSize = IntSize.Zero,
+    thumbnail: ImageBitmap? = null,
 ) {
     val viewer = LocalPhotoViewerCoordinator.current
     var source by remember(model, fallback) { mutableStateOf(model) }
@@ -87,6 +103,7 @@ internal fun ArchiveImage(
     var bounds by remember(id, source) { mutableStateOf<Rect?>(null) }
     val hidden = viewer?.hiddenPhotoId == id
     val unavailable by rememberUpdatedState(onUnavailable)
+    val placeholder = remember(thumbnail) { thumbnail?.let { BitmapPainter(it) } }
     Box(
         modifier.clipToBounds().onGloballyPositioned { coordinates ->
             val visible = coordinates.boundsInRoot()
@@ -99,7 +116,7 @@ internal fun ArchiveImage(
             .background(RoomColors.Line.copy(alpha = .3f)),
     ) {
         AsyncImage(
-            source, description, Modifier.fillMaxSize(), contentScale = scale,
+            source, description, Modifier.fillMaxSize(), placeholder = placeholder, contentScale = scale,
             onSuccess = {
                 val drawable = it.result.drawable
                 if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {

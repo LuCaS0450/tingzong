@@ -1,5 +1,6 @@
 package cn.musicpilgrimage.app.ui.room
 
+import android.net.Uri
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -37,12 +38,13 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import cn.musicpilgrimage.app.data.*
+import cn.musicpilgrimage.app.ui.rememberDetailZoomSource
 import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.first
 
 @Composable internal fun RoomWorkRow(work:MusicWork,releaseTitle:String,onClick:()->Unit) {
     Row(Modifier.fillMaxWidth().testTag("room-work-${work.id}").clickable(role=Role.Button,onClick=onClick).padding(vertical=12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
-        RoomCover(work.artwork,work.title,Modifier.size(64.dp))
+        RoomWorkCover(work,Modifier.size(64.dp))
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
             Text(work.title,color=RoomColors.Ink,fontSize=17.sp,fontWeight=FontWeight.Medium,maxLines=1,overflow=TextOverflow.Ellipsis)
             Text(work.artist,color=RoomColors.Muted,fontSize=13.sp,maxLines=1)
@@ -50,6 +52,14 @@ import kotlinx.coroutines.flow.first
         }
         Icon(Icons.Outlined.ChevronRight,null,tint=RoomColors.Ink)
     }
+}
+
+@Composable internal fun RoomWorkCover(work:MusicWork,modifier:Modifier) {
+    val artwork=work.artwork
+    val zoom=rememberDetailZoomSource("song/${Uri.encode(work.id)}",artwork?.takeIf{it.approved}?.id,ContentScale.Fit)
+    RoomCover(artwork,work.title,zoom?.position(modifier)?:modifier,onImageReady=zoom?.let{source->
+        { ready, _, image -> source.image=if(ready)image else null }
+    })
 }
 
 @Composable internal fun RoomAlbum(release:MusicRelease,favorite:Boolean,onFavorite:()->Unit,onWork:(MusicWork)->Unit,onPlace:(String)->Unit,onBack:()->Unit={},onSearch:()->Unit={}) {

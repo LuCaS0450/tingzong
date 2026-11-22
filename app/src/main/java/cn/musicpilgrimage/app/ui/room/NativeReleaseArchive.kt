@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
@@ -39,7 +38,6 @@ import cn.musicpilgrimage.app.ui.LocalRouteEntryId
 import cn.musicpilgrimage.app.ui.LocalRouteIsCurrent
 import cn.musicpilgrimage.app.ui.PhotoViewerRequest
 import cn.musicpilgrimage.app.ui.RELEASE_COVER_SIDE_INSET
-import coil.compose.AsyncImage
 
 @Composable
 internal fun NativeReleaseArchive(
@@ -202,7 +200,7 @@ internal fun NativeReleaseArchive(
                             val name = place.optString("name")
                             val photo = place.optString("image")
                             ReleaseArchiveRow(name, place.optString("listLocation"), { onPlace(place.optString("id")) }) {
-                                if (photo.isNotBlank()) AsyncImage(photo,null,Modifier.size(46.dp),contentScale = ContentScale.Crop)
+                                RelatedPlaceThumbnail(place.optString("id"), photo)
                             }
                         }
                         TextButton({ sources = true }) { Text("资料来源 ↗",color = RoomColors.Muted) }

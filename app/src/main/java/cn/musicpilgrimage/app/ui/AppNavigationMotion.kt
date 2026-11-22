@@ -3,6 +3,9 @@ package cn.musicpilgrimage.app.ui
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -17,11 +20,17 @@ internal val appMotionEasing = CubicBezierEasing(.22f, .61f, .36f, 1f)
 internal const val ContentFadeMillis = 130
 internal const val WallTabFadeMillis = 110
 internal const val LiveFadeMillis = 100
-internal const val SubpageTransitionMillis = 270
+internal const val SubpageTransitionMillis = 320
+internal const val DetailParallaxFraction = .28f
+internal const val DetailScrimAlpha = .12f
 internal const val CoverMorphMillis = 270
 internal const val CoverMorphCancelMillis = 175
 internal const val LocalOpenCloseMillis = 190
 internal const val LiveOpenCloseMillis = 190
+
+internal fun <T> detailMotionSpec(interactive: Boolean, visibilityThreshold: T? = null): FiniteAnimationSpec<T> =
+    if (interactive) tween(SubpageTransitionMillis, easing = LinearEasing)
+    else spring(dampingRatio = .94f, stiffness = 460f, visibilityThreshold = visibilityThreshold)
 
 internal val LocalRouteActive = staticCompositionLocalOf { true }
 internal val LocalRouteIsCurrent = staticCompositionLocalOf<() -> Boolean> { { true } }
@@ -37,33 +46,35 @@ internal fun wallSection(route: String?) = when (route) {
     else -> null
 }
 
-internal enum class AppRouteMotion(private val duration: Int) {
-    Tab(WallTabFadeMillis),
-    Detail(SubpageTransitionMillis),
-    Live(LiveOpenCloseMillis);
+internal enum class AppRouteMotion {
+    Tab,
+    Detail,
+    Live;
 
     fun enter(initialAlpha: Float = 0f): EnterTransition = when (this) {
         Tab -> fadeIn(tween(WallTabFadeMillis, easing = appMotionEasing), initialAlpha)
-        Detail -> slideInHorizontally(tween(SubpageTransitionMillis, easing = AppNavEasing)) { it }
+        Detail -> slideInHorizontally(detailMotionSpec(interactive = false)) { it }
         Live -> fadeIn(tween(LiveOpenCloseMillis, easing = AppNavEasing), initialAlpha) +
             scaleIn(tween(LiveOpenCloseMillis, easing = AppNavEasing), initialScale = 0.96f)
     }
 
     fun exit(): ExitTransition = when (this) {
         Tab -> fadeOut(tween(WallTabFadeMillis, easing = appMotionEasing), targetAlpha = 0.99f)
-        Detail -> slideOutHorizontally(tween(SubpageTransitionMillis, easing = AppNavEasing)) { -(it * 0.08f).toInt() }
+        Detail -> slideOutHorizontally(detailMotionSpec(interactive = false)) { -(it * DetailParallaxFraction).toInt() }
         Live -> fadeOut(tween(LiveOpenCloseMillis, easing = AppNavEasing))
     }
 
-    fun popEnter(): EnterTransition = when (this) {
+    fun popEnter(interactive: Boolean = false): EnterTransition = when (this) {
         Tab -> fadeIn(tween(WallTabFadeMillis, easing = appMotionEasing), 0f)
-        Detail -> slideInHorizontally(tween(SubpageTransitionMillis, easing = AppNavEasing)) { -(it * 0.08f).toInt() }
+        Detail -> slideInHorizontally(detailMotionSpec(interactive)) {
+            -(it * DetailParallaxFraction).toInt()
+        }
         Live -> fadeIn(tween(LiveOpenCloseMillis, easing = AppNavEasing), 0.75f)
     }
 
-    fun popExit(): ExitTransition = when (this) {
+    fun popExit(interactive: Boolean = false): ExitTransition = when (this) {
         Tab -> fadeOut(tween(WallTabFadeMillis, easing = appMotionEasing))
-        Detail -> slideOutHorizontally(tween(SubpageTransitionMillis, easing = AppNavEasing)) { it }
+        Detail -> slideOutHorizontally(detailMotionSpec(interactive)) { it }
         Live -> fadeOut(tween(LiveOpenCloseMillis, easing = AppNavEasing)) +
             scaleOut(tween(LiveOpenCloseMillis, easing = AppNavEasing), targetScale = 0.96f)
     }

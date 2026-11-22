@@ -3,16 +3,24 @@ package cn.musicpilgrimage.app.ui.room
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -36,9 +44,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -119,17 +127,41 @@ internal val SwissWallMuted=cn.musicpilgrimage.app.design.AppArt.WallMuted
 internal val SwissWallTabsHeight=69.dp
 
 @Composable internal fun SwissWallTabs(section:Int,onChoose:(String)->Unit,enabled:Boolean=true,includeTestTags:Boolean=true) {
+    val motion=LocalPhysicalMotion.current
     Column(Modifier.fillMaxWidth().height(SwissWallTabsHeight).padding(horizontal=24.dp).padding(bottom=8.dp).then(if(includeTestTags)Modifier.testTag("three-walls-tabs")else Modifier)) {
         Box(Modifier.fillMaxWidth().height(3.dp)) {
             HorizontalDivider(Modifier.align(Alignment.Center),color=Color(0xFFACB5A8),thickness=.5.dp)
             Row(Modifier.fillMaxSize()) {repeat(4){index->Box(Modifier.weight(1f).fillMaxHeight(),contentAlignment=Alignment.Center){if(index==section)Box(Modifier.width(16.dp).height(3.dp).background(SwissRed))}}}
         }
-        Row(Modifier.fillMaxWidth()) {listOf("音乐","世界","演奏","我的").forEachIndexed{index,label->
-            Box(Modifier.weight(1f).height(58.dp).semantics{selected=index==section}.then(if(includeTestTags)Modifier.testTag("wall-tab-$index")else Modifier)
-                .clickable(enabled=enabled,role=Role.Tab){onChoose(listOf("room","explore","performance","me")[index])},contentAlignment=Alignment.Center) {
-                Text(label,color=if(index==section)SwissInk else SwissWallMuted,fontSize=16.sp,fontWeight=if(index==section)FontWeight.Bold else FontWeight.Normal)
+        Row(Modifier.fillMaxWidth().selectableGroup()) {
+            val tabs=listOf("音乐" to "room","世界" to "explore","演奏" to "performance","我的" to "me")
+            tabs.forEachIndexed { index, (label, route) ->
+                val selected=index==section
+                val interaction=remember{MutableInteractionSource()}
+                val pressed by interaction.collectIsPressedAsState()
+                val focused by interaction.collectIsFocusedAsState()
+                val hovered by interaction.collectIsHoveredAsState()
+                val alpha by animateFloatAsState(
+                    when { pressed->.48f; hovered->.78f; else->1f },
+                    if(pressed||!motion)snap()else spring(dampingRatio=.85f,stiffness=680f),
+                    label="tab-press",
+                )
+                Box(
+                    Modifier.weight(1f).height(58.dp).then(if(includeTestTags)Modifier.testTag("wall-tab-$index")else Modifier)
+                        .selectable(selected,interactionSource=interaction,indication=null,enabled=enabled,role=Role.Tab){onChoose(route)},
+                    contentAlignment=Alignment.Center,
+                ) {
+                    Text(
+                        label,Modifier.graphicsLayer {
+                            this.alpha=alpha.coerceIn(0f,1f)
+                            compositingStrategy=CompositingStrategy.ModulateAlpha
+                        },color=if(selected)SwissInk else SwissWallMuted,fontSize=16.sp,
+                        fontWeight=if(selected)FontWeight.Bold else FontWeight.Normal,
+                        textDecoration=if(focused)TextDecoration.Underline else TextDecoration.None,
+                    )
+                }
             }
-        }}
+        }
     }
 }
 
