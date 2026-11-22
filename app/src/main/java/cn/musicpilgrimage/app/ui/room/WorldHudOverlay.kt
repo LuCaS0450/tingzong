@@ -171,7 +171,9 @@ internal fun WorldHudOverlay(
             }
 
             // Scale bar (z >= 3 when summary closed).
-            if (hud.compactHeader && !summaryOpen && hud.scaleLabel.isNotEmpty() && hud.scaleWidthPx > 0f) {
+            if (hud.compactHeader && !summaryOpen && !hud.streetOffline &&
+                hud.scaleLabel.isNotEmpty() && hud.scaleWidthPx > 0f
+            ) {
                 WorldScaleBar(
                     label = hud.scaleLabel,
                     widthPx = hud.scaleWidthPx,

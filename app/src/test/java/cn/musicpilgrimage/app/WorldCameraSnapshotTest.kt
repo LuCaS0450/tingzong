@@ -9,9 +9,18 @@ class WorldCameraSnapshotTest {
     @Test fun streetDetailsRoundTripPreservesTheExactCameraAndSelection() {
         val state = WorldCameraSnapshot(2.373333, 48.84298768033648, 15.125, "le-train-bleu", true)
         assertEquals(state, WorldCameraSnapshot.parse(JSONObject(state.json().toString())))
-        // MapLibre's latitude-relative globe camera needs a negative engine zoom near the poles.
-        val polar = WorldCameraSnapshot(12.3,77.0,-1.45)
-        assertEquals(polar,WorldCameraSnapshot.parse(polar.json()))
+        assertEquals(state, WorldCameraSnapshot.parse(state.json().put("version", 1)))
+    }
+
+    @Test fun oldGlobeKeepsItsLocationAndApparentSize() {
+        val old = WorldCameraSnapshot(12.3, 60.0, 0.0, "oslo", true).json().put("version", 1)
+        val restored = requireNotNull(WorldCameraSnapshot.parse(old))
+        assertEquals(12.3, restored.longitude, 1e-6)
+        assertEquals(60.0, restored.latitude, 1e-6)
+        assertEquals(0.52, restored.zoom, 1e-6)
+        assertEquals("oslo", restored.selected)
+        assertTrue(restored.summaryOpen)
+        assertEquals(restored, WorldCameraSnapshot.parse(restored.json()))
     }
 
     @Test fun arbitraryStreetDoesNotRequireASelectedMusicPlace() {

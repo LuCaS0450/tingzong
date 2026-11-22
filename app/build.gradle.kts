@@ -34,6 +34,7 @@ android {
         buildConfigField("String", "SUPABASE_URL", settingLiteral("supabase.url"))
         buildConfigField("String", "SUPABASE_ANON_KEY", settingLiteral("supabase.anonKey"))
         buildConfigField("String", "MAPTILER_KEY", settingLiteral("maptiler.key"))
+        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", settingLiteral("mapbox.accessToken"))
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         if (selectedDeviceTests.orNull.isNullOrBlank()) {
             testInstrumentationRunnerArguments["notAnnotation"] = "cn.musicpilgrimage.app.ExtendedDeviceTest"
@@ -100,7 +101,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.navigation:navigation-compose:2.8.9")
-    implementation("org.maplibre.gl:android-sdk-opengl:2026.11.2-globe")
+    implementation("com.mapbox.maps:android-ndk27:11.35.2")
     implementation("androidx.datastore:datastore-preferences:1.1.4")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("androidx.camera:camera-camera2:1.5.3")

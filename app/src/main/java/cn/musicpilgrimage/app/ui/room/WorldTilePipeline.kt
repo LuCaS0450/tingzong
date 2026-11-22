@@ -8,6 +8,17 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import cn.musicpilgrimage.app.BuildConfig
+import com.mapbox.bindgen.ExpectedFactory
+import com.mapbox.common.HttpRequest
+import com.mapbox.common.HttpRequestError
+import com.mapbox.common.HttpRequestErrorType
+import com.mapbox.common.HttpRequestOrResponse
+import com.mapbox.common.HttpResponse
+import com.mapbox.common.HttpResponseData
+import com.mapbox.common.HttpServiceFactory
+import com.mapbox.common.HttpServiceInterceptorInterface
+import com.mapbox.common.HttpServiceInterceptorRequestContinuation
+import com.mapbox.common.HttpServiceInterceptorResponseContinuation
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -22,6 +33,8 @@ import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
 import okhttp3.Cache
 import okhttp3.CacheControl
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.Dispatcher
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -30,10 +43,9 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
-import org.maplibre.android.MapLibre
-import org.maplibre.android.module.http.HttpRequestUtil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -41,14 +53,13 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * Native MapLibre tile pipeline, offline asset style builder, and satellite color-grading proxy.
- * Replaces WebView `WorldResources` and `earth-worker.js` with zero JS/Chromium overhead.
+ * Mapbox style with bundled satellite imagery and a cache for graded online imagery.
  */
 internal object WorldTilePipeline {
     private const val MAPTILER_HOST = "api.maptiler.com"
     private const val GRADED_EARTH_HOST = "earth-grade.tingzong.local"
     private val USER_AGENT =
-        "cn.musicpilgrimage.app/${BuildConfig.VERSION_NAME} (${BuildConfig.APPLICATION_ID}; MapLibre Android)"
+        "cn.musicpilgrimage.app/${BuildConfig.VERSION_NAME} (${BuildConfig.APPLICATION_ID})"
 
     private val TILE_PATH_REGEX = Regex("^/v2/(\\d+)/(\\d+)/(\\d+)\\.jpg$")
     private val POW_LUT = DoubleArray(256) { i -> (i / 255.0).pow(0.6) }
@@ -73,9 +84,6 @@ internal object WorldTilePipeline {
     private val cacheMaintenance = Executors.newSingleThreadExecutor()
 
     @Volatile
-    private var lastStreetFailureAtMs: Long = 0L
-
-    @Volatile
     private var lastHdFailureAtMs: Long = 0L
 
     @Volatile
@@ -84,29 +92,59 @@ internal object WorldTilePipeline {
     private class OceanAtlas(val width: Int, val height: Int, val pixels: IntArray)
 
     @Synchronized
-    fun configureMapLibre(context: Context) {
-        val appContext = context.applicationContext
-        if (!MapLibre.hasInstance()) {
-            MapLibre.getInstance(appContext)
-        }
-        if (!httpClientConfigured) {
-            HttpRequestUtil.setOkHttpClient(getClient(appContext))
-            httpClientConfigured = true
-        }
+    fun configureMapboxTileTransport(context: Context) {
+        if (httpClientConfigured) return
+        val client = getClient(context.applicationContext)
+        HttpServiceFactory.setHttpServiceInterceptor(object : HttpServiceInterceptorInterface {
+            override fun onRequest(request: HttpRequest, continuation: HttpServiceInterceptorRequestContinuation) {
+                val url = request.url.toHttpUrlOrNull()
+                if (url?.host != GRADED_EARTH_HOST) {
+                    continuation.run(HttpRequestOrResponse(request))
+                    return
+                }
+                client.newCall(Request.Builder().url(url).build()).enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
+                        continuation.run(HttpRequestOrResponse(satelliteTransportError(request)))
+                    }
+
+                    override fun onResponse(call: Call, response: Response) {
+                        val nativeResponse = try {
+                            response.use { tile ->
+                                val headers = HashMap<String, String>()
+                                for ((name, value) in tile.headers) headers[name.lowercase()] = value
+                                headers.remove("content-encoding")
+                                headers.remove("content-length")
+                                val data = HttpResponseData(headers, tile.code, tile.body?.bytes() ?: ByteArray(0))
+                                HttpResponse(request.id ?: 0, request, ExpectedFactory.createValue(data))
+                            }
+                        } catch (_: IOException) {
+                            satelliteTransportError(request)
+                        }
+                        continuation.run(HttpRequestOrResponse(nativeResponse))
+                    }
+                })
+            }
+
+            override fun onResponse(response: HttpResponse, continuation: HttpServiceInterceptorResponseContinuation) {
+                continuation.run(response)
+            }
+        })
+        httpClientConfigured = true
     }
 
-    fun hasKey(rawKey: String = BuildConfig.MAPTILER_KEY): Boolean = rawKey.trim().isNotEmpty()
+    private fun satelliteTransportError(request: HttpRequest) = HttpResponse(
+        request.id ?: 0,
+        request,
+        ExpectedFactory.createError(HttpRequestError(HttpRequestErrorType.CONNECTION_ERROR, "Satellite tile unavailable")),
+    )
 
-    fun recentStreetErrorSince(sinceMs: Long): Boolean = lastStreetFailureAtMs > sinceMs
     fun recentHdErrorSince(sinceMs: Long): Boolean = lastHdFailureAtMs > sinceMs
 
     fun resetErrorFlags() {
-        lastStreetFailureAtMs = 0L
         lastHdFailureAtMs = 0L
     }
 
-    @Synchronized
-    fun getClient(context: Context): OkHttpClient {
+    private fun getClient(context: Context): OkHttpClient {
         cachedClient?.let { return it }
         val appContext = context.applicationContext
         val cacheDir = File(appContext.cacheDir, "world-map-tiles")
@@ -126,7 +164,7 @@ internal object WorldTilePipeline {
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(12, TimeUnit.SECONDS)
             .addInterceptor(GradedEarthInterceptor(appContext, coastClient, gradedCacheDir))
-            .addInterceptor(OfflineFallbackInterceptor())
+            .addInterceptor(SatelliteCacheFallback())
             .build()
         cachedClient = client
         return client
@@ -155,33 +193,23 @@ internal object WorldTilePipeline {
         }
     }
 
-    private class OfflineFallbackInterceptor : Interceptor {
+    private class SatelliteCacheFallback : Interceptor {
         override fun intercept(chain: Interceptor.Chain): Response {
             val original = chain.request()
             val req = original.newBuilder()
                 .header("User-Agent", USER_AGENT)
                 .build()
-            val streetTile = req.url.host == MAPTILER_HOST && req.url.encodedPath.startsWith("/tiles/v3/")
             return try {
-                val response = chain.proceed(req)
-                if (streetTile) {
-                    if (response.isSuccessful) lastStreetFailureAtMs = 0L
-                    else if (response.code != 404 && response.code != 304) {
-                        lastStreetFailureAtMs = System.currentTimeMillis()
-                    }
-                }
-                response
+                chain.proceed(req)
             } catch (e: IOException) {
                 if (chain.call().isCanceled()) throw e
-                // Attempt stale disk cache so revisited streets and earth tiles remain usable offline.
+                // Reuse a cached satellite tile after a connection failure.
                 val cachedReq = req.newBuilder().cacheControl(CacheControl.FORCE_CACHE).build()
                 val cachedResp = runCatching { chain.proceed(cachedReq) }.getOrNull()
                 if (cachedResp != null && cachedResp.isSuccessful) {
-                    if (streetTile) lastStreetFailureAtMs = 0L
                     cachedResp
                 } else {
                     cachedResp?.close()
-                    if (streetTile) lastStreetFailureAtMs = System.currentTimeMillis()
                     syntheticError(req, 504, "Offline")
                 }
             }
@@ -245,8 +273,6 @@ internal object WorldTilePipeline {
             }
             val coastDeadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(2600L)
             return try {
-                // Keep the satellite request on MapLibre's original OkHttp call so cancelling a
-                // tile cancels the actual download and frees a slot for the new viewport.
                 chain.proceed(upstreamReq).use { upstreamResp ->
                     if (!upstreamResp.isSuccessful) {
                         lastHdFailureAtMs = System.currentTimeMillis()
@@ -776,15 +802,14 @@ internal object WorldTilePipeline {
     }
 
     /**
-     * Builds the complete MapLibre Style JSON matching the Swiss paper palette and projection.
-     * Bundled `asset://` earth tiles always load offline; remote HD earth & vector streets attach when key is present.
+     * Keeps the bundled Earth visible from the first frame and uses the same Swiss paper palette for streets.
      */
     fun buildWorldStyleJson(
         rawKey: String = BuildConfig.MAPTILER_KEY,
         paperHex: String = "#f7f6f2",
+        includeStreets: Boolean = true,
     ): String {
         val key = rawKey.trim()
-        val encodedKey = URLEncoder.encode(key, "UTF-8")
         val hasRemoteKey = key.isNotEmpty()
 
         val sources = JSONObject().apply {
@@ -819,14 +844,10 @@ internal object WorldTilePipeline {
                         put("maxzoom", 9)
                     },
                 )
-                put(
-                    "streets",
-                    JSONObject().apply {
-                        put("type", "vector")
-                        put("url", "https://$MAPTILER_HOST/tiles/v3/tiles.json?key=$encodedKey")
-                    },
-                )
             }
+            if (includeStreets) put("streets", JSONObject().put("type", "vector")
+                .put("url", "mapbox://mapbox.mapbox-streets-v8"))
+            WorldMapboxPins.appendSources(this)
         }
 
         val layers = JSONArray().apply {
@@ -838,7 +859,7 @@ internal object WorldTilePipeline {
                         "paint",
                         JSONObject().apply {
                             put("background-color", "#ecebe4")
-                            put("background-opacity", if (hasRemoteKey) exprInterpolateLinearZoom(4.0 to 0.0, 7.0 to 1.0) else 0)
+                            put("background-opacity", if (includeStreets) exprInterpolateLinearZoom(5.0 to 0.0, 8.0 to 1.0) else 0)
                         },
                     )
                 },
@@ -848,11 +869,10 @@ internal object WorldTilePipeline {
                     put("id", "earth-base")
                     put("type", "raster")
                     put("source", "earth-base")
-                    if (hasRemoteKey) put("maxzoom", 8)
                     put(
                         "paint",
                         JSONObject().apply {
-                            put("raster-opacity", if (hasRemoteKey) exprInterpolateLinearZoom(5.0 to 1.0, 8.0 to 0.0) else 1)
+                            put("raster-opacity", 1)
                             put("raster-fade-duration", 0)
                             put("raster-resampling", "linear")
                         },
@@ -864,12 +884,11 @@ internal object WorldTilePipeline {
                     put("id", "earth")
                     put("type", "raster")
                     put("source", "earth")
-                    if (hasRemoteKey) put("maxzoom", 8)
                     put(
                         "paint",
                         JSONObject().apply {
-                            put("raster-opacity", if (hasRemoteKey) exprInterpolateLinearZoom(5.0 to 1.0, 8.0 to 0.0) else 1)
-                            put("raster-fade-duration", 200)
+                            put("raster-opacity", 1)
+                            put("raster-fade-duration", 0)
                             put("raster-resampling", "linear")
                         },
                     )
@@ -888,24 +907,23 @@ internal object WorldTilePipeline {
                             JSONObject().apply {
                                 put(
                                     "raster-opacity",
-                                    exprInterpolateLinearZoom(1.25 to 0.0, 1.75 to 1.0, 5.0 to 1.0, 8.0 to 0.0),
+                                    exprInterpolateLinearZoom(1.25 to 0.0, 1.75 to 1.0, 7.8 to 1.0, 8.0 to 0.0),
                                 )
-                                put("raster-fade-duration", 200)
+                                put("raster-fade-duration", 0)
                                 put("raster-resampling", "linear")
                             },
                         )
                     },
                 )
-                appendStreetLayers(this, paperHex)
             }
+            if (includeStreets) appendStreetLayers(this, paperHex)
+            WorldMapboxPins.appendLayers(this)
         }
 
         return JSONObject().apply {
             put("version", 8)
-            put("projection", JSONObject().put("type", "globe"))
-            if (hasRemoteKey) {
-                put("glyphs", "https://$MAPTILER_HOST/fonts/{fontstack}/{range}.pbf?key=$encodedKey")
-            }
+            put("projection", JSONObject().put("name", "globe"))
+            put("glyphs", "mapbox://fonts/mapbox/{fontstack}/{range}.pbf")
             put("sources", sources)
             put("layers", layers)
         }.toString()
@@ -941,34 +959,35 @@ internal object WorldTilePipeline {
             )
         }
 
-        fillLayer("world-park", "landcover", "#dee2cf", exprInClass("wood", "grass", "farmland"))
-        fillLayer("world-landuse", "landuse", "#dee2cf", exprInClass("park", "cemetery", "pitch", "recreation_ground", "garden"))
+        fillLayer("world-landuse", "landuse", "#dee2cf", exprInClass(
+            "park", "cemetery", "pitch", "recreation_ground", "garden", "wood", "grass", "agriculture",
+        ))
         fillLayer("world-water", "water", "#b9d6dd")
         lineLayer("world-waterway", "waterway", "#b9d6dd", exprExpZoom(1.4, 8 to 0.5, 15 to 3.0, 18 to 10.0))
         fillLayer("world-building", "building", "#dfddd4", minzoom = 12)
         lineLayer("world-building-line", "building", "#cfccc1", 0.4, minzoom = 14)
-        lineLayer("world-rail", "transportation", "#c3c1b7", exprExpZoom(1.4, 9 to 0.3, 14 to 1.2, 18 to 4.0), exprEqClass("rail"))
+        lineLayer("world-rail", "road", "#c3c1b7", exprExpZoom(1.4, 9 to 0.3, 14 to 1.2, 18 to 4.0), exprEqClass("rail"))
         val notMinor = exprNotInClass("rail", "path", "track")
-        lineLayer("world-road-casing", "transportation", "#cfccc1", exprExpZoom(1.55, 9 to 1.1, 13 to 3.0, 16 to 7.0, 18 to 16.0), notMinor, minzoom = 9)
-        lineLayer("world-road", "transportation", "#fdfcf8", exprExpZoom(1.55, 9 to 0.7, 13 to 2.4, 16 to 6.0, 18 to 15.0), notMinor, minzoom = 9)
-        lineLayer("world-path", "transportation", "#fdfcf8", exprInterpolateLinearZoom(12.0 to 0.5, 18.0 to 3.0), exprInClass("path", "track"), minzoom = 12)
+        lineLayer("world-road-casing", "road", "#cfccc1", exprExpZoom(1.55, 9 to 1.1, 13 to 3.0, 16 to 7.0, 18 to 16.0), notMinor, minzoom = 9)
+        lineLayer("world-road", "road", "#fdfcf8", exprExpZoom(1.55, 9 to 0.7, 13 to 2.4, 16 to 6.0, 18 to 15.0), notMinor, minzoom = 9)
+        lineLayer("world-path", "road", "#fdfcf8", exprInterpolateLinearZoom(12.0 to 0.5, 18.0 to 3.0), exprInClass("path", "track"), minzoom = 12)
         target.put(
             JSONObject().apply {
                 put("id", "world-street-name")
                 put("type", "symbol")
                 put("source", "streets")
-                put("source-layer", "transportation_name")
+                put("source-layer", "road")
                 put("minzoom", 13)
                 put(
                     "layout",
                     JSONObject().apply {
                         put("text-field", JSONArray().apply {
                             put("coalesce")
+                            put(JSONArray(listOf("get", "name_zh-Hans")))
                             put(JSONArray(listOf("get", "name")))
-                            put(JSONArray(listOf("get", "name:latin")))
                             put("")
                         })
-                        put("text-font", JSONArray(listOf("Noto Sans Regular")))
+                        put("text-font", JSONArray(listOf("DIN Pro Regular", "Arial Unicode MS Regular")))
                         put("text-size", 9.0)
                         put("symbol-placement", "line")
                         put("text-max-angle", 25)

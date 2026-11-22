@@ -157,8 +157,8 @@ class WorldPinProjectionTest {
 
     @Test
     fun buildWorldStyleJson_supportsOfflineAndRemoteKeyModes() {
-        val offlineStyle = JSONObject(WorldTilePipeline.buildWorldStyleJson(rawKey = ""))
-        assertEquals("globe", offlineStyle.getJSONObject("projection").getString("type"))
+        val offlineStyle = JSONObject(WorldTilePipeline.buildWorldStyleJson(rawKey = "", includeStreets = false))
+        assertEquals("globe", offlineStyle.getJSONObject("projection").getString("name"))
         val offlineSources = offlineStyle.getJSONObject("sources")
         assertTrue(offlineSources.has("earth-base"))
         assertTrue(offlineSources.has("earth"))
@@ -179,7 +179,7 @@ class WorldPinProjectionTest {
         assertTrue(keyedSources.has("earth"))
         assertTrue(keyedSources.has("earth-hd"))
         assertTrue(keyedSources.has("streets"))
-        assertTrue(keyedStyle.getString("glyphs").contains("test-key"))
+        assertEquals("mapbox://mapbox.mapbox-streets-v8", keyedSources.getJSONObject("streets").getString("url"))
         assertTrue(
             keyedSources.getJSONObject("earth-hd").getJSONArray("tiles").getString(0).contains("/v2/"),
         )

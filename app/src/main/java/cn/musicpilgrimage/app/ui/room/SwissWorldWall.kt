@@ -4,8 +4,11 @@ import android.content.Context
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,15 +37,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import cn.musicpilgrimage.app.BuildConfig
 import cn.musicpilgrimage.app.data.Catalog
 import cn.musicpilgrimage.app.data.Place
 import cn.musicpilgrimage.app.data.musicMapCities
@@ -50,7 +62,7 @@ import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.LocalRouteIsCurrent
 
 /**
- * Pure native World wall powered by MapLibre Native (`TextureView`) + Compose overlays.
+ * The native map owns the bottom map and pins; Compose owns the page chrome.
  * Keeps `MapView` alive across background/foreground transitions so returning never reloads.
  */
 @Composable
@@ -88,7 +100,7 @@ internal fun SwissWorldWall(
 
     var controller by remember(browse) { mutableStateOf(browse.worldController) }
     LaunchedEffect(browse, active) {
-        if (active && controller == null) {
+        if (active && controller == null && BuildConfig.MAPBOX_ACCESS_TOKEN.isNotBlank()) {
             awaitMapStartup(context)
             controller = browse.worldController ?: NativeWorldController(context, browse).also { browse.worldController = it }
         }
@@ -123,6 +135,15 @@ internal fun SwissWorldWall(
         // Approved textured warm-white canvas shows transparently behind the 3D globe (z < 4).
         RoomShelfWall(Modifier.fillMaxSize())
 
+        if (active && BuildConfig.MAPBOX_ACCESS_TOKEN.isBlank()) {
+            Text(
+                "地图暂不可用",
+                color = RoomColors.Muted,
+                fontSize = 15.sp,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
         controller?.let { ctrl ->
             val currentById by rememberUpdatedState(byId)
             val currentBrowse by rememberUpdatedState(browse)
@@ -149,10 +170,8 @@ internal fun SwissWorldWall(
                     }
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
-                            Lifecycle.Event.ON_START -> ctrl.onStart()
                             Lifecycle.Event.ON_RESUME -> ctrl.onResume()
                             Lifecycle.Event.ON_PAUSE -> ctrl.onPause()
-                            Lifecycle.Event.ON_STOP -> ctrl.onStop()
                             else -> Unit
                         }
                     }
@@ -164,7 +183,6 @@ internal fun SwissWorldWall(
                         }
                         ctrl.onTapEvent = null
                         ctrl.onPause()
-                        ctrl.onStop()
                     }
                 }
             }
@@ -197,13 +215,19 @@ internal fun SwissWorldWall(
                         }
                     },
                 )
-                if (active && motion) {
-                    WorldTransitionAtmosphere(ctrl, Modifier.fillMaxSize())
+                if (ctrl.hudState.streetOffline) {
+                    val summaryInset = with(LocalDensity.current) { summaryHeightPx.toDp() }
+                    WorldStreetOffline(
+                        onRetry = ctrl::retryTiles,
+                        interactive = active,
+                        bottomInset = summaryInset,
+                    )
+                } else {
+                    WorldGlobeLighting(
+                        controller = ctrl,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
-                WorldPinOverlay(
-                    controller = ctrl,
-                    modifier = Modifier.fillMaxSize(),
-                )
             }
         }
 
@@ -283,6 +307,52 @@ internal fun SwissWorldWall(
                     chooser = null
                     browse.focusWorld(id, WorldFocusKind.List)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorldStreetOffline(
+    onRetry: () -> Unit,
+    interactive: Boolean,
+    bottomInset: Dp,
+) {
+    var retried by remember { mutableStateOf(false) }
+    Box(
+        Modifier.fillMaxSize()
+            .background(RoomColors.Paper)
+            .pointerInput(Unit) {
+                // Give the failure page the stage's touches while leaving its controls interactive.
+                awaitPointerEventScope { while (true) awaitPointerEvent() }
+            }
+            .padding(start = 24.dp, end = 24.dp, bottom = bottomInset),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.testTag("world-street-offline").semantics { liveRegion = LiveRegionMode.Polite },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                "街道地图加载失败",
+                color = RoomColors.Ink,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                if (retried) "当前仍未连接网络。" else "连接网络后重试。",
+                color = RoomColors.Muted,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+            )
+            SwissOutlinedButton(
+                onClick = { retried = true; onRetry() },
+                enabled = interactive,
+                modifier = Modifier.heightIn(min = 48.dp).testTag("world-street-offline-retry"),
+            ) {
+                Text("重试")
             }
         }
     }

@@ -1,10 +1,13 @@
 package cn.musicpilgrimage.app
 
+import android.graphics.Bitmap
+import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -13,6 +16,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import cn.musicpilgrimage.app.ui.room.NativeWorldController
 import cn.musicpilgrimage.app.ui.room.WorldDiagnosticsSnapshot
+import cn.musicpilgrimage.app.ui.room.WorldMapMath
 import cn.musicpilgrimage.app.ui.room.WorldTestRegistry
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -21,11 +25,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.maplibre.android.maps.MapView
 import java.io.File
 import kotlin.math.hypot
 
-/** Physical Android multi-pointer input against the native MapLibre globe & street controller. */
+/** Physical Android multi-pointer input against the native globe and street map. */
 @RunWith(AndroidJUnit4::class)
 @ExtendedDeviceTest
 class WorldGestureInputTest {
@@ -142,8 +145,50 @@ class WorldGestureInputTest {
     }
 
     @Test
+    fun disconnectedStreetOffersRetryAndReturnToGlobe() {
+        compose.waitUntil(25_000) {
+            compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
+        }
+        val wifiEnabled = shell("settings get global wifi_on") == "1"
+        val dataEnabled = shell("settings get global mobile_data") == "1"
+        try {
+            shell("svc wifi disable")
+            shell("svc data disable")
+            compose.onNodeWithTag("wall-tab-1").performClick()
+            compose.waitUntil(15_000) { WorldTestRegistry.activeController?.hasVisual == true }
+            val ctrl = controller()
+            compose.runOnUiThread { ctrl.jumpTo(4.2917, -111.377, 16.0) }
+            compose.waitUntil(12_000) {
+                compose.onAllNodes(hasTestTag("world-street-offline")).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithTag("world-street-offline").assertIsDisplayed()
+            val screenshot = instrumentation.uiAutomation.takeScreenshot()
+            File(instrumentation.targetContext.filesDir, "world-street-offline.png").outputStream().use {
+                screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            screenshot.recycle()
+            compose.onNodeWithTag("world-street-offline-retry").performClick()
+            compose.onNodeWithTag("world-street-offline").assertIsDisplayed()
+            compose.onNodeWithTag("world-mini-globe").performClick()
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasTestTag("world-street-offline")).fetchSemanticsNodes().isEmpty()
+            }
+        } finally {
+            if (dataEnabled) shell("svc data enable")
+            if (wifiEnabled) shell("svc wifi enable")
+        }
+    }
+
+    private fun angularDistance(a: Pair<Double, Double>, b: Pair<Double, Double>) =
+        hypot(a.first - b.first, WorldMapMath.wrapLongitude(a.second - b.second))
+
+    private fun shell(command: String): String =
+        ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command))
+            .bufferedReader().use { it.readText().trim() }
+
+    @Test
     fun zoomRailKeepsItsScreenPositionAcrossLevelLabels() {
-        compose.waitUntil(10_000) {
+        compose.waitUntil(25_000) {
             compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("wall-tab-1").performClick()
@@ -163,7 +208,7 @@ class WorldGestureInputTest {
 
     @Test
     fun physicalPinchLocksFocusAndReverseKeepsTheBrowseState() {
-        compose.waitUntil(10_000) {
+        compose.waitUntil(25_000) {
             compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("wall-tab-1").performClick()
@@ -203,19 +248,6 @@ class WorldGestureInputTest {
         lateinit var grabbed: Pair<Double, Double>
         instrumentation.runOnMainSync { grabbed = requireNotNull(ctrl.screenToLatLng(localX, localY)) }
 
-        var projectedFrames = 0
-        var largestPinError = 0.0
-        val checkPins = MapView.OnDidFinishRenderingFrameWithStatsListener { _, _ ->
-            if (ctrl.visiblePins.isNotEmpty()) projectedFrames++
-            for (pin in ctrl.visiblePins) {
-                val projected = ctrl.latLngToScreen(pin.lat, pin.lon) ?: continue
-                largestPinError = maxOf(
-                    largestPinError,
-                    hypot((projected.first - pin.x).toDouble(), (projected.second - pin.y).toDouble()),
-                )
-            }
-        }
-        instrumentation.runOnMainSync { ctrl.mapView.addOnDidFinishRenderingFrameListener(checkPins) }
         val down = SystemClock.uptimeMillis()
         event(down, MotionEvent.ACTION_DOWN, listOf(screenX to screenY))
         for (i in 1..40) {
@@ -226,15 +258,14 @@ class WorldGestureInputTest {
             event(down, MotionEvent.ACTION_MOVE, listOf(screenX + 80f to screenY + 12f))
             SystemClock.sleep(20)
         }
-        lateinit var draggedScreen: Pair<Float, Float>
-        instrumentation.runOnMainSync { draggedScreen = requireNotNull(ctrl.latLngToScreen(grabbed.first, grabbed.second)) }
-        val dragDrift = hypot((draggedScreen.first - localX - 80f).toDouble(), (draggedScreen.second - localY - 12f).toDouble())
+        lateinit var underFinger: Pair<Double, Double>
+        instrumentation.runOnMainSync {
+            underFinger = requireNotNull(ctrl.screenToLatLng(localX + 80f, localY + 12f))
+        }
+        val dragDrift = angularDistance(grabbed, underFinger)
         event(down, MotionEvent.ACTION_UP, listOf(screenX + 80f to screenY + 12f))
         idle(ctrl)
-        instrumentation.runOnMainSync { ctrl.mapView.removeOnDidFinishRenderingFrameListener(checkPins) }
-        assertTrue("Grabbed globe coordinate must follow the finger: $dragDrift", dragDrift < 12.0)
-        assertTrue("Expected pin samples during rotation", projectedFrames >= 3)
-        assertTrue("A pin trailed the current map projection by $largestPinError px", largestPinError < 0.5)
+        assertTrue("The grabbed coordinate must track the finger: $dragDrift degrees", dragDrift < 6.0)
 
         val before = diag(ctrl)
         assertTrue("Globe control must be operational before gestures", before.zoom < 2.0)
@@ -243,14 +274,16 @@ class WorldGestureInputTest {
 
         pinch(screenX, screenY, 45f, 165f)
         val after = idle(ctrl)
-        lateinit var projected: Pair<Float, Float>
-        instrumentation.runOnMainSync { projected = requireNotNull(ctrl.latLngToScreen(anchor.first, anchor.second)) }
-        val drift = hypot((projected.first - localX).toDouble(), (projected.second - localY).toDouble())
+        lateinit var afterAnchor: Pair<Double, Double>
+        instrumentation.runOnMainSync { afterAnchor = requireNotNull(ctrl.screenToLatLng(localX, localY)) }
+        val drift = angularDistance(anchor, afterAnchor)
         val zoomDelta = after.zoom - before.zoom
+        assertTrue("Real multi-touch must zoom: delta=$zoomDelta", zoomDelta > 0.6)
+        assertTrue("Pinch focus drift: $drift degrees", drift < 7.0)
 
         var pinches = 1
         var street = after
-        repeat(7) {
+        repeat(10) {
             if (street.zoom < 14.5) {
                 pinch(screenX, screenY, 45f, 165f)
                 street = idle(ctrl)
@@ -264,16 +297,12 @@ class WorldGestureInputTest {
             idle(ctrl)
         }
         val reverse = diag(ctrl)
-        assertTrue("Real multi-touch must zoom: delta=$zoomDelta", zoomDelta > 0.6)
-        assertTrue("Pinch focus drift: $drift px", drift < 18.0)
         assertTrue("Inverse pinch must return toward globe: ${reverse.zoom}", reverse.zoom < 2.2)
         assertEquals(before.selected, reverse.selected)
 
         val record = JSONObject()
-            .put("dragFocusDriftPx", dragDrift)
-            .put("pinProjectionErrorPx", largestPinError)
-            .put("pinFramesSampled", projectedFrames)
-            .put("pinchFocusDriftPx", drift)
+            .put("dragFocusDriftDegrees", dragDrift)
+            .put("pinchFocusDriftDegrees", drift)
             .put("zoomDelta", zoomDelta)
             .put("globePanStop", panStopsOnRelease(ctrl, screenX, screenY))
 

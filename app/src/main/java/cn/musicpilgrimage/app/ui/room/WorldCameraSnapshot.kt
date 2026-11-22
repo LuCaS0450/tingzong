@@ -7,7 +7,7 @@ internal data class WorldCameraSnapshot(
     val longitude: Double, val latitude: Double, val zoom: Double,
     val selected: String = "", val summaryOpen: Boolean = false,
 ) {
-    fun json() = JSONObject().put("version", 1).put("longitude", longitude).put("latitude", latitude)
+    fun json() = JSONObject().put("version", 2).put("longitude", longitude).put("latitude", latitude)
         .put("zoom", zoom).put("selected", selected).put("summaryOpen", summaryOpen)
 
     companion object {
@@ -19,7 +19,13 @@ internal data class WorldCameraSnapshot(
             if (!lon.isFinite() || !lat.isFinite() || !zoom.isFinite() ||
                 lon !in -180.0..180.0 || lat !in -85.051129..85.051129 || zoom !in -3.0..18.0) return null
             val selected = value.optString("selected").takeIf { it.length <= 180 } ?: return null
-            return WorldCameraSnapshot(lon, lat, zoom, selected, value.optBoolean("summaryOpen") && selected.isNotBlank())
+            val restoredZoom = if (value.optInt("version", 1) == 1) {
+                // The old globe zoom was relative to latitude. Preserve the apparent size on restore.
+                WorldMapMath.visualZoom(zoom, lat) - MapboxGlobeZoomOffset * WorldMapMath.globenessForZoom(zoom)
+            } else zoom
+            return WorldCameraSnapshot(
+                lon, lat, restoredZoom, selected, value.optBoolean("summaryOpen") && selected.isNotBlank(),
+            )
         }
     }
 }

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Keep Mapbox's distance threshold and recognize deliberate slow pinches as well. -->
+    <dimen name="mapbox_minimum_scale_speed">0dp</dimen>
+    <dimen name="mapbox_minimum_angled_scale_speed">0dp</dimen>
+</resources>

@@ -1,39 +1,25 @@
 package cn.musicpilgrimage.app.ui.room
 
+import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Typeface
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas as GraphicsCanvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
-import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -42,89 +28,55 @@ private val VisitedEnamel = intArrayOf(59, 68, 63)
 private val IvoryEnamel = intArrayOf(245, 242, 234)
 private val IvoryEdge = intArrayOf(196, 191, 178)
 
-/**
- * Pure Compose 1:1 port of the enamel globe pin layer (`surface-markers.js`) and subtle sphere
- * drop-shadow/rim lighting (`focus-layer.js`). Keeps pin labels hidden on the map per `AGENTS.md`
- * while exposing full screen-reader semantics for every visible pin and cluster.
- */
 @Composable
-internal fun WorldPinOverlay(
-    controller: NativeWorldController,
-    modifier: Modifier = Modifier,
-) {
-    val density = LocalDensity.current.density.coerceAtLeast(1f)
-    val motion = LocalPhysicalMotion.current
-    val pulseTick = controller.selectionPulseTick
-    val pulse = remember { Animatable(1f) }
-    LaunchedEffect(pulseTick, motion) {
-        if (motion && pulseTick > 0) {
-            pulse.snapTo(0f)
-            pulse.animateTo(1f, tween(durationMillis = 360, easing = LinearEasing))
-        }
+internal fun WorldGlobeLighting(controller: NativeWorldController, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current.density
+    Canvas(modifier) {
+        val bounds = controller.activeGlobeBounds
+        val zoom = controller.hudState.zoom
+        if (controller.hasVisual && bounds != null && zoom < 4.0) drawGlobeShadowAndRim(bounds, zoom, density)
     }
-    val pinLabels by remember(controller) {
-        derivedStateOf {
-            controller.visiblePins.map { it.key to it.name }.sortedBy { it.first }
-        }
+}
+
+internal fun renderWorldPinArtwork(
+    density: Float,
+    snapToStreet: Boolean,
+    visited: Boolean = false,
+    selected: Boolean = false,
+    cluster: Boolean = false,
+    showClusterText: Boolean = false,
+): Bitmap {
+    val bitmapSize = (60f * density).roundToInt()
+    val center = bitmapSize / 2f
+    val bitmap = Bitmap.createBitmap(bitmapSize, bitmapSize, Bitmap.Config.ARGB_8888)
+    val zoom = if (snapToStreet) 11.0 else if (showClusterText) 3.0 else 1.0
+    val pointRadius = if (snapToStreet) 6.4f else 5.0f
+    val radius = if (cluster) 7.6f else if (selected) pointRadius + 2.4f else pointRadius
+    val stem = if (snapToStreet) {
+        if (cluster) 5.5f else if (selected) 16.5f else 11.5f
+    } else {
+        if (selected) 3.3f else 1.8f
     }
-
-    val countPaint = remember(density) {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
-        }
+    val artwork = ProjectedPin(
+        key = "", placeId = null, clusterId = null, name = "", pointCount = if (cluster) 2 else 0,
+        visited = visited, isSelected = selected, x = center, y = center,
+        hx = center, hy = center - stem * density, radius = radius, ratio = 1f, angle = 0f,
+        face = 1f, stand = if (snapToStreet) 1f else 0f, opacity = 1f, light = 1f,
+        highlight = 0f, lat = 0.0, lon = 0.0,
+    )
+    val countPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create("sans-serif", Typeface.BOLD)
     }
-
-    Box(modifier) {
-        Canvas(Modifier.fillMaxSize()) {
-            val pins = controller.visiblePins
-            val zoom = controller.pinZoom
-            val globeBounds = controller.activeGlobeBounds
-            if (globeBounds != null && zoom < 4.0 && globeBounds.radius > 4f) {
-                drawGlobeShadowAndRim(globeBounds, zoom, density)
-            }
-
-            val selectionAnimProgress = if (motion) pulse.value else 1f
-            for (i in pins.lastIndex downTo 0) {
-                drawEnamelPin(
-                    pin = pins[i],
-                    zoom = zoom,
-                    density = density,
-                    selectionProgress = selectionAnimProgress,
-                    motion = motion,
-                    countPaint = countPaint,
-                )
-            }
-        }
-
-        // Accessibility-only nodes: zero pointer interception so gestures flow straight to MapView.
-        val touchSize = 44.dp
-        val halfTouchPx = touchSize.value * density / 2
-        for ((id, name) in pinLabels) {
-            key(id) {
-                Box(
-                    Modifier
-                        .offset {
-                            val pin = controller.visiblePins.firstOrNull { it.key == id }
-                            if (pin == null) IntOffset.Zero else IntOffset(
-                                (pin.hx - halfTouchPx).roundToInt(),
-                                (pin.hy - halfTouchPx).roundToInt(),
-                            )
-                        }
-                        .size(touchSize)
-                        .semantics {
-                            contentDescription = name
-                            role = Role.Button
-                            onClick(label = name) {
-                                val pin = controller.visiblePins.firstOrNull { it.key == id }
-                                if (pin != null) controller.handlePinAccessibilityClick(pin)
-                                pin != null
-                            }
-                        }
-                )
-            }
-        }
+    CanvasDrawScope().draw(
+        Density(density),
+        LayoutDirection.Ltr,
+        GraphicsCanvas(bitmap.asImageBitmap()),
+        Size(bitmapSize.toFloat(), bitmapSize.toFloat()),
+    ) {
+        drawEnamelPin(artwork, zoom, density, 1f, false, countPaint, drawClusterCount = false)
     }
+    return bitmap
 }
 
 private fun DrawScope.drawGlobeShadowAndRim(bounds: GlobeBounds, zoom: Double, density: Float) {
@@ -200,6 +152,7 @@ private fun DrawScope.drawEnamelPin(
     selectionProgress: Float,
     motion: Boolean,
     countPaint: Paint,
+    drawClusterCount: Boolean,
 ) {
     val opacity = pin.opacity
     val stand = pin.stand
@@ -397,7 +350,7 @@ private fun DrawScope.drawEnamelPin(
                 center = headCenter,
             )
         }
-        if (numOpacity > 0.04f) {
+        if (drawClusterCount && numOpacity > 0.04f) {
             val fontScale = when {
                 pin.pointCount >= 100 -> 0.78f
                 pin.pointCount >= 10 -> 0.88f

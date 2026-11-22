@@ -358,6 +358,8 @@ import org.json.JSONObject
                     AccountParagraph("在音乐中发现地点，留下自己的足迹。")
                 }
                 AccountSection("01","地图与许可") {
+                    AboutSource("Mapbox","世界地图引擎、街道数据与署名","https://docs.mapbox.com/help/dive-deeper/attribution/")
+                    HorizontalDivider(color=RoomColors.Line)
                     AboutSource("MapTiler","底图服务与版权说明","https://www.maptiler.com/copyright/")
                     HorizontalDivider(color=RoomColors.Line)
                     AboutSource("OpenStreetMap","地图数据许可说明","https://www.openstreetmap.org/copyright")
