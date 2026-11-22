@@ -590,15 +590,21 @@ internal class NativeWorldController(
     ) {
         val nextSelected = selection?.placeId?.takeIf { id -> entries.any { it.place.id == id } }.orEmpty()
         val nextSummary = nextSelected.isNotEmpty() && selection?.summaryOpen == true
+        val nextSummaryHeight = when {
+            !nextSummary -> 0
+            summaryHeightPx > 0 -> summaryHeightPx
+            summaryOpen && selectedId == nextSelected -> summaryHeight // The same summary is awaiting layout on return.
+            else -> 0
+        }
         val dataChanged = this.entries !== entries || this.visits != visits || selectedId != nextSelected
-        val paddingChanged = summaryOpen != nextSummary || summaryHeight != summaryHeightPx
+        val paddingChanged = summaryOpen != nextSummary || summaryHeight != nextSummaryHeight
         this.entries = entries
         if (dataChanged) byId = entries.associateBy { it.place.id }
         this.visits = visits
         if (selectedId != nextSelected) updateSelectionRing(null)
         selectedId = nextSelected
         summaryOpen = nextSummary
-        summaryHeight = summaryHeightPx
+        summaryHeight = nextSummaryHeight
         if (paddingChanged) positionMapCredits()
         if (motionEnabled && !motion) cameraTarget?.let { target ->
             val completingSelection = focusingSelection
@@ -685,6 +691,13 @@ internal class NativeWorldController(
             cameraTarget = null
             mapView.camera.cancelAllAnimators()
         }
+    }
+
+    fun holdCameraForDetail(focusToken: Long?) {
+        if (focusToken != null) lastAppliedFocusToken = maxOf(lastAppliedFocusToken, focusToken)
+        pendingFocus = null
+        cancelCameraAnimation()
+        onCameraSettled()
     }
 
     private fun finishSelectionFocus() {

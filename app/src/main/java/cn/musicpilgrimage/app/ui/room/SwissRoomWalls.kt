@@ -100,6 +100,10 @@ internal val SwissWallMuted=cn.musicpilgrimage.app.design.AppArt.WallMuted
         worldSelection=WorldSelection(id,true)
         worldFocus=WorldFocus(id,kind,++worldFocusToken)
     }
+    fun holdWorldCameraForDetail() {
+        worldController?.holdCameraForDetail(worldFocus?.token)
+        worldFocus=null
+    }
     fun closeWorldSummary(){worldSelection=worldSelection?.copy(summaryOpen=false)}
     fun reopenWorldSummary(id:String){if(worldSelection?.placeId==id)worldSelection=WorldSelection(id,true)}
     fun page(value:Int){shelfPage=value.coerceAtLeast(0);prefs.edit().putInt("shelf-page",shelfPage).apply()}

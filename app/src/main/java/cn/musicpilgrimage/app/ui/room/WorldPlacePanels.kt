@@ -267,7 +267,7 @@ internal fun WorldPlaceSummary(
                         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             if (art.isNotBlank()) {
-                                var resolvedRatio by remember(scene.id, art) {
+                                var resolvedRatio by rememberSaveable(scene.id, art) {
                                     mutableFloatStateOf(scene.aspectRatio.coerceIn(0.65f, 1.85f))
                                 }
                                 val widthDp = (78f * resolvedRatio).coerceAtMost(120f)

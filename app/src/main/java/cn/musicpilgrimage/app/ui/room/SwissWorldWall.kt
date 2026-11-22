@@ -300,7 +300,10 @@ internal fun SwissWorldWall(
             onFavorite = onFavorite,
             onAround = { browse.focusWorld(it, WorldFocusKind.Street) },
             onAdd = onAdd,
-            onDetail = onPlace,
+            onDetail = { id ->
+                browse.holdWorldCameraForDetail()
+                onPlace(id)
+            },
         )
 
         chooser?.takeIf { active }?.let { ids ->

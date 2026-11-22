@@ -5,6 +5,10 @@ import android.graphics.Color
 import android.graphics.SurfaceTexture
 import android.os.SystemClock
 import android.view.TextureView
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -12,15 +16,18 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.core.view.descendants
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import cn.musicpilgrimage.app.ui.room.NativeWorldController
 import cn.musicpilgrimage.app.ui.room.WorldTestRegistry
+import com.mapbox.maps.CameraState
 import com.mapbox.maps.RenderedQueryGeometry
 import com.mapbox.maps.RenderedQueryOptions
 import com.mapbox.maps.ScreenBox
 import com.mapbox.maps.ScreenCoordinate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -126,6 +133,57 @@ class WorldRenderingDeviceTest {
         assertEquals(street.longitude, restored.longitude, 0.01)
         assertEquals(street.latitude, restored.latitude, 0.01)
         assertEquals(street.zoom, restored.zoom, 0.005)
+    }
+
+    @Test
+    fun returningFromPlaceDetailKeepsTheGlobeCameraAndSummary() {
+        val controller = openWorld()
+        val map = controller.mapView.mapboxMap
+        compose.onNodeWithTag("world-place-list").performClick()
+        compose.onNodeWithTag("world-place-query").performTextInput("府中竞马")
+        compose.onNodeWithTag("world-place-option-fuchukeiba-seimon-mae-station").performClick()
+        compose.waitUntil(8_000) {
+            compose.runOnUiThread {
+                controller.diagnostics().let { it.summaryOpen && it.zoom >= 10.9 && !it.moving }
+            }
+        }
+        val summary = compose.onNodeWithTag("world-summary-title")
+        val selectedTitle = summary.fetchSemanticsNode().config[SemanticsProperties.Text].single().text
+        val openDetail = requireNotNull(compose.onNodeWithTag("world-summary-detail")
+            .fetchSemanticsNode().config[SemanticsActions.OnClick].action)
+        val before = compose.runOnUiThread {
+            controller.jumpTo(29.0, 122.0, 2.2)
+            map.cameraState
+        }
+        assertTrue("The summary must have a measured camera inset", before.padding.bottom > 0.0)
+        val changed = mutableListOf<CameraState>()
+        val subscription = compose.runOnUiThread { map.subscribeCameraChanged { changed.add(it.cameraState) } }
+        try {
+            compose.runOnUiThread {
+                controller.zoomTo(3.5, durationMs = 600)
+                assertTrue(controller.hasPendingCameraTarget())
+                assertTrue(openDetail())
+                assertFalse(controller.hasPendingCameraTarget())
+            }
+            compose.onNodeWithTag("room-place-detail").assertIsDisplayed()
+            compose.waitUntil(5_000) { WorldTestRegistry.activeController == null }
+            Espresso.pressBack()
+            compose.onNodeWithTag("world-place-summary").assertIsDisplayed()
+            summary.assertTextEquals(selectedTitle)
+            // Include the full window in which summary measurement can restart camera padding.
+            SystemClock.sleep(350)
+            val frames = compose.runOnUiThread { changed.toList() + map.cameraState }
+            frames.forEachIndexed { index, frame ->
+                assertEquals("Camera longitude at frame $index", before.center.longitude(), frame.center.longitude(), .00001)
+                assertEquals("Camera latitude at frame $index", before.center.latitude(), frame.center.latitude(), .00001)
+                assertEquals("Camera zoom at frame $index", before.zoom, frame.zoom, .00001)
+                assertEquals("Camera direction at frame $index", before.bearing, frame.bearing, .00001)
+                assertEquals("Camera tilt at frame $index", before.pitch, frame.pitch, .00001)
+                assertEquals("Camera padding at frame $index", before.padding.bottom, frame.padding.bottom, .5)
+            }
+        } finally {
+            compose.runOnUiThread { subscription.cancel() }
+        }
     }
 
     private fun mapTexture(controller: NativeWorldController): SurfaceTexture = compose.runOnUiThread {
