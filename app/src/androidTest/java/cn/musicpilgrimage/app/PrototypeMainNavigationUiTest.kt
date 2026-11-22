@@ -228,6 +228,49 @@ class PrototypeMainNavigationUiTest {
     }
 
     @ExtendedDeviceTest
+    @Test
+    fun archiveLinksOpenTheSelectedPlaceAndReturnToTheRightArchive() {
+        openWorld()
+        chooseWorldPlace("Susan说", "taipei-city-reference")
+        compose.onNodeWithTag("world-summary-detail").performClick()
+        val placeTitle = compose.onNodeWithTag("place-archive-title")
+        placeTitle.assertTextEquals("台北")
+
+        fun link(label: String) = compose.onNode(hasText(label) and hasClickAction())
+        link("Susan说").performScrollTo().performClick()
+        val workTitle = compose.onNodeWithTag("work-archive-title")
+        workTitle.assertTextEquals("Susan说")
+
+        for (place in listOf("南京", "洪洞县")) {
+            val row = link(place)
+            row.performScrollTo().performClick()
+            placeTitle.assertTextEquals(place)
+            Espresso.pressBack()
+            workTitle.assertTextEquals("Susan说")
+            row.assertIsDisplayed()
+        }
+
+        val release = link("发行详情")
+        release.performScrollTo().performClick()
+        val releaseTitle = compose.onNodeWithTag("release-archive-title")
+        releaseTitle.assertTextEquals("太平盛世")
+        val nanjing = link("南京")
+        nanjing.performScrollTo().performClick()
+        placeTitle.assertTextEquals("南京")
+        Espresso.pressBack()
+        releaseTitle.assertTextEquals("太平盛世")
+        nanjing.assertIsDisplayed()
+
+        link("Susan说").performScrollTo().performClick()
+        workTitle.assertTextEquals("Susan说")
+        link("台北").performScrollTo().performClick()
+        placeTitle.assertTextEquals("台北")
+        link("Susan说").assertIsDisplayed()
+        Espresso.pressBack()
+        compose.onNodeWithTag("world-place-summary").assertIsDisplayed()
+    }
+
+    @ExtendedDeviceTest
     @Test fun worldAndPlaceArchivesShowCanonicalLocationAndReviewedFilmPreview() {
         openWorld()
         chooseWorldPlace("大屿山")

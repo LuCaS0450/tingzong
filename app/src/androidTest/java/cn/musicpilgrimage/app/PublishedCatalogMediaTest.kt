@@ -1,8 +1,11 @@
 package cn.musicpilgrimage.app
 
+import android.content.Context
+import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import cn.musicpilgrimage.app.data.*
 import cn.musicpilgrimage.app.ui.room.SwissDetailMedia
+import cn.musicpilgrimage.app.ui.room.archiveConnections
 import cn.musicpilgrimage.app.ui.room.placeArchiveTargets
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -13,10 +16,67 @@ import java.util.zip.GZIPInputStream
 
 @ExtendedDeviceTest
 class PublishedCatalogMediaTest {
+    private fun bundledPublicCatalog(context: Context): Catalog {
+        val raw=context.assets.open("catalog.json").bufferedReader().use{catalogFromJson(JSONObject(it.readText()))}
+        return BundledCatalogMedia(context).apply(BundledCatalogCorrections(context).apply(raw)).publicOnly()
+    }
+
+    @Test fun bundledArchiveLinksResolveToTheirOwnRecords() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val catalog = bundledPublicCatalog(context)
+        val music = MusicCatalogue.from(catalog)
+        val places = catalog.places.associateBy(Place::id)
+        val releases = music.releases.associateBy(MusicRelease::id)
+        val works = music.works.associateBy(MusicWork::id)
+        assertEquals(catalog.places.size, places.size)
+        assertEquals(music.releases.size, releases.size)
+        assertEquals(music.works.size, works.size)
+
+        fun checkPlaceLinks(source: String, links: List<MusicPlaceLink>) {
+            assertEquals(source, links.size, links.distinctBy { it.place.id }.size)
+            for (link in links) {
+                val place = places.getValue(link.place.id)
+                assertEquals("$source → ${link.place.id}", place, link.place)
+                assertTrue(place.scenes.containsAll(link.scenes))
+            }
+        }
+        for (release in releases.values) {
+            checkPlaceLinks(release.id, release.places)
+            for (work in release.works) {
+                assertEquals(work, works.getValue(work.id))
+                assertEquals(release.id, work.releaseId)
+            }
+        }
+        for (work in works.values) {
+            checkPlaceLinks(work.id, work.places)
+            assertTrue(releases.getValue(work.releaseId).works.any { it.id == work.id })
+        }
+
+        var linksFromPlaces = 0
+        for (place in places.values) {
+            val targets = music.placeArchiveTargets(place.id)
+            val groups = place.archiveConnections(emptySet(), targets) { null }.objects()
+            val rows = groups.flatMap { it.getJSONArray("rows").objects() }
+            for (row in rows) {
+                val action = row.optString("actionId")
+                if (action.isBlank()) continue
+                val target = targets.getValue(action)
+                val links = if (target.isRelease) releases.getValue(target.id).places else works.getValue(target.id).places
+                assertTrue("${place.id} → ${target.id}", links.any { link ->
+                    link.place.id == place.id && link.scenes.any { it.id == action }
+                })
+                assertEquals(target.title, row.getString("work"))
+                linksFromPlaces++
+            }
+        }
+        Log.i("ArchiveNavigationAudit", "${places.size} places, ${releases.size} releases, ${works.size} works, " +
+            "${releases.values.sumOf { it.places.size }} release–place links, " +
+            "${works.values.sumOf { it.places.size }} work–place links, $linksFromPlaces clickable links from places")
+    }
+
     @Test fun archiveReusesTheReviewedSoundtrackImagesFromWorld() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
-        val raw=context.assets.open("catalog.json").bufferedReader().use{catalogFromJson(JSONObject(it.readText()))}
-        val catalog=BundledCatalogMedia(context).apply(BundledCatalogCorrections(context).apply(raw)).publicOnly()
+        val catalog=bundledPublicCatalog(context)
         val music=MusicCatalogue.from(catalog)
         val media=SwissDetailMedia(context)
         val referenceKinds=setOf("film_preview","film_frame","soundtrack_mv_frame")

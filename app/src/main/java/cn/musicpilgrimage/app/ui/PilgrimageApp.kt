@@ -51,7 +51,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NamedNavArgument
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
@@ -70,6 +69,19 @@ import org.json.JSONObject
 
 private const val PlaceArchiveEntry = "place-archive-entry"
 private class SavedNotice(val message: String, val destination: String?)
+
+private val RouteParameterPattern = Regex("""\{(\w+)\}""")
+
+internal fun NavGraphBuilder.appDestination(
+ route: String,
+ content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit,
+) {
+ // Navigation compares back-stack argument values only when their types are declared.
+ val arguments = RouteParameterPattern.findAll(route).map { match ->
+  navArgument(match.groupValues[1]) { type = NavType.StringType }
+ }.toList()
+ composable(route,arguments=arguments,content=content)
+}
 
 @Composable private fun NativeWallTab(section:Int,onSearch:()->Unit,content:@Composable ()->Unit) {
  Column(Modifier.fillMaxSize()) {
@@ -366,10 +378,12 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    LaunchedEffect(entry?.id) {if(addTripEntry!=null&&addTripEntry!=entry?.id)closeAddTrip()}
    val musicFavorites=storedMusicFavorites.takeIf{it.owner==libraryOwner} ?: MusicFavorites()
    val archiveState=storedArchive.takeIf{it.owner==owner} ?: MusicArchiveState(owner=owner,loading=owner!=null)
+   fun findBackStackEntry(path:String)=try { nav.getBackStackEntry(path) }catch(_:IllegalArgumentException){ null }
    fun navigateTo(path:String,placeEntry:Bundle?=null,useThumbnail:Boolean=false) {
-    if(runCatching{nav.getBackStackEntry(path).id}.getOrNull()==nav.currentBackStackEntry?.id)return
-    val anchor=if(motion&&useThumbnail)detailZoom.capture(nav.currentBackStackEntry?.id,path)else null
-    focus.clearFocus();keyboard?.hide();nav.navigate(path){launchSingleTop=true}
+    val current=nav.currentBackStackEntry?:return
+    if(findBackStackEntry(path)?.id==current.id)return
+    val anchor=if(motion&&useThumbnail)detailZoom.capture(current.id,path)else null
+    focus.clearFocus();keyboard?.hide();nav.navigate(path)
     nav.currentBackStackEntry?.let { target ->
      if(placeEntry!=null)target.savedStateHandle[PlaceArchiveEntry]=placeEntry
      if(anchor!=null)detailZoom.bind(target,anchor)
@@ -378,9 +392,13 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    val navigate:(String)->Unit={navigateTo(it)}
    fun followMusicArchiveLink(source:NavBackStackEntry,target:String,origin:Bundle?=null,useThumbnail:Boolean=false) {
     if(nav.currentBackStackEntry!=source)return
-    if(runCatching{nav.getBackStackEntry(target)}.getOrNull()!=null) {
-     nav.popBackStack(target,inclusive=false)
-    }else navigateTo(target,origin,useThumbnail)
+    if(!nav.popBackStack(target,inclusive=false))navigateTo(target,origin,useThumbnail)
+   }
+   fun replaceLegacyRoute(source:NavBackStackEntry,target:String) {
+    if(nav.currentBackStackEntry!=source)return
+    val existing=findBackStackEntry(target)
+    if(existing!=null&&existing.id==nav.previousBackStackEntry?.id)nav.popBackStack()
+    else nav.navigate(target){popUpTo(source.destination.id){inclusive=true}}
    }
    fun openArchivePlace(source:NavBackStackEntry,id:String,links:List<MusicPlaceLink>) {
     if(nav.currentBackStackEntry!=source)return
@@ -419,7 +437,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
     else if(profile?.optString("nickname").orEmpty().length<2){pendingForm="form/$kind/${Uri.encode(target)}";navigate("edit-profile")}
     else {nav.currentBackStackEntry?.savedStateHandle?.set("editing",item?.raw?.toString().orEmpty());navigate("form/$kind/${Uri.encode(target)}")}
    }
-   val openProfile:(String)->Unit={if(owner==null)login() else navigate("profile/$it")}
+   val openProfile:(String)->Unit={if(owner==null)login() else navigate("profile/${Uri.encode(it)}")}
    // Cold-start callbacks can arrive before NavHost installs its graph.
    LaunchedEffect(recovery,navigationReady){if(recovery&&navigationReady){authPending=true;navigate("auth")}}
    LaunchedEffect(openAuth,navigationReady){if(openAuth&&navigationReady){authPending=true;navigate("auth");session.openAuth.value=false}}
@@ -509,10 +527,10 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    var detailTransition by remember{mutableStateOf<DetailNavigationTransition?>(null)}
 
    fun NavGraphBuilder.page(
-    path:String,arguments:List<NamedNavArgument> = emptyList(),
+    path:String,
     content:@Composable AnimatedContentScope.(NavBackStackEntry)->Unit,
    ) {
-    composable(path,arguments=arguments){destination->
+    appDestination(path){destination->
      val detail=detailTransition?.takeIf{motion&&(destination.id==it.top||destination.id==it.under)}
      val moving=transition.currentState!=transition.targetState
      val slide=motion&&transitionMotion==AppRouteMotion.Detail&&!transitionUseMorph&&detail==null
@@ -649,7 +667,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
      }) {
      page("room"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
      page("catalogue"){NativeWallTab(0,{navigate("search")}){SwissRecordWall(musicCatalog,wallBrowse,openRelease)}}
-     page("album/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
+     page("album/{id}"){e->musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.let {release->
       AlbumArchiveRoute(
        entry=e,
        release=release,
@@ -667,11 +685,11 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
      }}
      page("search"){RoomSearch(musicCatalog){navigateTo("song/${Uri.encode(it.id)}",useThumbnail=true)}}
      page("release-search/{id}"){e->RoomSearch(musicCatalog,musicCatalog.releases.find{it.id==e.arguments?.getString("id")}?.title.orEmpty()){navigateTo("song/${Uri.encode(it.id)}",useThumbnail=true)}}
-     composable("music-favorites/{kind}"){e->
+     appDestination("music-favorites/{kind}"){e->
       val kind=if(e.arguments?.getString("kind")=="releases")"releases" else "songs"
-      LaunchedEffect(kind){nav.navigate("archive/$kind"){popUpTo("music-favorites/{kind}"){inclusive=true};launchSingleTop=true}}
+      LaunchedEffect(e.id,kind){replaceLegacyRoute(e,"archive/$kind")}
      }
-     page("song/{id}",arguments=listOf(navArgument("id"){type=NavType.StringType})){e->musicCatalog.works.find{it.id==e.arguments?.getString("id")}?.let {work->
+     page("song/{id}"){e->musicCatalog.works.find{it.id==e.arguments?.getString("id")}?.let {work->
       LaunchedEffect(work.id,libraryOwner){music.browseWork(work.id)}
       RoomSong(work,musicCatalog.releases.find{it.id==work.releaseId}?.title.orEmpty(),work.id in musicFavorites.songs,{music.toggleFavorite(work.id)},
        {openArchivePlace(e,it,work.places)},
@@ -714,7 +732,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
      }
      // Resolve saved navigation stacks from versions that still had these screens.
      listOf("library" to "me","archive-more" to "archive/footprints","account-scores" to "me","account-publications" to "submissions","account-badges" to "me").forEach { (old,destination)->
-      composable(old){LaunchedEffect(Unit){nav.navigate(destination){popUpTo(old){inclusive=true};launchSingleTop=true}}}
+      appDestination(old){e->LaunchedEffect(e.id){replaceLegacyRoute(e,destination)}}
      }
      page("archive/{kind}"){e->key(libraryOwner) {
       val kind=e.arguments?.getString("kind").orEmpty()
@@ -766,11 +784,11 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
       RoomAccountInfo(kind,session.services.accountEmail(owner),owner!=null,sessionBusy,sessionError,
        {session.deleteAccount{if(!requireAccount)nav.navigate("auth"){popUpTo(nav.graph.id){inclusive=true}}}},login)
      }}
-     composable("mine/{kind}"){e->
+     appDestination("mine/{kind}"){e->
       val kind=e.arguments?.getString("kind")
-      LaunchedEffect(kind) {
+      LaunchedEffect(e.id,kind) {
        val destination=when(kind){"visit"->"archive/footprints";"recreation"->"archive/recreations";"message"->"archive/messages";else->"me"}
-       nav.navigate(destination){popUpTo("mine/{kind}"){inclusive=true};launchSingleTop=true}
+       replaceLegacyRoute(e,destination)
       }
      }
      page("profile/{id}"){profileScreen(it.arguments?.getString("id").orEmpty())}
