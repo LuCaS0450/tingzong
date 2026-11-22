@@ -355,6 +355,9 @@ internal class NativeWorldController(
     private var artwork: Map<String, Bitmap> = emptyMap()
     private var firstFrameSubscription: Cancelable? = null
     private var exposeAccessiblePins = false
+    private var lastPinDepthLat = Double.NaN
+    private var lastPinDepthLon = Double.NaN
+    private var lastPinDepthZoom = Double.NaN
 
     val mapView: MapView
     private val map: MapboxMap
@@ -545,9 +548,13 @@ internal class NativeWorldController(
             WorldMapboxPins.installArtwork(loaded, artwork, density)
             WorldMapboxPins.updateData(loaded, entries, selectedId, visits)
             WorldMapboxPins.setSelectionRingVisible(loaded, selectionRingZoom != null)
+            lastPinDepthLat = Double.NaN
+            lastPinDepthLon = Double.NaN
+            lastPinDepthZoom = Double.NaN
             ready = true
             // Bind the tile cover to the measured viewport and the restored camera.
             map.setCamera(camera)
+            syncPinGlobeDepth(map.cameraState, force = true)
             map.triggerRepaint()
             syncHud(map.cameraState)
             scheduleStreetCheck()
@@ -743,6 +750,7 @@ internal class NativeWorldController(
 
     private fun syncHud(camera: CameraState) {
         if (stageWidth <= 0 || stageHeight <= 0) return
+        syncPinGlobeDepth(camera, force = false)
         val zoom = camera.zoom
         if (!focusingSelection) selectionRingZoom?.let { previous ->
             if (zoom < previous - 0.025) updateSelectionRing(null)
@@ -805,6 +813,26 @@ internal class NativeWorldController(
         val visibility = Value.valueOf(if (visible) "visible" else "none")
         currentStyle.setStyleLayerProperty("earth-base", "visibility", visibility)
         currentStyle.setStyleLayerProperty("earth", "visibility", visibility)
+    }
+
+    private fun syncPinGlobeDepth(camera: CameraState, force: Boolean) {
+        val currentStyle = style ?: return
+        val lat = camera.center.latitude()
+        val lon = WorldMapMath.wrapLongitude(camera.center.longitude())
+        val zoom = camera.zoom
+        if (!force && !lastPinDepthZoom.isNaN()) {
+            val wasFlat = lastPinDepthZoom >= 4.2
+            val isFlat = zoom >= 4.2
+            if (wasFlat && isFlat) return
+            val latDelta = abs(lat - lastPinDepthLat)
+            val lonDelta = abs(WorldMapMath.wrapLongitude(lon - lastPinDepthLon))
+            val zoomDelta = abs(zoom - lastPinDepthZoom)
+            if (wasFlat == isFlat && latDelta < 2.0 && lonDelta < 2.0 && zoomDelta < 0.06) return
+        }
+        lastPinDepthLat = lat
+        lastPinDepthLon = lon
+        lastPinDepthZoom = zoom
+        WorldMapboxPins.updateGlobeDepth(currentStyle, lat, lon, zoom)
     }
 
     private fun scheduleStreetCheck(delay: Long = 90) {

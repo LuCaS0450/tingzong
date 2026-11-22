@@ -8,15 +8,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Canvas as GraphicsCanvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -46,10 +49,13 @@ internal fun WorldGlobeLighting(controller: NativeWorldController, modifier: Mod
         }
 
         // The overview lighting stays fixed while the texture rotates beneath it.
-        val left = floor(bounds.x - bounds.radius - 2f)
-        val top = floor(bounds.y - bounds.radius - 2f)
-        val width = ceil(2f * bounds.radius + 5f).toInt()
-        val height = ceil(2f * bounds.radius + 28f * density + 5f).toInt()
+        val padH = ceil(max(24f * density, bounds.radius * 0.24f))
+        val padTop = ceil(16f * density)
+        val padBottom = ceil(56f * density)
+        val left = floor(bounds.x - bounds.radius - padH)
+        val top = floor(bounds.y - bounds.radius - padTop)
+        val width = ceil(2f * bounds.radius + 2f * padH + 2f).toInt()
+        val height = ceil(2f * bounds.radius + padTop + padBottom + 2f).toInt()
         val lighting = ImageBitmap(width, height)
         CanvasDrawScope().draw(this, layoutDirection, GraphicsCanvas(lighting), Size(width.toFloat(), height.toFloat())) {
             drawGlobeShadowAndRim(bounds.copy(x = bounds.x - left, y = bounds.y - top), zoom, density)
@@ -120,27 +126,112 @@ internal fun renderWorldSelectionRing(density: Float): Bitmap {
     return bitmap
 }
 
-private fun DrawScope.drawGlobeShadowAndRim(bounds: GlobeBounds, zoom: Double, density: Float) {
-    val r = (bounds.radius - WorldMapMath.globeClipInsetPx(density)).coerceAtLeast(1f)
-    val shadowAlpha = ((3.2 - zoom) / 2.0).toFloat().coerceIn(0f, 1f)
-    if (shadowAlpha > 0.01f) {
-        val shadowW = r * 1.24f
-        val shadowH = 28f * density
-        val sx = bounds.x + r * 0.16f
-        val sy = bounds.y + r + 14f * density
+/**
+ * Map-aligned ground contact shadow projected onto the tangent plane of the 3D globe.
+ * Stretches along the bottom-right direction to match the fixed top-left (315 deg) key light.
+ */
+internal fun renderWorldPinContactShadow(
+    density: Float,
+    cluster: Boolean = false,
+    selected: Boolean = false,
+): Bitmap {
+    val bitmap = worldPinBitmap(density)
+    val bitmapSize = bitmap.width
+    val center = bitmapSize / 2f
+    CanvasDrawScope().draw(
+        Density(density),
+        LayoutDirection.Ltr,
+        GraphicsCanvas(bitmap.asImageBitmap()),
+        Size(bitmapSize.toFloat(), bitmapSize.toFloat()),
+    ) {
+        val coreR = (if (selected) 5.6f else if (cluster) 5.2f else 3.8f) * density
+        val castRx = (if (selected) 9.0f else if (cluster) 7.4f else 5.6f) * density
+        val castRy = castRx * 0.60f
+        val castOffset = (if (selected) 3.4f else if (cluster) 2.6f else 2.0f) * density
+
+        // Directional cast shadow angled bottom-right from top-left key light.
         withTransform({
-            translate(sx, sy)
-            scale(scaleX = 1f, scaleY = shadowH / max(1f, shadowW), pivot = Offset.Zero)
+            translate(center + castOffset, center + castOffset * 1.06f)
+            rotate(42f, pivot = Offset.Zero)
+            scale(scaleX = 1f, scaleY = castRy / max(1f, castRx), pivot = Offset.Zero)
         }) {
             drawCircle(
                 brush = Brush.radialGradient(
-                    0f to Color(0x6235454B).copy(alpha = 0.38f * shadowAlpha),
-                    0.44f to Color(0x3035454B).copy(alpha = 0.19f * shadowAlpha),
-                    0.74f to Color.Transparent,
+                    0f to Color(0xFF0A151B).copy(alpha = if (selected) 0.42f else 0.34f),
+                    0.52f to Color(0xFF0D1B22).copy(alpha = if (selected) 0.18f else 0.14f),
+                    1f to Color.Transparent,
                     center = Offset.Zero,
-                    radius = shadowW * 0.5f,
+                    radius = castRx,
                 ),
-                radius = shadowW * 0.5f,
+                radius = castRx,
+                center = Offset.Zero,
+            )
+        }
+
+        // Tighter ambient-occlusion contact pool right where the pin meets the globe surface.
+        drawCircle(
+            brush = Brush.radialGradient(
+                0f to Color(0xFF071014).copy(alpha = if (selected) 0.54f else 0.46f),
+                0.55f to Color(0xFF0A161B).copy(alpha = if (selected) 0.24f else 0.18f),
+                1f to Color.Transparent,
+                center = Offset(center + 0.6f * density, center + 0.7f * density),
+                radius = coreR,
+            ),
+            radius = coreR,
+            center = Offset(center + 0.6f * density, center + 0.7f * density),
+        )
+    }
+    return bitmap
+}
+
+private fun DrawScope.drawGlobeShadowAndRim(bounds: GlobeBounds, zoom: Double, density: Float) {
+    // Match the rendered Mapbox globe silhouette closely so the inner Fresnel rim seals cleanly with no dark hairline seam.
+    val r = (bounds.radius + 0.35f * density).coerceAtLeast(1f)
+    val c = Offset(bounds.x, bounds.y)
+
+    // 1. Two-layer floating ground shadow (top-left key light -> shadow offsets subtly to bottom-right).
+    val shadowAlpha = ((3.2 - zoom) / 2.0).toFloat().coerceIn(0f, 1f)
+    if (shadowAlpha > 0.01f) {
+        // Soft wide penumbra.
+        val penumbraW = r * 1.46f
+        val penumbraH = 34f * density
+        val px = bounds.x + r * 0.13f
+        val py = bounds.y + r + 15f * density
+        withTransform({
+            translate(px, py)
+            scale(scaleX = 1f, scaleY = penumbraH / max(1f, penumbraW), pivot = Offset.Zero)
+        }) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to Color(0xFF283438).copy(alpha = 0.24f * shadowAlpha),
+                    0.46f to Color(0xFF283438).copy(alpha = 0.11f * shadowAlpha),
+                    0.82f to Color.Transparent,
+                    center = Offset.Zero,
+                    radius = penumbraW * 0.5f,
+                ),
+                radius = penumbraW * 0.5f,
+                center = Offset.Zero,
+            )
+        }
+
+        // Tighter core umbra grounding the physical sphere above the Swiss paper surface.
+        val umbraW = r * 0.84f
+        val umbraH = 14f * density
+        val ux = bounds.x + r * 0.07f
+        val uy = bounds.y + r + 10f * density
+        withTransform({
+            translate(ux, uy)
+            scale(scaleX = 1f, scaleY = umbraH / max(1f, umbraW), pivot = Offset.Zero)
+        }) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to Color(0xFF1A2326).copy(alpha = 0.36f * shadowAlpha),
+                    0.48f to Color(0xFF1A2326).copy(alpha = 0.16f * shadowAlpha),
+                    0.86f to Color.Transparent,
+                    center = Offset.Zero,
+                    radius = umbraW * 0.5f,
+                ),
+                radius = umbraW * 0.5f,
                 center = Offset.Zero,
             )
         }
@@ -148,36 +239,118 @@ private fun DrawScope.drawGlobeShadowAndRim(bounds: GlobeBounds, zoom: Double, d
 
     val lightStrength = ((4.0 - zoom) / 2.8).toFloat().coerceIn(0f, 1f)
     if (lightStrength > 0.01f) {
-        val c = Offset(bounds.x, bounds.y)
-        // Subtle fixed top-left specular bloom and bottom-right curvature shading inside the clipped sphere.
-        drawCircle(
-            brush = Brush.radialGradient(
-                0f to Color.White.copy(alpha = 0.06f * lightStrength),
-                0.55f to Color.Transparent,
-                center = Offset(bounds.x - r * 0.34f, bounds.y - r * 0.38f),
-                radius = r * 0.95f,
-            ),
-            radius = r,
-            center = c,
-        )
+        // Subtle outer atmospheric softening against the warm-white paper background.
+        val outerHaloR = r + 5.5f * density
+        val innerStop = (r / outerHaloR).coerceIn(0.8f, 0.99f)
         drawCircle(
             brush = Brush.radialGradient(
                 0f to Color.Transparent,
-                0.68f to Color.Transparent,
-                1.0f to Color(0xFF1A2629).copy(alpha = 0.16f * lightStrength),
-                center = Offset(bounds.x - r * 0.28f, bounds.y - r * 0.30f),
-                radius = r * 1.28f,
+                innerStop to Color(0xFFC5DCE6).copy(alpha = 0.14f * lightStrength),
+                1f to Color.Transparent,
+                center = c,
+                radius = outerHaloR,
             ),
-            radius = r,
+            radius = outerHaloR,
             center = c,
         )
+
+        val spherePath = Path().apply {
+            addOval(Rect(c.x - r, c.y - r, c.x + r, c.y + r))
+        }
+        clipPath(spherePath) {
+            // 2a. Key light diffuse wash (top-left warm sunlit hemisphere).
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to Color(0xFFFFFDF8).copy(alpha = 0.22f * lightStrength),
+                    0.42f to Color(0xFFF6FAFC).copy(alpha = 0.10f * lightStrength),
+                    0.82f to Color.Transparent,
+                    center = Offset(c.x - r * 0.34f, c.y - r * 0.36f),
+                    radius = r * 1.18f,
+                ),
+                radius = r,
+                center = c,
+            )
+
+            // 2b. Soft satin ceramic specular bloom (restrained, non-plastic).
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to Color.White.copy(alpha = 0.16f * lightStrength),
+                    0.48f to Color.White.copy(alpha = 0.05f * lightStrength),
+                    1f to Color.Transparent,
+                    center = Offset(c.x - r * 0.37f, c.y - r * 0.39f),
+                    radius = r * 0.46f,
+                ),
+                radius = r,
+                center = c,
+            )
+
+            // 2c. Terminator and shadow hemisphere (deep slate-indigo rather than muddy black).
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to Color.Transparent,
+                    0.46f to Color.Transparent,
+                    0.66f to Color(0xFF0E1B24).copy(alpha = 0.13f * lightStrength),
+                    0.84f to Color(0xFF0A161F).copy(alpha = 0.32f * lightStrength),
+                    1f to Color(0xFF071118).copy(alpha = 0.44f * lightStrength),
+                    center = Offset(c.x - r * 0.32f, c.y - r * 0.34f),
+                    radius = r * 1.36f,
+                ),
+                radius = r,
+                center = c,
+            )
+
+            // 2d. Gentle limb darkening around the full perimeter for spherical wrap-around.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to Color.Transparent,
+                    0.74f to Color.Transparent,
+                    0.90f to Color(0xFF0D1B22).copy(alpha = 0.08f * lightStrength),
+                    1f to Color(0xFF09141A).copy(alpha = 0.16f * lightStrength),
+                    center = c,
+                    radius = r,
+                ),
+                radius = r,
+                center = c,
+            )
+
+            // 2e. Warm paper bounce light on the lower-right underside, carving out the core shadow band.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to Color(0xFFF3EFE4).copy(alpha = 0.25f * lightStrength),
+                    0.55f to Color(0xFFF0ECE0).copy(alpha = 0.10f * lightStrength),
+                    1f to Color.Transparent,
+                    center = Offset(c.x + r * 0.68f, c.y + r * 0.74f),
+                    radius = r * 0.64f,
+                ),
+                radius = r,
+                center = c,
+            )
+
+            // 2f. Inner Fresnel atmosphere haze softening the hard silhouette edge.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to Color.Transparent,
+                    0.78f to Color.Transparent,
+                    0.89f to Color(0xFFCCE2EC).copy(alpha = 0.10f * lightStrength),
+                    0.96f to Color(0xFFE2EFF3).copy(alpha = 0.24f * lightStrength),
+                    1f to Color(0xFFF4F6F1).copy(alpha = 0.36f * lightStrength),
+                    center = c,
+                    radius = r,
+                ),
+                radius = r,
+                center = c,
+            )
+        }
+
+        // 2g. Crisp directional rim finish.
         val rimStroke = 1.0f * density
         drawCircle(
             brush = Brush.linearGradient(
-                0f to Color(0xFFA1CFE3).copy(alpha = 0.16f * lightStrength),
-                1f to Color(0xFF1F2B28).copy(alpha = 0.08f * lightStrength),
-                start = Offset(bounds.x - r * 0.7f, bounds.y - r * 0.7f),
-                end = Offset(bounds.x + r * 0.7f, bounds.y + r * 0.7f),
+                0f to Color.White.copy(alpha = 0.44f * lightStrength),
+                0.50f to Color(0xFFC5DCE6).copy(alpha = 0.18f * lightStrength),
+                1f to Color(0xFF233236).copy(alpha = 0.10f * lightStrength),
+                start = Offset(c.x - r * 0.72f, c.y - r * 0.72f),
+                end = Offset(c.x + r * 0.72f, c.y + r * 0.72f),
             ),
             radius = max(1f, r - rimStroke * 0.5f),
             center = c,

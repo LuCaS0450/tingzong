@@ -162,23 +162,44 @@ class WorldPinProjectionTest {
         val offlineSources = offlineStyle.getJSONObject("sources")
         assertTrue(offlineSources.has("earth-base"))
         assertTrue(offlineSources.has("earth"))
+        assertTrue(offlineSources.has("globe-graticule"))
+        assertFalse(offlineSources.has("earth-dem"))
         assertFalse(offlineSources.has("streets"))
         assertFalse(offlineSources.has("earth-hd"))
         val offlineLayers = offlineStyle.getJSONArray("layers")
+        var hasGraticuleLayer = false
+        var hasPinShadowLayer = false
         for (i in 0 until offlineLayers.length()) {
             val layer = offlineLayers.getJSONObject(i)
+            when (layer.getString("id")) {
+                "globe-graticule" -> {
+                    hasGraticuleLayer = true
+                    val opacity = layer.getJSONObject("paint").getJSONArray("line-opacity")
+                    assertEquals("interpolate", opacity.getString(0))
+                    assertEquals("zoom", opacity.getJSONArray(2).getString(0))
+                }
+                "world-place-pin-shadows" -> {
+                    hasPinShadowLayer = true
+                    assertEquals("map", layer.getJSONObject("layout").getString("icon-pitch-alignment"))
+                }
+            }
             if (layer.getString("type") == "raster") {
                 assertFalse(layer.has("maxzoom"))
                 assertEquals(1, layer.getJSONObject("paint").getInt("raster-opacity"))
             }
         }
+        assertTrue("Offline globe style must include local graticule layer", hasGraticuleLayer)
+        assertTrue("Globe style must include tangent-plane pin contact shadow layer", hasPinShadowLayer)
 
         val keyedStyle = JSONObject(WorldTilePipeline.buildWorldStyleJson(rawKey = "test-key"))
         val keyedSources = keyedStyle.getJSONObject("sources")
         assertTrue(keyedSources.has("earth-base"))
         assertTrue(keyedSources.has("earth"))
         assertTrue(keyedSources.has("earth-hd"))
+        assertTrue(keyedSources.has("earth-dem"))
+        assertTrue(keyedSources.has("globe-graticule"))
         assertTrue(keyedSources.has("streets"))
+        assertTrue(keyedSources.getJSONObject("world-places-source").has("clusterProperties"))
         assertEquals("mapbox://mapbox.mapbox-streets-v8", keyedSources.getJSONObject("streets").getString("url"))
         assertTrue(
             keyedSources.getJSONObject("earth-hd").getJSONArray("tiles").getString(0).contains("/v2/"),
