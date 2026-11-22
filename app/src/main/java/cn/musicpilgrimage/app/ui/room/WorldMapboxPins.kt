@@ -211,20 +211,20 @@ internal object WorldMapboxPins {
 
         val placeOpacity = interpLinear(
             pointDot,
-            0.0 to (1.0 - 0.16 * globeWeight),
-            0.35 to (1.0 - 0.04 * globeWeight),
-            0.75 to 1.0,
+            0.0 to (1.0 - 0.10 * globeWeight),
+            0.35 to (1.0 - 0.02 * globeWeight),
+            0.70 to 1.0,
         )
         val clusterOpacity = interpLinear(
             clusterDot,
-            0.0 to (1.0 - 0.16 * globeWeight),
-            0.35 to (1.0 - 0.04 * globeWeight),
-            0.75 to 1.0,
+            0.0 to (1.0 - 0.10 * globeWeight),
+            0.35 to (1.0 - 0.02 * globeWeight),
+            0.70 to 1.0,
         )
         val selectedOpacity = interpLinear(
             pointDot,
-            0.0 to (1.0 - 0.08 * globeWeight),
-            0.40 to 1.0,
+            0.0 to (1.0 - 0.05 * globeWeight),
+            0.35 to 1.0,
         )
 
         val placeShadowOpacity = interpLinear(

@@ -856,13 +856,6 @@ internal object WorldTilePipeline {
                     },
                 )
             }
-            put(
-                "globe-graticule",
-                JSONObject().apply {
-                    put("type", "geojson")
-                    put("data", buildGlobeGraticuleGeoJson())
-                },
-            )
             if (includeStreets) put("streets", JSONObject().put("type", "vector")
                 .put("url", "mapbox://mapbox.mapbox-streets-v8"))
             WorldMapboxPins.appendSources(this)
@@ -958,70 +951,6 @@ internal object WorldTilePipeline {
                     },
                 )
             }
-            put(
-                JSONObject().apply {
-                    put("id", "globe-graticule")
-                    put("type", "line")
-                    put("source", "globe-graticule")
-                    put("maxzoom", 5)
-                    put(
-                        "layout",
-                        JSONObject().apply {
-                            put("line-cap", "round")
-                            put("line-join", "round")
-                        },
-                    )
-                    put(
-                        "paint",
-                        JSONObject().apply {
-                            put(
-                                "line-color",
-                                JSONArray(
-                                    listOf(
-                                        "case",
-                                        JSONArray(listOf("==", JSONArray(listOf("get", "kind")), "equator")),
-                                        "#faf8f2",
-                                        "#e6f0f4",
-                                    ),
-                                ),
-                            )
-                            put(
-                                "line-width",
-                                JSONArray(
-                                    listOf(
-                                        "case",
-                                        JSONArray(listOf("==", JSONArray(listOf("get", "kind")), "equator")),
-                                        0.9,
-                                        0.6,
-                                    ),
-                                ),
-                            )
-                            put(
-                                "line-opacity",
-                                JSONArray().apply {
-                                    put("interpolate")
-                                    put(JSONArray(listOf("linear")))
-                                    put(JSONArray(listOf("zoom")))
-                                    fun stopValue(normal: Double, equator: Double) = JSONArray(
-                                        listOf(
-                                            "case",
-                                            JSONArray(listOf("==", JSONArray(listOf("get", "kind")), "equator")),
-                                            equator,
-                                            normal,
-                                        ),
-                                    )
-                                    put(0.0)
-                                    put(stopValue(0.22, 0.32))
-                                    put(2.6)
-                                    put(stopValue(0.14, 0.21))
-                                    put(4.2)
-                                    put(0.0)
-                                },
-                            )
-                        },
-                    )
-                },
-            )
             if (includeStreets) appendStreetLayers(this, paperHex)
             WorldMapboxPins.appendLayers(this)
         }
@@ -1148,45 +1077,5 @@ internal object WorldTilePipeline {
         put("==")
         put(JSONArray(listOf("get", "class")))
         put(value)
-    }
-
-    private fun buildGlobeGraticuleGeoJson(): JSONObject {
-        val features = JSONArray()
-        fun addLine(kind: String, coords: JSONArray) {
-            features.put(
-                JSONObject().apply {
-                    put("type", "Feature")
-                    put("properties", JSONObject().put("kind", kind))
-                    put(
-                        "geometry",
-                        JSONObject().apply {
-                            put("type", "LineString")
-                            put("coordinates", coords)
-                        },
-                    )
-                },
-            )
-        }
-        for (lon in -150..180 step 30) {
-            val coords = JSONArray()
-            for (lat in -80..80 step 4) {
-                coords.put(JSONArray().put(lon).put(lat))
-            }
-            addLine("meridian", coords)
-        }
-        for (lat in listOf(-60, -30, 0, 30, 60)) {
-            val kind = if (lat == 0) "equator" else "parallel"
-            for ((startLon, endLon) in listOf(-180 to 0, 0 to 180)) {
-                val coords = JSONArray()
-                for (lon in startLon..endLon step 4) {
-                    coords.put(JSONArray().put(lon).put(lat))
-                }
-                addLine(kind, coords)
-            }
-        }
-        return JSONObject().apply {
-            put("type", "FeatureCollection")
-            put("features", features)
-        }
     }
 }
