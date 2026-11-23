@@ -9,7 +9,6 @@ import android.view.MotionEvent
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -19,6 +18,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import cn.musicpilgrimage.app.ui.room.NativeWorldController
 import cn.musicpilgrimage.app.ui.room.WorldDiagnosticsSnapshot
+import cn.musicpilgrimage.app.ui.room.WorldMapBottomInset
 import cn.musicpilgrimage.app.ui.room.WorldMapMath
 import cn.musicpilgrimage.app.ui.room.WorldMapboxPins
 import cn.musicpilgrimage.app.ui.room.WorldTestRegistry
@@ -255,7 +255,7 @@ class WorldGestureInputTest {
     }
 
     @Test
-    fun worldHeaderAndFooterAlignAndMapCreditsStayVisible() {
+    fun worldHeaderAndMapOverlaysFollowTheSameGrid() {
         compose.waitUntil(25_000) {
             compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
         }
@@ -279,11 +279,8 @@ class WorldGestureInputTest {
         assertEquals(search.center.y, placesBounds.center.y, 0.5f)
         assertTrue(placesBounds.right <= search.left)
 
-        val trips = compose.onNodeWithTag("world-dock-trips")
-        val footprints = compose.onNodeWithTag("world-dock-footprints")
-        trips.assertIsDisplayed().assertHasClickAction()
-        footprints.assertIsDisplayed().assertHasClickAction()
-        assertEquals(trips.fetchSemanticsNode().boundsInRoot.center.y, footprints.fetchSemanticsNode().boundsInRoot.center.y, 0.5f)
+        compose.onNodeWithTag("world-dock-trips").assertDoesNotExist()
+        compose.onNodeWithTag("world-dock-footprints").assertDoesNotExist()
         compose.onNodeWithTag("world-zoom-in").assertDoesNotExist()
         compose.onNodeWithTag("world-zoom-out").assertDoesNotExist()
         compose.onNodeWithTag("world-gesture-hint").assertDoesNotExist()
@@ -294,23 +291,31 @@ class WorldGestureInputTest {
             assertTrue(logo.enabled && attribution.enabled && attribution.clickable)
             assertEquals(Gravity.BOTTOM or Gravity.END, logo.position)
             assertEquals(logo.position, attribution.position)
+            assertEquals(WorldMapBottomInset.value * ctrl.mapView.resources.displayMetrics.density, logo.marginBottom, 0.5f)
             assertEquals(logo.marginBottom, attribution.marginBottom, 0.5f)
             assertTrue(logo.marginRight > attribution.marginRight)
             logo.marginBottom
         }
-        saveScreenshot("world-footer-overview")
+        saveScreenshot("world-map-overview")
         places.performClick()
         compose.onNodeWithTag("world-place-query").performTextInput("南京")
         compose.onNodeWithTag("world-place-option-nanjing-city-reference").performClick()
         compose.onNodeWithTag("world-place-summary").assertIsDisplayed()
-        trips.assertDoesNotExist()
-        footprints.assertDoesNotExist()
         idle(ctrl)
         compose.runOnUiThread {
             assertTrue(ctrl.mapView.logo.marginBottom > closedMargin)
             assertEquals(ctrl.mapView.logo.marginBottom, ctrl.mapView.attribution.marginBottom, 0.5f)
         }
-        saveScreenshot("world-footer-summary")
+        compose.onNodeWithTag("world-summary-close").performClick()
+        compose.waitForIdle()
+        compose.runOnUiThread { ctrl.zoomTo(6.0, durationMs = 0) }
+        idle(ctrl)
+        val miniGlobe = compose.onNodeWithTag("world-mini-globe").assertIsDisplayed()
+        val scale = compose.onNodeWithTag("world-scale-bar").assertIsDisplayed()
+        assertEquals(musicTitle.x, miniGlobe.fetchSemanticsNode().boundsInRoot.left, 0.5f)
+        assertEquals(musicTitle.x, scale.fetchSemanticsNode().boundsInRoot.left, 0.5f)
+        compose.runOnUiThread { assertEquals(closedMargin, ctrl.mapView.attribution.marginBottom, 0.5f) }
+        saveScreenshot("world-map-zoomed")
     }
 
     @Test

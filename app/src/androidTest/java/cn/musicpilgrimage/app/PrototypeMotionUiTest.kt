@@ -1359,8 +1359,6 @@ class PrototypeMotionUiTest {
                         favoriteBusy = false,
                         onPlace = {},
                         onFavorite = {},
-                        onTrips = {},
-                        onFootprints = {},
                         onAdd = {},
                         onSearch = {},
                         onBack = {},

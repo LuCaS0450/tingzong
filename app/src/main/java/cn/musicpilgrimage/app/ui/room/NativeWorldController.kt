@@ -187,7 +187,7 @@ internal object WorldMapMath {
         fovDegrees: Double = WorldFovDegrees,
     ): Double {
         if (stageWidthDp <= 0.0 || stageHeightDp <= 0.0) return 0.9
-        val r = stageWidthDp * (304.0 / 360.0) / 2.0
+        val r = min(stageWidthDp * 0.90, stageHeightDp * 0.88) / 2.0
         val d = stageHeightDp / (2.0 * tan(Math.toRadians(fovDegrees / 2.0)).coerceAtLeast(1e-4))
         val bigR = r * r / d + r * sqrt(1.0 + r * r / (d * d))
         return log2(bigR * 2.0 * PI / 512.0)
@@ -639,9 +639,8 @@ internal class NativeWorldController(
         // The SDK wordmark and attribution icon are both 21dp tall.
         val ornamentSize = 21f
         val end = SwissWallEndInset.value * density
-        val bottom = if (summaryOpen && summaryHeight > 0) summaryHeight + 8 * density else {
-            (WorldFooterBottomInset.value + (WorldFooterButtonHeight.value - ornamentSize) / 2f) * density
-        }
+        val bottom = if (summaryOpen && summaryHeight > 0) summaryHeight + 8 * density
+            else WorldMapBottomInset.value * density
         mapView.logo.updateSettings {
             position = Gravity.BOTTOM or Gravity.END
             marginRight = end + (ornamentSize + 6f) * density

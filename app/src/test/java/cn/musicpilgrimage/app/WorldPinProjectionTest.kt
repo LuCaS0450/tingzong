@@ -40,6 +40,7 @@ class WorldPinProjectionTest {
             stageHeightPx = 1280f,
             density = 2f,
         ).radius
+        assertEquals(648f, expectedRadius * 2f, 0.05f)
 
         for (lat in listOf(-55.0, -24.0, 0.0, 24.0, 55.0)) {
             val z = WorldMapMath.zoomForEquatorialZoom(eqZoom, lat)
@@ -58,6 +59,13 @@ class WorldPinProjectionTest {
         }
         assertEquals(15.0, WorldMapMath.visualZoom(15.0, 55.0), 1e-6)
         assertEquals(15.0, WorldMapMath.visualZoom(15.0, 0.0), 1e-6)
+    }
+
+    @Test
+    fun overviewGlobeFitsInAShortViewport() {
+        val zoom = WorldMapMath.globeEquatorialZoom(640.0, 300.0)
+        val diameter = 2f * WorldMapMath.globeBounds(zoom, 0.0, 320f, 150f, 300f, 1f).radius
+        assertEquals(264f, diameter, 0.05f)
     }
 
     @Test

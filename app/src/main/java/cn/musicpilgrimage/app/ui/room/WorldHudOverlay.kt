@@ -6,7 +6,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,7 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -54,8 +52,9 @@ import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 
 private val WorldFaint = Color(0xFF9A9E95)
-internal val WorldFooterBottomInset = 10.dp
-internal val WorldFooterButtonHeight = 48.dp
+internal val WorldMapBottomInset = 14.dp
+private val WorldMapTopInset = 16.dp
+private val MiniGlobeSize = 48.dp
 
 /**
  * Compose chrome for the World wall, with the Mapbox ornaments placed by the native controller.
@@ -69,8 +68,6 @@ internal fun WorldHudOverlay(
     onGoGlobe: () -> Unit,
     onZoomRegion: () -> Unit,
     onZoomCity: () -> Unit,
-    onTrips: () -> Unit,
-    onFootprints: () -> Unit,
     onRetryTiles: () -> Unit,
     onPlaces: () -> Unit,
     onSearch: () -> Unit,
@@ -105,8 +102,12 @@ internal fun WorldHudOverlay(
                     interactive = interactive,
                     onRetry = onRetryTiles,
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = unit * 14f),
+                        .align(Alignment.TopEnd)
+                        .padding(
+                            start = SwissWallStartInset + MiniGlobeSize + 12.dp,
+                            top = WorldMapTopInset,
+                            end = SwissWallEndInset,
+                        ),
                 )
             }
 
@@ -117,11 +118,11 @@ internal fun WorldHudOverlay(
                 exit = if (motion) fadeOut() else ExitTransition.None,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = unit * 12f, top = unit * 12f),
+                    .padding(start = SwissWallStartInset, top = WorldMapTopInset),
             ) {
                 Box(
                     Modifier
-                        .size(48.dp)
+                        .size(MiniGlobeSize)
                         .shadow(4.dp, CircleShape)
                         .clip(CircleShape)
                         .background(RoomColors.Paper)
@@ -161,19 +162,7 @@ internal fun WorldHudOverlay(
                     satelliteBackdrop = hud.satelliteScale,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = SwissWallStartInset, bottom = WorldFooterBottomInset + WorldFooterButtonHeight + 12.dp),
-                )
-            }
-
-            // Bottom-left Trips & Footprints dock (hidden when summary card is open).
-            if (!summaryOpen) {
-                WorldFooterActions(
-                    interactive = interactive,
-                    onTrips = onTrips,
-                    onFootprints = onFootprints,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = SwissWallStartInset, bottom = WorldFooterBottomInset),
+                        .padding(start = SwissWallStartInset, bottom = WorldMapBottomInset),
                 )
             }
         }
@@ -378,7 +367,7 @@ private fun WorldScaleBar(
 ) {
     val widthDp = with(LocalDensity.current) { widthPx.toDp() }
     Column(
-        modifier
+        modifier.testTag("world-scale-bar")
             .then(
                 if (satelliteBackdrop) {
                     Modifier
@@ -387,8 +376,7 @@ private fun WorldScaleBar(
                 } else {
                     Modifier
                 }
-            )
-            .testTag("world-scale-bar"),
+            ),
     ) {
         Text(
             text = label,
@@ -401,35 +389,6 @@ private fun WorldScaleBar(
             drawLine(RoomColors.Ink, Offset(0f, 0f), Offset(0f, size.height), stroke)
             drawLine(RoomColors.Ink, Offset(0f, size.height), Offset(size.width, size.height), stroke)
             drawLine(RoomColors.Ink, Offset(size.width, 0f), Offset(size.width, size.height), stroke)
-        }
-    }
-}
-
-@Composable
-private fun WorldFooterActions(
-    interactive: Boolean,
-    onTrips: () -> Unit,
-    onFootprints: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = ButtonDefaults.outlinedButtonColors(
-        containerColor = RoomColors.Paper,
-        contentColor = RoomColors.Ink,
-    )
-    val border = BorderStroke(1.dp, RoomColors.Line)
-    val padding = PaddingValues(horizontal = 13.dp)
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        SwissOutlinedButton(
-            onTrips, Modifier.height(WorldFooterButtonHeight).testTag("world-dock-trips"),
-            enabled = interactive, border = border, colors = colors, contentPadding = padding,
-        ) {
-            Text("行程", fontWeight = FontWeight.Medium)
-        }
-        SwissOutlinedButton(
-            onFootprints, Modifier.height(WorldFooterButtonHeight).testTag("world-dock-footprints"),
-            enabled = interactive, border = border, colors = colors, contentPadding = padding,
-        ) {
-            Text("足迹", fontWeight = FontWeight.Medium)
         }
     }
 }

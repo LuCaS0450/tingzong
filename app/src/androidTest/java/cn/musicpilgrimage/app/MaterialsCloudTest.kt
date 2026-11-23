@@ -39,7 +39,7 @@ class MaterialsCloudTest {
             activity.setContent {
                 PilgrimageTheme {
                     DisposableEffect(browse) { onDispose { browse.worldController?.destroy() } }
-                    SwissWorldWall(catalog,browse,emptySet(),false,{},{},{},{},{},{},{},emptySet(),true)
+                    SwissWorldWall(catalog,browse,emptySet(),false,{},{},{},{},{},emptySet(),true)
                 }
             }
         }

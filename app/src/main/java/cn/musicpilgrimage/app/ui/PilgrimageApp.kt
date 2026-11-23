@@ -697,7 +697,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
      }}
      page("explore"){e->
       SwissWorldWall(sourceCatalog,wallBrowse,archiveState.places.toSet(),archiveState.loading,
-       {navigate("place/${Uri.encode(it)}")},togglePlace,openTrips,{navigate("archive/footprints")},addToTrip,
+       {navigate("place/${Uri.encode(it)}")},togglePlace,addToTrip,
        {navigate("search")},back,archiveState.visits.map{it.location}.toSet(),active=entry==e)
      }
      page("performance"){NativeWallTab(2,{navigate("search")}){
