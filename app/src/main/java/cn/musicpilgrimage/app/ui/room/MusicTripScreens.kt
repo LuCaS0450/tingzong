@@ -297,7 +297,7 @@ private enum class TripSettingsPane { Menu, Dates, Details }
         vm.dates(owner,trip.id,from,to,beforeStart,beforeEnd){settings=null}
     }
     if(settings==TripSettingsPane.Details) {
-        val cities=remember(catalog){musicMapCities(catalog,null).map{MusicTripCity(it.name,it.country)}}
+        val cities=remember(catalog){tripCatalogueCities(catalog)}
         TripDetailsDialog(trip,cities,state,owner,vm){settings=null;vm.dismissError()}
     }
     if(editingDay in 1..trip.days && moving==null && deleting==null && !custom) {
@@ -386,7 +386,7 @@ private enum class TripSettingsPane { Menu, Dates, Details }
     var start by rememberSaveable{mutableStateOf(LocalDate.now().toString())}
     var end by rememberSaveable{mutableStateOf(LocalDate.now().plusDays(2).toString())}
     var name by rememberSaveable{mutableStateOf("")}
-    var selection by rememberSaveable{mutableStateOf(listOfNotNull(initialCity).destinationFields())}
+    var selection by rememberSaveable{mutableStateOf(listOfNotNull(initialCity?.asPickerDestination()).destinationFields())}
     val selected=selection.tripDestinations()
     val from=LocalDate.parse(start)
     val to=LocalDate.parse(end)
@@ -424,8 +424,16 @@ private enum class TripSettingsPane { Menu, Dates, Details }
     TripPanel("名称与目的地",state.busy,onClose) {
         TripDestinationFields(name,{name=it},cities,selected,{selection=it.destinationFields()},state.busy,Modifier.weight(1f,fill=false))
         TripError(state.error)
-        SwissButton({vm.details(owner,trip.id,if (name.trim() == beforeDisplayName) beforeName else name,
-            selected,beforeName,beforeFields.tripDestinations().map{it.key},onClose)},
+        SwissButton({
+            val original=beforeFields.tripDestinations()
+            val selectedKeys=selected.mapTo(mutableSetOf()){it.pickerKey}
+            val originalKeys=original.mapTo(mutableSetOf()){it.pickerKey}
+            // A reselected city still owns its previously saved activities.
+            val retained=original.filter{it.pickerKey in selectedKeys}
+            val added=selected.filterNot{it.pickerKey in originalKeys}
+            vm.details(owner,trip.id,if(name.trim()==beforeDisplayName)beforeName else name,
+                retained+added,beforeName,original.map{it.key},onClose)
+        },
             Modifier.fillMaxWidth(),enabled=!state.busy&&name.isNotBlank()&&selected.isNotEmpty()){Text("保存")}
         SwissTextButton(onClose,Modifier.align(Alignment.End),enabled=!state.busy){Text("取消")}
     }

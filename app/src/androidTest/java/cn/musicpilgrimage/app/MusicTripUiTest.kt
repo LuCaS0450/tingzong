@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
@@ -168,7 +169,7 @@ class MusicTripUiTest {
 
         val catalog=services.catalog.value.publicOnly()
         val place=catalog.places.first{it.id=="samaritaine"}
-        val destinations=listOf(MusicTripCity("约克","英国"),MusicTripCity(place.city,place.country))
+        val destinations=tripCatalogueCities(catalog)
         val vm=ViewModelProvider(compose.activity)[MusicTripViewModel::class.java]
         compose.waitUntil(5_000){!vm.state.value.busy&&vm.state.value.owner==key}
         fun current()=vm.state.value.trips.first{it.name==name}
@@ -191,7 +192,16 @@ class MusicTripUiTest {
         compose.onNodeWithText("下一步").performClick()
         compose.onNodeWithTag("trip-name-input").performTextInput(name)
         val search=compose.onNodeWithTag("trip-destination-search")
-        search.performTextInput("英国")
+        search.performTextInput("基隆市")
+        search.performImeAction()
+        val keelung = hasText("基隆 · 中国台湾") and SemanticsMatcher.keyIsDefined(SemanticsProperties.ToggleableState)
+        compose.onNode(keelung).assertIsOff().performClick()
+        search.performTextReplacement("基隆")
+        compose.onAllNodes(keelung).assertCountEquals(1)
+        compose.onNode(keelung).assertIsOn()
+        compose.onNodeWithText("基隆市 · 中国台湾").assertDoesNotExist()
+        capture("city-alias-selection")
+        search.performTextReplacement("英国")
         search.performImeAction()
         capture("destination-search")
         compose.onNodeWithText("英国 · 国家或地区").performClick()
@@ -202,7 +212,7 @@ class MusicTripUiTest {
         compose.onNodeWithText("加入目的地").performScrollTo().performClick()
         compose.onNodeWithTag("trip-create-save").performClick()
         compose.waitUntil(8_000){vm.state.value.trips.any{it.name==name}}
-        assertEquals(listOf("英国","未收录测试城"),current().cities.map{it.label})
+        assertEquals(listOf("基隆","英国（全境）","未收录测试城"),current().cities.map{it.name})
 
         compose.runOnIdle{openPlaceDialog!!.invoke()}
         compose.onNodeWithTag("trip-choice-${expired.id}").assertDoesNotExist()

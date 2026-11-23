@@ -31,6 +31,7 @@ import cn.musicpilgrimage.app.data.MusicTripStop
 import cn.musicpilgrimage.app.data.Place
 import cn.musicpilgrimage.app.data.canonicalRegionName
 import cn.musicpilgrimage.app.data.locationLabel
+import cn.musicpilgrimage.app.data.matchesDestinationName
 import cn.musicpilgrimage.app.ui.AppBottomSheet
 
 @Composable internal fun TripPanel(
@@ -92,12 +93,12 @@ private val MusicTripCity.destinationPickerLabel:String
     get()=when {
         region!=null->label
         isCountry->"$label · 国家或地区"
-        else->"$name · $country"
+        else->"$label · $country"
     }
 
 internal fun tripDestinationOptions(catalogCities:List<MusicTripCity>):List<MusicTripCity> {
     val countries=catalogCities.map{canonicalRegionName(it.country)}.distinct().map{MusicTripCity.country(it)}
-    return (countries+catalogCities).distinctBy{it.pickerKey}
+    return (countries+catalogCities.map{it.asPickerDestination()}).distinctBy{it.pickerKey}
 }
 
 internal fun searchTripDestinations(options:List<MusicTripCity>,query:String,catalogCities:List<MusicTripCity> = options):List<MusicTripCity> {
@@ -105,7 +106,7 @@ internal fun searchTripDestinations(options:List<MusicTripCity>,query:String,cat
     if(term.isEmpty())return emptyList()
     val matchedRegions=catalogCities.filter{it.region!=null&&it.name.contains(term,true)}.mapTo(mutableSetOf()){it.pickerKey}
     return options.filter {
-        it.label.contains(term,true)||it.country.contains(term,true)||it.pickerKey in matchedRegions
+        it.matchesDestinationName(term)||it.country.contains(term,true)||it.pickerKey in matchedRegions
     }.sortedBy{!it.label.equals(term,true)}
 }
 
@@ -171,9 +172,8 @@ internal fun searchTripDestinations(options:List<MusicTripCity>,query:String,cat
                     OutlinedTextField(countryName,{countryName=it.take(60)},label={Text("国家或地区名称")},
                         singleLine=true,enabled=!busy,modifier=Modifier.fillMaxWidth())
                     val country=canonicalRegionName(countryName.trim())
-                    val destination=MusicTripCity(cityName.trim(),country).let {
-                        if(countryOnly||it.region!=null)MusicTripCity.country(it.region?:country) else it
-                    }
+                    val city=MusicTripCity(cityName.trim(),country)
+                    val destination=if(countryOnly)MusicTripCity.country(country) else city.asPickerDestination()
                     SwissOutlinedButton({
                         onSelection(selected+destination)
                         manual=false

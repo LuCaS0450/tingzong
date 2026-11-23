@@ -369,8 +369,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    val libraryOwner=remember(owner){owner?.let{"user:$it"} ?: LibraryDatabase.guestOwner(context)}
    val tripState=storedTrips.takeIf{it.owner==libraryOwner}?:MusicTripState(libraryOwner,busy=true)
    val tripCities=remember(sourceCatalog,tripState.trips){
-    val catalogueCities=musicMapCities(sourceCatalog,null).flatMap{group->group.places.map{MusicTripCity(it.city,it.country)}}
-    (catalogueCities+tripState.trips.flatMap{it.cities}).distinctBy{it.key}
+    (tripCatalogueCities(sourceCatalog)+tripState.trips.flatMap{it.cities}).distinctBy{it.key}
    }
    var addTripPlace by rememberSaveable(owner){mutableStateOf<String?>(null)}
    var addTripEntry by rememberSaveable(owner){mutableStateOf<String?>(null)}

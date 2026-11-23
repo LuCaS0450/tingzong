@@ -45,7 +45,8 @@ internal class MusicTripViewModel(app:Application):AndroidViewModel(app) {
     }
     fun create(owner:String,name:String,start:LocalDate,end:LocalDate,cities:List<MusicTripCity>,done:(String)->Unit) {
         val id=UUID.randomUUID().toString()
-        change(owner,{it+MusicTrip(id,name.trim(),start,end,cities.distinctBy{it.key})},{done(id)})
+        val destinations = cities.map { it.asPickerDestination() }.distinctBy { it.pickerKey }
+        change(owner,{it+MusicTrip(id,name.trim(),start,end,destinations)},{done(id)})
     }
     fun add(owner:String,trip:String,place:Place,date:LocalDate,requireActive:Boolean=false,done:()->Unit) = change(owner,{ rows ->
         val plan=rows.find{it.id==trip} ?: throw UserActionException("这个行程已经不存在")

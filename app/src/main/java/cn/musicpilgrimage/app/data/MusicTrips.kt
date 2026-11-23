@@ -11,8 +11,13 @@ internal data class MusicTripCity(val name:String,val country:String) {
     val key get()="$country::$name"
     val isCountry get()=name==countryName(country)
     val region get()=unifiedDestinationRegion(country)
-    val pickerKey get()=region?.let{"region:$it"}?:key
-    val label get()=region?:if(isCountry) country else name
+    private val canonicalCountry get()=canonicalRegionName(country)
+    val pickerKey get()=region?.let{"region:$it"}
+        ?: "$canonicalCountry::${if(isCountry) countryName(canonicalCountry) else label}"
+    val label get()=region?:if(isCountry) canonicalCountry else canonicalTripCityName(name,canonicalCountry)
+
+    fun asPickerDestination(): MusicTripCity =
+        if (region != null || isCountry) country(canonicalCountry) else MusicTripCity(label, canonicalCountry)
 
     companion object {
         // Keep country destinations in the existing name/country sync format.
@@ -69,8 +74,9 @@ internal data class MusicTrip(val id:String,val name:String,val start:LocalDate,
         requireUserAction(day in 1..days){"请输入1至${days}之间的天数"}
         requireUserAction(stops.none{it.placeId==place.id&&it.day==day}){"这个地点已经安排在第${day}天，可查看原安排或选择另一天"}
         val placeCity=MusicTripCity(place.city,place.country)
-        val destination=cities.firstOrNull{it.pickerKey==placeCity.pickerKey}
-            ?:placeCity.region?.let{MusicTripCity.country(it)}?:placeCity
+        val destination=cities.firstOrNull{it.key==placeCity.key}
+            ?:cities.firstOrNull{it.pickerKey==placeCity.pickerKey}
+            ?:placeCity.asPickerDestination()
         val destinations=if(cities.any{it.key==destination.key}) cities else cities+destination
         requireUserAction(destinations===cities||destinations.size<=MAX_DESTINATIONS){"每个行程最多 $MAX_DESTINATIONS 个目的地"}
         val stop=MusicTripStop(UUID.randomUUID().toString(),place.id,place.name,destination.name,destination.country,day)

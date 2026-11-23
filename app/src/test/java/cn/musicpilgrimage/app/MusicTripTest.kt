@@ -50,6 +50,50 @@ class MusicTripTest {
         assertEquals("香港大会堂",lantern.regionalTitle("香港大会堂"))
     }
 
+    @Test fun cityAndCountyAliasesOfferOneChoiceWithoutMergingNeighboringCities() {
+        val taiwan = "中国台湾"
+        val keelung = MusicTripCity("基隆", taiwan)
+        val taipei = MusicTripCity("台北", taiwan)
+        val newTaipei = MusicTripCity("新北", taiwan)
+        val hualien = MusicTripCity("花莲", taiwan)
+        val tokyo = MusicTripCity("东京", "日本")
+        val fuchu = MusicTripCity("府中", "日本")
+        val losAngeles = MusicTripCity("洛杉矶", "美国")
+        val catalogue = listOf(
+            keelung, MusicTripCity("基隆市", taiwan),
+            taipei, MusicTripCity("台北／新北", taiwan), MusicTripCity("台北市松山区", taiwan),
+            newTaipei, MusicTripCity("新北市淡水区", taiwan),
+            hualien, MusicTripCity("花莲县丰滨乡", taiwan),
+            tokyo, MusicTripCity("Tokyo", "日本"), MusicTripCity("东京都府中市", "日本"),
+            losAngeles, MusicTripCity("Los Angeles", "美国"),
+        )
+        val choices = tripDestinationOptions(catalogue)
+        assertEquals(listOf(keelung, taipei, newTaipei, hualien, tokyo, fuchu, losAngeles), choices.filterNot { it.isCountry })
+
+        val searches = mapOf(
+            "基隆市" to keelung, "臺北市松山區" to taipei, "台北／新北" to taipei,
+            "新北" to newTaipei, "淡水" to newTaipei, "豐濱" to hualien,
+            "Tokyo" to tokyo, "府中" to fuchu, "Los Angeles" to losAngeles,
+        )
+        searches.forEach { (query, expected) ->
+            assertEquals(query, listOf(expected), searchTripDestinations(choices, query, catalogue))
+        }
+    }
+
+    @Test fun addingAnAliasedPlaceKeepsTheExistingDestinationAndItsSavedActivities() {
+        val previous = MusicTripCity("基隆市", "中国台湾")
+        val canonical = MusicTripCity("基隆", "中国台湾")
+        val localPlace = place("keelung").copy(city = canonical.name, country = canonical.country)
+        val station = localPlace.copy(id = "station", city = previous.name)
+        val legacy = plan().copy(cities = listOf(previous)).add(station, 1)
+        val updated = legacy.add(localPlace, 2)
+        assertEquals(listOf(previous), updated.cities)
+        assertEquals(legacy.stops.single(), updated.stops.first())
+        assertEquals(listOf(previous.name, previous.name), updated.stops.map { it.city })
+        assertEquals(updated, MusicTripCodec.decode(MusicTripCodec.encode(listOf(updated))).single())
+        assertEquals(listOf(paris, canonical), plan().add(station, 1).cities)
+    }
+
     private val start=LocalDate.of(2026,11,1)
     private val paris=MusicTripCity("巴黎","法国")
     private fun plan()=MusicTrip("trip","出发",start,start.plusDays(2),listOf(paris))
