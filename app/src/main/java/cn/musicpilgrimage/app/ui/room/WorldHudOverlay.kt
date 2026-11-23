@@ -6,6 +6,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -13,7 +14,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,12 +28,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,8 +46,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -58,10 +54,11 @@ import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 
 private val WorldFaint = Color(0xFF9A9E95)
+internal val WorldFooterBottomInset = 10.dp
+internal val WorldFooterButtonHeight = 48.dp
 
 /**
- * Pure Compose HUD for the World wall (`header`, `breadcrumb`, `mini globe`, `zoom rail`,
- * `scale bar`, `dock`, `gesture hint`, and non-blocking `loading/retry` pill).
+ * Compose chrome for the World wall, with the Mapbox ornaments placed by the native controller.
  */
 @Composable
 internal fun WorldHudOverlay(
@@ -70,8 +67,8 @@ internal fun WorldHudOverlay(
     interactive: Boolean,
     unit: Dp,
     onGoGlobe: () -> Unit,
-    onZoomBy: (Double) -> Unit,
-    onZoomToStop: (WorldZoomStop) -> Unit,
+    onZoomRegion: () -> Unit,
+    onZoomCity: () -> Unit,
     onTrips: () -> Unit,
     onFootprints: () -> Unit,
     onRetryTiles: () -> Unit,
@@ -86,7 +83,7 @@ internal fun WorldHudOverlay(
 
     Box(modifier.fillMaxSize()) {
         // Stage overlays start at the compact header's bottom edge.
-        BoxWithConstraints(
+        Box(
             Modifier
                 .fillMaxSize()
                 .padding(top = unit * 64f)
@@ -154,19 +151,6 @@ internal fun WorldHudOverlay(
                 }
             }
 
-            // Bottom gesture hint at rest globe overview.
-            if (!hud.enlarged && !summaryOpen) {
-                Text(
-                    text = "拖动旋转 · 双指或双击放大",
-                    color = RoomColors.Muted,
-                    fontSize = 11.sp,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = unit * 96f)
-                        .testTag("world-gesture-hint"),
-                )
-            }
-
             // Scale bar (z >= 3 when summary closed).
             if (hud.compactHeader && !summaryOpen && !hud.streetOffline &&
                 hud.scaleLabel.isNotEmpty() && hud.scaleWidthPx > 0f
@@ -177,36 +161,19 @@ internal fun WorldHudOverlay(
                     satelliteBackdrop = hud.satelliteScale,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = unit * 14f, bottom = unit * 70f),
+                        .padding(start = SwissWallStartInset, bottom = WorldFooterBottomInset + WorldFooterButtonHeight + 12.dp),
                 )
             }
 
             // Bottom-left Trips & Footprints dock (hidden when summary card is open).
             if (!summaryOpen) {
-                WorldBottomDock(
-                    enlarged = hud.enlarged,
+                WorldFooterActions(
                     interactive = interactive,
                     onTrips = onTrips,
                     onFootprints = onFootprints,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = SwissWallStartInset - 10.dp, bottom = 10.dp),
-                )
-            }
-
-            // Right-edge zoom rail (hidden when summary card is open).
-            if (!summaryOpen) {
-                WorldZoomRail(
-                    readHud = readHud,
-                    hud = hud,
-                    interactive = interactive,
-                    stopHeight = ((maxHeight - 116.dp) / 4).coerceIn(22.dp, 48.dp),
-                    onZoomIn = { onZoomBy(1.0) },
-                    onZoomOut = { onZoomBy(-1.0) },
-                    onZoomStop = onZoomToStop,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = SwissWallEndInset, bottom = 16.dp),
+                        .padding(start = SwissWallStartInset, bottom = WorldFooterBottomInset),
                 )
             }
         }
@@ -219,7 +186,8 @@ internal fun WorldHudOverlay(
             interactive = interactive,
             unit = unit,
             onGoGlobe = onGoGlobe,
-            onZoomToStop = onZoomToStop,
+            onZoomRegion = onZoomRegion,
+            onZoomCity = onZoomCity,
             onPlaces = onPlaces,
             onSearch = onSearch,
         )
@@ -234,16 +202,16 @@ private fun WorldHeaderBar(
     interactive: Boolean,
     unit: Dp,
     onGoGlobe: () -> Unit,
-    onZoomToStop: (WorldZoomStop) -> Unit,
+    onZoomRegion: () -> Unit,
+    onZoomCity: () -> Unit,
     onPlaces: () -> Unit,
     onSearch: () -> Unit,
 ) {
     if (!compact) {
         Box(Modifier.fillMaxWidth()) {
             RoomShelfWall(Modifier.matchParentSize())
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-                SwissWallHeader(1, onSearch, searchEnabled = interactive, searchTag = "world-search")
-                WorldPlacesButton(interactive, onPlaces, Modifier.padding(end = SwissWallEndInset))
+            SwissWallHeader(1, onSearch, searchEnabled = interactive, searchTag = "world-search") {
+                WorldPlacesButton(interactive, onPlaces)
             }
         }
     } else {
@@ -298,7 +266,7 @@ private fun WorldHeaderBar(
                                 label = regionName,
                                 highlighted = cityName.isEmpty(),
                                 interactive = interactive,
-                                onClick = { onZoomToStop(WorldZoomStop.Region) },
+                                onClick = onZoomRegion,
                             )
                         }
                         if (cityName.isNotEmpty()) {
@@ -307,7 +275,7 @@ private fun WorldHeaderBar(
                                 label = cityName,
                                 highlighted = true,
                                 interactive = interactive,
-                                onClick = { onZoomToStop(WorldZoomStop.City) },
+                                onClick = onZoomCity,
                             )
                         }
                     }
@@ -325,10 +293,10 @@ private fun WorldHeaderBar(
 }
 
 @Composable
-private fun WorldPlacesButton(interactive: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun WorldPlacesButton(interactive: Boolean, onClick: () -> Unit) {
     SwissTextButton(
         onClick,
-        modifier.heightIn(min = 48.dp).testTag("world-place-list"),
+        Modifier.heightIn(min = 48.dp).testTag("world-place-list"),
         enabled = interactive,
         contentPadding = PaddingValues(horizontal = 8.dp),
     ) {
@@ -438,136 +406,31 @@ private fun WorldScaleBar(
 }
 
 @Composable
-private fun WorldBottomDock(
-    enlarged: Boolean,
+private fun WorldFooterActions(
     interactive: Boolean,
     onTrips: () -> Unit,
     onFootprints: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier) {
-        if (enlarged) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .padding(vertical = 10.dp)
-                    .shadow(2.dp)
-                    .background(RoomColors.Paper.copy(alpha = 0.94f))
-                    .border(1.dp, RoomColors.Ink.copy(alpha = 0.08f))
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+    val colors = ButtonDefaults.outlinedButtonColors(
+        containerColor = RoomColors.Paper,
+        contentColor = RoomColors.Ink,
+    )
+    val border = BorderStroke(1.dp, RoomColors.Line)
+    val padding = PaddingValues(horizontal = 13.dp)
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SwissOutlinedButton(
+            onTrips, Modifier.height(WorldFooterButtonHeight).testTag("world-dock-trips"),
+            enabled = interactive, border = border, colors = colors, contentPadding = padding,
         ) {
-            Box(
-                Modifier
-                    .heightIn(min = 48.dp)
-                    .testTag("world-dock-trips")
-                    .clickable(enabled = interactive, role = Role.Button, onClick = onTrips)
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("行程", color = RoomColors.Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-            if (enlarged) {
-                VerticalDivider(
-                    modifier = Modifier.height(20.dp),
-                    thickness = 1.dp,
-                    color = RoomColors.Line,
-                )
-            }
-            Box(
-                Modifier
-                    .heightIn(min = 48.dp)
-                    .testTag("world-dock-footprints")
-                    .clickable(enabled = interactive, role = Role.Button, onClick = onFootprints)
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("足迹", color = RoomColors.Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
+            Text("行程", fontWeight = FontWeight.Medium)
         }
-    }
-}
-
-@Composable
-private fun WorldZoomRail(
-    readHud: () -> WorldHudState,
-    hud: WorldHudState,
-    interactive: Boolean,
-    stopHeight: Dp,
-    onZoomIn: () -> Unit,
-    onZoomOut: () -> Unit,
-    onZoomStop: (WorldZoomStop) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier.width(60.dp)
-            .shadow(2.dp)
-            .background(RoomColors.Paper.copy(alpha = 0.98f))
-            .border(1.dp, RoomColors.Line),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        WorldZoomButton(enlarge = true, enabled = interactive && hud.zoom < WorldMaxZoom - 0.01, onClick = onZoomIn)
-        Box(Modifier.fillMaxWidth()) {
-            Canvas(Modifier.matchParentSize()) {
-                val x = 11.dp.toPx()
-                val yEnd = size.height * WorldZoomStop.Globe.trackFraction
-                drawLine(WorldFaint, Offset(x, 0f), Offset(x, yEnd), 1.dp.toPx())
-                for (stop in WorldZoomStop.entries) {
-                    val y = stop.trackFraction * size.height
-                    drawLine(WorldFaint, Offset(x, y), Offset(x + 4.dp.toPx(), y), 1.dp.toPx())
-                }
-                val camera = readHud()
-                val y = (size.height * WorldMapMath.zoomRailFraction(camera.zoom, camera.globeZoom))
-                    .coerceAtLeast(1.dp.toPx())
-                drawLine(RoomColors.Red, Offset(x - 3.dp.toPx(), y), Offset(x + 6.dp.toPx(), y), 2.dp.toPx())
-            }
-            Column {
-                for (stop in WorldZoomStop.entries) {
-                    val active = stop.label == hud.levelLabel
-                    Box(
-                        Modifier.fillMaxWidth().height(stopHeight).testTag(stop.tag)
-                            .semantics { selected = active }
-                            .clickable(
-                                enabled = interactive,
-                                role = Role.Button,
-                                onClickLabel = "缩放到${stop.label}",
-                                onClick = { onZoomStop(stop) },
-                            )
-                            .padding(start = 22.dp, end = 5.dp),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        Text(
-                            if (stop == WorldZoomStop.Region) "地区" else stop.label,
-                            color = if (active) RoomColors.Red else RoomColors.Muted,
-                            fontSize = 11.sp,
-                            fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
+        SwissOutlinedButton(
+            onFootprints, Modifier.height(WorldFooterButtonHeight).testTag("world-dock-footprints"),
+            enabled = interactive, border = border, colors = colors, contentPadding = padding,
+        ) {
+            Text("足迹", fontWeight = FontWeight.Medium)
         }
-        WorldZoomButton(enlarge = false, enabled = interactive && hud.zoom > hud.globeZoom + 0.01, onClick = onZoomOut)
-    }
-}
-
-@Composable
-private fun WorldZoomButton(enlarge: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val label = if (enlarge) "放大一级" else "缩小一级"
-    Box(
-        Modifier.fillMaxWidth().height(48.dp)
-            .testTag(if (enlarge) "world-zoom-in" else "world-zoom-out")
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = label, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            if (enlarge) Icons.Outlined.Add else Icons.Outlined.Remove,
-            contentDescription = label,
-            modifier = Modifier.size(20.dp),
-            tint = if (enabled) RoomColors.Ink else WorldFaint,
-        )
     }
 }
 

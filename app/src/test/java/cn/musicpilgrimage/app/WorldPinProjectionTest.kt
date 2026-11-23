@@ -138,18 +138,7 @@ class WorldPinProjectionTest {
     }
 
     @Test
-    fun levelLabel_andScaleBarMetric_reflectZoomStages() {
-        assertEquals("地球", WorldMapMath.levelLabel(0.9))
-        assertEquals("国家或地区", WorldMapMath.levelLabel(5.0))
-        assertEquals("城市", WorldMapMath.levelLabel(11.0))
-        assertEquals("街道", WorldMapMath.levelLabel(15.0))
-        assertEquals(0.875f, WorldMapMath.zoomRailFraction(0.9, 0.9), 0.001f)
-        assertEquals(0.625f, WorldMapMath.zoomRailFraction(5.0, 0.9), 0.001f)
-        assertEquals(0.375f, WorldMapMath.zoomRailFraction(11.0, 0.9), 0.001f)
-        assertEquals(0.125f, WorldMapMath.zoomRailFraction(15.0, 0.9), 0.001f)
-        assertEquals(0.0625f, WorldMapMath.zoomRailFraction(16.5, 0.9), 0.001f)
-        assertEquals(0f, WorldMapMath.zoomRailFraction(18.0, 0.9), 0.001f)
-
+    fun scaleBarMetric_reflectsZoom() {
         val (globeLabel, globeWidth) = WorldMapMath.scaleBarMetric(1.0, 24.0, 2.0f)
         val (streetLabel, streetWidth) = WorldMapMath.scaleBarMetric(15.0, 48.85, 2.0f)
         assertTrue(globeLabel.endsWith("km"))

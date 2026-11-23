@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.accessibility.AccessibilityManager
@@ -89,15 +90,7 @@ internal const val InitialWorldLatitude = 24.0
 internal const val WorldFovDegrees = 36.86989764584402
 internal const val MapboxGlobeZoomOffset = 0.48
 internal const val WorldMaxZoom = 18.0
-
-internal enum class WorldZoomStop(val zoom: Double, val threshold: Double, val label: String, val tag: String) {
-    Street(15.0, 13.0, "街道", "world-zoom-street"),
-    City(11.0, 7.0, "城市", "world-zoom-city"),
-    Region(5.0, 3.0, "国家或地区", "world-zoom-region"),
-    Globe(0.0, Double.NEGATIVE_INFINITY, "地球", "world-zoom-globe");
-
-    val trackFraction get() = (ordinal + 0.5f) / entries.size
-}
+internal const val WorldCityZoom = 11.0
 
 internal data class GlobeBounds(val x: Float, val y: Float, val radius: Float)
 
@@ -132,7 +125,6 @@ internal data class WorldHudState(
     val enlarged: Boolean = false,
     val beyondGlobe: Boolean = false,
     val satelliteScale: Boolean = true,
-    val levelLabel: String = "地球",
     val regionName: String = "",
     val cityName: String = "",
     val scaleLabel: String = "",
@@ -284,28 +276,6 @@ internal object WorldMapMath {
         val label = if (intValue >= 1000) "${intValue / 1000} km" else "$intValue m"
         val barPx = (value / metersPerPx).toFloat().coerceIn(24f, 140f * safeDensity)
         return label to barPx
-    }
-
-    fun levelLabel(zoom: Double): String =
-        WorldZoomStop.entries.firstOrNull { zoom >= it.threshold }?.label ?: WorldZoomStop.Globe.label
-
-    fun zoomRailFraction(zoom: Double, globeZoom: Double): Float {
-        val stops = WorldZoomStop.entries
-        val street = WorldZoomStop.Street
-        if (zoom >= street.zoom) {
-            val remaining = ((WorldMaxZoom - zoom) / (WorldMaxZoom - street.zoom)).coerceIn(0.0, 1.0)
-            return street.trackFraction * remaining.toFloat()
-        }
-        for (index in 0 until stops.lastIndex) {
-            val upper = stops[index]
-            val lower = stops[index + 1]
-            val lowerZoom = if (lower == WorldZoomStop.Globe) globeZoom else lower.zoom
-            if (zoom >= lowerZoom) {
-                val fraction = ((upper.zoom - zoom) / (upper.zoom - lowerZoom)).toFloat()
-                return upper.trackFraction + (lower.trackFraction - upper.trackFraction) * fraction
-            }
-        }
-        return WorldZoomStop.Globe.trackFraction
     }
 
     fun globenessForZoom(zoom: Double): Float = ((6.0 - zoom) / 1.0).toFloat().coerceIn(0f, 1f)
@@ -654,7 +624,7 @@ internal class NativeWorldController(
         val camera = map.cameraState
         val zoom = when (focus.kind) {
             WorldFocusKind.Pin -> camera.zoom
-            WorldFocusKind.List -> max(11.0, camera.zoom)
+            WorldFocusKind.List -> max(WorldCityZoom, camera.zoom)
             WorldFocusKind.Street -> 15.0
         }.coerceIn(overviewZoom, WorldMaxZoom)
         moveCamera(
@@ -666,9 +636,23 @@ internal class NativeWorldController(
     }
 
     private fun positionMapCredits() {
-        val bottom = if (summaryOpen && summaryHeight > 0) summaryHeight + 8 * density else 54 * density
-        mapView.logo.updateSettings { marginBottom = bottom }
-        mapView.attribution.updateSettings { marginBottom = bottom }
+        // The SDK wordmark and attribution icon are both 21dp tall.
+        val ornamentSize = 21f
+        val end = SwissWallEndInset.value * density
+        val bottom = if (summaryOpen && summaryHeight > 0) summaryHeight + 8 * density else {
+            (WorldFooterBottomInset.value + (WorldFooterButtonHeight.value - ornamentSize) / 2f) * density
+        }
+        mapView.logo.updateSettings {
+            position = Gravity.BOTTOM or Gravity.END
+            marginRight = end + (ornamentSize + 6f) * density
+            marginBottom = bottom
+        }
+        mapView.attribution.updateSettings {
+            position = Gravity.BOTTOM or Gravity.END
+            marginLeft = 0f
+            marginRight = end
+            marginBottom = bottom
+        }
     }
 
     private fun moveCamera(
@@ -730,8 +714,6 @@ internal class NativeWorldController(
         selectionRingZoom = zoom
         if (visibilityChanged) style?.let { WorldMapboxPins.setSelectionRingVisible(it, zoom != null) }
     }
-
-    fun zoomBy(delta: Double) = zoomTo(map.cameraState.zoom + delta, 280)
 
     fun zoomTo(targetZoom: Double, durationMs: Int = 450) {
         val camera = map.cameraState
@@ -811,7 +793,7 @@ internal class NativeWorldController(
             zoom = zoom, globeZoom = overviewZoom,
             compactHeader = zoom >= 3.0, enlarged = zoom > overviewZoom + 0.08,
             beyondGlobe = beyondGlobe, satelliteScale = zoom < StreetZoom,
-            scaleLabel = scale?.first.orEmpty(), scaleWidthPx = scale?.second ?: 0f, levelLabel = WorldMapMath.levelLabel(zoom),
+            scaleLabel = scale?.first.orEmpty(), scaleWidthPx = scale?.second ?: 0f,
         )
         activeGlobeBounds = if (zoom < 4.0) WorldMapMath.globeBounds(
             zoom + MapboxGlobeZoomOffset, 0.0,

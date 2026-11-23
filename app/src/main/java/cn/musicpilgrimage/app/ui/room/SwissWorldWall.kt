@@ -238,11 +238,8 @@ internal fun SwissWorldWall(
             interactive = active,
             unit = unit,
             onGoGlobe = { controller?.goGlobe() },
-            onZoomBy = { delta -> controller?.zoomBy(delta) },
-            onZoomToStop = { stop ->
-                if (stop == WorldZoomStop.Globe) controller?.goGlobe()
-                else controller?.zoomTo(stop.zoom, durationMs = 650)
-            },
+            onZoomRegion = { controller?.zoomTo(5.0, durationMs = 650) },
+            onZoomCity = { controller?.zoomTo(WorldCityZoom, durationMs = 650) },
             onTrips = onTrips,
             onFootprints = onFootprints,
             onRetryTiles = { controller?.retryTiles() },

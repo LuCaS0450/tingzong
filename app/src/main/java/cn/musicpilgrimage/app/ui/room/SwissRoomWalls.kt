@@ -126,12 +126,14 @@ internal val SwissWallEndInset = 16.dp
     onSearch: () -> Unit,
     searchEnabled: Boolean = true,
     searchTag: String = "room-search-button",
+    beforeSearch: @Composable () -> Unit = {},
 ) {
     Row(Modifier.fillMaxWidth().height(112.dp).padding(start=SwissWallStartInset,end=SwissWallEndInset),verticalAlignment=Alignment.CenterVertically) {
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(9.dp)) {
             Text(listOf("01 / MUSIC","02 / WORLD","03 / PLAY","04 / PERSONAL")[section],color=SwissRed,fontSize=11.sp,letterSpacing=1.8.sp,fontWeight=FontWeight.Medium)
             Text(listOf("唱片架","地图与旅行","演奏","我的空间")[section],fontSize=32.sp,lineHeight=38.sp,fontWeight=FontWeight.Bold,letterSpacing=(-.45).sp,color=SwissInk)
         }
+        beforeSearch()
         SwissWallSearchButton(onSearch, searchEnabled, searchTag)
     }
 }

@@ -3,13 +3,13 @@ package cn.musicpilgrimage.app
 import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.view.Gravity
 import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -21,9 +21,9 @@ import cn.musicpilgrimage.app.ui.room.NativeWorldController
 import cn.musicpilgrimage.app.ui.room.WorldDiagnosticsSnapshot
 import cn.musicpilgrimage.app.ui.room.WorldMapMath
 import cn.musicpilgrimage.app.ui.room.WorldMapboxPins
-import cn.musicpilgrimage.app.ui.room.WorldMaxZoom
 import cn.musicpilgrimage.app.ui.room.WorldTestRegistry
-import cn.musicpilgrimage.app.ui.room.WorldZoomStop
+import com.mapbox.maps.plugin.attribution.attribution
+import com.mapbox.maps.plugin.logo.logo
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -193,7 +193,7 @@ class WorldGestureInputTest {
             .bufferedReader().use { it.readText().trim() }
 
     @Test
-    fun bothZoomOutControlsHideTheSelectedRingAndKeepOnePinShape() {
+    fun pinchAndMiniGlobeHideTheSelectedRingAndKeepOnePinShape() {
         compose.waitUntil(30_000) {
             compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
         }
@@ -201,16 +201,13 @@ class WorldGestureInputTest {
         compose.waitUntil(20_000) { WorldTestRegistry.activeController?.let { diag(it).hasVisual } == true }
         val ctrl = controller()
 
-        fun pickPlace() {
-            compose.onNodeWithTag("world-place-list").performClick()
-            compose.onNodeWithTag("world-place-query").performTextInput("蓝色列车餐厅")
-            compose.onNode(hasText("蓝色列车餐厅") and !hasTestTag("world-place-query")).performClick()
-            idle(ctrl)
-            compose.onNodeWithTag("world-summary-close").performClick()
-            compose.waitUntil(4_000) {
-                compose.onAllNodes(hasTestTag("world-summary-close")).fetchSemanticsNodes().isEmpty()
-            }
-            idle(ctrl)
+        compose.onNodeWithTag("world-place-list").performClick()
+        compose.onNodeWithTag("world-place-query").performTextInput("蓝色列车餐厅")
+        compose.onNode(hasText("蓝色列车餐厅") and !hasTestTag("world-place-query")).performClick()
+        idle(ctrl)
+        compose.onNodeWithTag("world-summary-close").performClick()
+        compose.waitUntil(4_000) {
+            compose.onAllNodes(hasTestTag("world-summary-close")).fetchSemanticsNodes().isEmpty()
         }
 
         fun layerValue(layer: String, property: String): Any? = compose.runOnUiThread {
@@ -220,21 +217,8 @@ class WorldGestureInputTest {
         fun ringOpacity(): Double =
             (layerValue(WorldMapboxPins.SELECTION_RING_LAYER, "icon-opacity") as Number).toDouble()
 
-        pickPlace()
-        val before = diag(ctrl)
+        val beforePinch = idle(ctrl)
         val pinImage = layerValue(WorldMapboxPins.SELECTION_LAYER, "icon-image") as String
-        assertEquals(1.0, ringOpacity(), 0.0)
-        saveScreenshot("world-selection-before")
-        compose.onNodeWithTag("world-zoom-out").performClick()
-        val afterMinus = idle(ctrl)
-        assertTrue(afterMinus.zoom < before.zoom)
-        assertEquals(before.selected, afterMinus.selected)
-        assertEquals(0.0, ringOpacity(), 0.0)
-        assertEquals(pinImage, layerValue(WorldMapboxPins.SELECTION_LAYER, "icon-image"))
-        saveScreenshot("world-selection-minus")
-
-        pickPlace()
-        val beforePinch = diag(ctrl)
         assertEquals(1.0, ringOpacity(), 0.0)
         val location = IntArray(2)
         val (x, y) = compose.runOnUiThread {
@@ -244,14 +228,14 @@ class WorldGestureInputTest {
         pinch(x, y, 165f, 45f)
         val afterPinch = idle(ctrl)
         assertTrue(afterPinch.zoom < beforePinch.zoom)
-        assertEquals(before.selected, afterPinch.selected)
+        assertEquals(beforePinch.selected, afterPinch.selected)
         assertEquals(0.0, ringOpacity(), 0.0)
         saveScreenshot("world-selection-pinch")
 
         compose.onNodeWithTag("world-mini-globe").performClick()
         val globe = idle(ctrl)
         assertTrue(globe.zoom < 2.0)
-        assertEquals(before.selected, globe.selected)
+        assertEquals(beforePinch.selected, globe.selected)
         assertEquals(0.0, ringOpacity(), 0.0)
         assertEquals(pinImage, layerValue(WorldMapboxPins.SELECTION_LAYER, "icon-image"))
         saveScreenshot("world-selection-globe")
@@ -271,7 +255,7 @@ class WorldGestureInputTest {
     }
 
     @Test
-    fun worldHeaderAlignsWithMusicAndZoomRailMatchesTheCamera() {
+    fun worldHeaderAndFooterAlignAndMapCreditsStayVisible() {
         compose.waitUntil(25_000) {
             compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
         }
@@ -281,31 +265,52 @@ class WorldGestureInputTest {
         compose.onNodeWithTag("wall-tab-1").performClick()
         compose.waitUntil(15_000) { WorldTestRegistry.activeController?.let { diag(it).hasVisual } == true }
         val ctrl = controller()
-        val globe = compose.onNodeWithTag(WorldZoomStop.Globe.tag)
-        globe.performClick()
-        val globeZoom = idle(ctrl).zoom
-        compose.onNodeWithTag("world-zoom-out").assertIsNotEnabled()
+        if (compose.onAllNodes(hasTestTag("world-summary-close")).fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithTag("world-summary-close").performClick()
+        }
+        compose.runOnUiThread { ctrl.goGlobe() }
+        idle(ctrl)
         assertEquals(musicNumber, compose.onNodeWithText("02 / WORLD").fetchSemanticsNode().boundsInRoot.topLeft)
         assertEquals(musicTitle, compose.onNodeWithText("地图与旅行").fetchSemanticsNode().boundsInRoot.topLeft)
-        assertEquals(musicSearch, compose.onNodeWithTag("world-search").fetchSemanticsNode().boundsInRoot)
-        compose.onNodeWithText("行程").assertIsDisplayed()
-        compose.onNodeWithText("足迹").assertIsDisplayed()
-        val zoomIn = compose.onNodeWithTag("world-zoom-in")
-        val initialX = zoomIn.fetchSemanticsNode().boundsInRoot.center.x
-        for (stop in listOf(WorldZoomStop.Region, WorldZoomStop.City, WorldZoomStop.Street, WorldZoomStop.Globe)) {
-            val mark = compose.onNodeWithTag(stop.tag)
-            mark.performClick()
-            val deadline = SystemClock.uptimeMillis() + 3_000
-            do {
-                assertEquals("Zoom rail moved at ${stop.tag}", initialX, zoomIn.fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
-            } while (diag(ctrl).moving && SystemClock.uptimeMillis() < deadline)
-            val camera = idle(ctrl)
-            assertEquals(if (stop == WorldZoomStop.Globe) globeZoom else stop.zoom, camera.zoom, 0.03)
-            mark.assertIsSelected()
+        val search = compose.onNodeWithTag("world-search").fetchSemanticsNode().boundsInRoot
+        val places = compose.onNodeWithTag("world-place-list")
+        val placesBounds = places.fetchSemanticsNode().boundsInRoot
+        assertEquals(musicSearch, search)
+        assertEquals(search.center.y, placesBounds.center.y, 0.5f)
+        assertTrue(placesBounds.right <= search.left)
+
+        val trips = compose.onNodeWithTag("world-dock-trips")
+        val footprints = compose.onNodeWithTag("world-dock-footprints")
+        trips.assertIsDisplayed().assertHasClickAction()
+        footprints.assertIsDisplayed().assertHasClickAction()
+        assertEquals(trips.fetchSemanticsNode().boundsInRoot.center.y, footprints.fetchSemanticsNode().boundsInRoot.center.y, 0.5f)
+        compose.onNodeWithTag("world-zoom-in").assertDoesNotExist()
+        compose.onNodeWithTag("world-zoom-out").assertDoesNotExist()
+        compose.onNodeWithTag("world-gesture-hint").assertDoesNotExist()
+
+        val closedMargin = compose.runOnUiThread {
+            val logo = ctrl.mapView.logo
+            val attribution = ctrl.mapView.attribution
+            assertTrue(logo.enabled && attribution.enabled && attribution.clickable)
+            assertEquals(Gravity.BOTTOM or Gravity.END, logo.position)
+            assertEquals(logo.position, attribution.position)
+            assertEquals(logo.marginBottom, attribution.marginBottom, 0.5f)
+            assertTrue(logo.marginRight > attribution.marginRight)
+            logo.marginBottom
         }
-        compose.runOnUiThread { ctrl.zoomTo(WorldMaxZoom, durationMs = 0) }
-        assertEquals(WorldMaxZoom, idle(ctrl).zoom, 0.03)
-        zoomIn.assertIsNotEnabled()
+        saveScreenshot("world-footer-overview")
+        places.performClick()
+        compose.onNodeWithTag("world-place-query").performTextInput("南京")
+        compose.onNodeWithTag("world-place-option-nanjing-city-reference").performClick()
+        compose.onNodeWithTag("world-place-summary").assertIsDisplayed()
+        trips.assertDoesNotExist()
+        footprints.assertDoesNotExist()
+        idle(ctrl)
+        compose.runOnUiThread {
+            assertTrue(ctrl.mapView.logo.marginBottom > closedMargin)
+            assertEquals(ctrl.mapView.logo.marginBottom, ctrl.mapView.attribution.marginBottom, 0.5f)
+        }
+        saveScreenshot("world-footer-summary")
     }
 
     @Test
@@ -331,7 +336,7 @@ class WorldGestureInputTest {
         idle(ctrl)
         compose.onNodeWithTag("world-summary-close").performClick()
 
-        compose.onNodeWithTag("world-zoom-globe").performClick()
+        compose.onNodeWithTag("world-mini-globe").performClick()
         idle(ctrl)
 
         val location = IntArray(2)
@@ -408,7 +413,7 @@ class WorldGestureInputTest {
             .put("zoomDelta", zoomDelta)
             .put("globePanStop", panStopsOnRelease(ctrl, screenX, screenY))
 
-        compose.onNodeWithTag("world-zoom-street").performClick()
+        compose.runOnUiThread { ctrl.zoomTo(15.0) }
         idle(ctrl)
         record.put("streetPanStop", panStopsOnRelease(ctrl, screenX, screenY))
         File(instrumentation.targetContext.filesDir, "world-gesture-review.json").writeText(record.toString(2))
