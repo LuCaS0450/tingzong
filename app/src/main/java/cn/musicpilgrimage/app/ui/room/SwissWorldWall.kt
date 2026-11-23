@@ -9,24 +9,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -238,55 +230,25 @@ internal fun SwissWorldWall(
             }
         }
 
-        val compact by remember { derivedStateOf { controller?.hudState?.compactHeader == true } }
         val initialHud = remember { WorldHudState() }
 
         WorldHudOverlay(
             readHud = { controller?.hudState ?: initialHud },
-            cityCount = cities.size,
-            placeCount = entries.size,
             summaryOpen = summary != null,
             interactive = active,
             unit = unit,
             onGoGlobe = { controller?.goGlobe() },
-            onZoomRegion = { controller?.zoomTo(5.0, durationMs = 600) },
-            onZoomCity = { controller?.zoomTo(11.0, durationMs = 600) },
             onZoomBy = { delta -> controller?.zoomBy(delta) },
-            onZoomToStop = { stopZoom ->
-                if (stopZoom <= 0.5) controller?.goGlobe()
-                else controller?.zoomTo(stopZoom, durationMs = 650)
+            onZoomToStop = { stop ->
+                if (stop == WorldZoomStop.Globe) controller?.goGlobe()
+                else controller?.zoomTo(stop.zoom, durationMs = 650)
             },
             onTrips = onTrips,
             onFootprints = onFootprints,
             onRetryTiles = { controller?.retryTiles() },
+            onPlaces = { showChooser(emptyList()) },
+            onSearch = onSearch,
         )
-
-        SwissTextButton(
-            { showChooser(emptyList()) },
-            Modifier
-                .align(Alignment.TopEnd)
-                .offset(y = unit * if (compact) 5 else 83)
-                .padding(end = unit * if (compact) 57 else 22)
-                .heightIn(min = 48.dp)
-                .testTag("world-place-list"),
-            enabled = active,
-            contentPadding = PaddingValues(horizontal = 4.dp),
-        ) {
-            Icon(Icons.AutoMirrored.Outlined.FormatListBulleted, null, Modifier.size(18.dp), tint = RoomColors.Ink)
-            Spacer(Modifier.width(5.dp))
-            Text("地点", color = RoomColors.Ink, fontWeight = FontWeight.Medium)
-        }
-        IconButton(
-            onSearch,
-            Modifier
-                .align(Alignment.TopEnd)
-                .offset(y = unit * if (compact) 5 else 10)
-                .padding(end = unit * 10)
-                .testTag("world-search"),
-            enabled = active,
-        ) {
-            Icon(Icons.Outlined.Search, "搜索歌曲与地点", tint = RoomColors.Ink)
-        }
 
         WorldPlaceSummary(
             entry = summary,

@@ -118,13 +118,28 @@ internal val SwissWallMuted=cn.musicpilgrimage.app.design.AppArt.WallMuted
     fun play(index:Int,offset:Int){playIndex=index;playOffset=offset;prefs.edit().putInt("play-index",index).putInt("play-offset",offset).apply()}
 }
 
-@Composable internal fun SwissWallHeader(section:Int,onSearch:()->Unit) {
-    Row(Modifier.fillMaxWidth().height(112.dp).padding(start=26.dp,end=16.dp),verticalAlignment=Alignment.CenterVertically) {
+internal val SwissWallStartInset = 26.dp
+internal val SwissWallEndInset = 16.dp
+
+@Composable internal fun SwissWallHeader(
+    section: Int,
+    onSearch: () -> Unit,
+    searchEnabled: Boolean = true,
+    searchTag: String = "room-search-button",
+) {
+    Row(Modifier.fillMaxWidth().height(112.dp).padding(start=SwissWallStartInset,end=SwissWallEndInset),verticalAlignment=Alignment.CenterVertically) {
         Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(9.dp)) {
             Text(listOf("01 / MUSIC","02 / WORLD","03 / PLAY","04 / PERSONAL")[section],color=SwissRed,fontSize=11.sp,letterSpacing=1.8.sp,fontWeight=FontWeight.Medium)
             Text(listOf("唱片架","地图与旅行","演奏","我的空间")[section],fontSize=32.sp,lineHeight=38.sp,fontWeight=FontWeight.Bold,letterSpacing=(-.45).sp,color=SwissInk)
         }
-        IconButton(onSearch,Modifier.size(48.dp).testTag("room-search-button")){Icon(Icons.Outlined.Search,"搜索歌曲",Modifier.size(24.dp),tint=RoomColors.Ink)}
+        SwissWallSearchButton(onSearch, searchEnabled, searchTag)
+    }
+}
+
+@Composable
+internal fun SwissWallSearchButton(onSearch: () -> Unit, enabled: Boolean, tag: String) {
+    IconButton(onSearch, Modifier.size(48.dp).testTag(tag), enabled = enabled) {
+        Icon(Icons.Outlined.Search, "搜索歌曲", Modifier.size(24.dp), tint = RoomColors.Ink)
     }
 }
 

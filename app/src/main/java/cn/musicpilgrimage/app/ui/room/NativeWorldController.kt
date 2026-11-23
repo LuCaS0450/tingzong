@@ -88,6 +88,16 @@ internal const val InitialWorldLongitude = 35.0
 internal const val InitialWorldLatitude = 24.0
 internal const val WorldFovDegrees = 36.86989764584402
 internal const val MapboxGlobeZoomOffset = 0.48
+internal const val WorldMaxZoom = 18.0
+
+internal enum class WorldZoomStop(val zoom: Double, val threshold: Double, val label: String, val tag: String) {
+    Street(15.0, 13.0, "街道", "world-zoom-street"),
+    City(11.0, 7.0, "城市", "world-zoom-city"),
+    Region(5.0, 3.0, "国家或地区", "world-zoom-region"),
+    Globe(0.0, Double.NEGATIVE_INFINITY, "地球", "world-zoom-globe");
+
+    val trackFraction get() = (ordinal + 0.5f) / entries.size
+}
 
 internal data class GlobeBounds(val x: Float, val y: Float, val radius: Float)
 
@@ -276,18 +286,27 @@ internal object WorldMapMath {
         return label to barPx
     }
 
-    fun levelLabel(zoom: Double): String = when {
-        zoom >= 13.0 -> "街道"
-        zoom >= 7.0 -> "城市"
-        zoom >= 3.0 -> "国家或地区"
-        else -> "地球"
-    }
+    fun levelLabel(zoom: Double): String =
+        WorldZoomStop.entries.firstOrNull { zoom >= it.threshold }?.label ?: WorldZoomStop.Globe.label
 
-    fun zoomRailFraction(zoom: Double, globeZoom: Double): Float = when {
-        zoom >= 11.0 -> ((15.0 - zoom) / 4.0 / 3.0).coerceAtLeast(0.0)
-        zoom >= 5.0 -> (1.0 + (11.0 - zoom) / 6.0) / 3.0
-        else -> (2.0 + ((5.0 - zoom) / (5.0 - globeZoom)).coerceIn(0.0, 1.0)) / 3.0
-    }.toFloat()
+    fun zoomRailFraction(zoom: Double, globeZoom: Double): Float {
+        val stops = WorldZoomStop.entries
+        val street = WorldZoomStop.Street
+        if (zoom >= street.zoom) {
+            val remaining = ((WorldMaxZoom - zoom) / (WorldMaxZoom - street.zoom)).coerceIn(0.0, 1.0)
+            return street.trackFraction * remaining.toFloat()
+        }
+        for (index in 0 until stops.lastIndex) {
+            val upper = stops[index]
+            val lower = stops[index + 1]
+            val lowerZoom = if (lower == WorldZoomStop.Globe) globeZoom else lower.zoom
+            if (zoom >= lowerZoom) {
+                val fraction = ((upper.zoom - zoom) / (upper.zoom - lowerZoom)).toFloat()
+                return upper.trackFraction + (lower.trackFraction - upper.trackFraction) * fraction
+            }
+        }
+        return WorldZoomStop.Globe.trackFraction
+    }
 
     fun globenessForZoom(zoom: Double): Float = ((6.0 - zoom) / 1.0).toFloat().coerceIn(0f, 1f)
 
@@ -448,7 +467,7 @@ internal class NativeWorldController(
             }
             false
         }
-        map.setBounds(CameraBoundsOptions.Builder().minZoom(0.0).maxZoom(18.0).minPitch(0.0).maxPitch(0.0).build())
+        map.setBounds(CameraBoundsOptions.Builder().minZoom(0.0).maxZoom(WorldMaxZoom).minPitch(0.0).maxPitch(0.0).build())
         subscriptions += map.subscribeCameraChanged {
             if (destroyed || !started) return@subscribeCameraChanged
             syncGlobeLighting(it.cameraState)
@@ -522,7 +541,7 @@ internal class NativeWorldController(
         if (!styleRequested && mapView.width > 0 && mapView.height > 0) {
             val lat = WorldMapMath.clampLatitude(initialSnapshot?.latitude ?: InitialWorldLatitude)
             val lon = initialSnapshot?.longitude ?: InitialWorldLongitude
-            val zoom = (initialSnapshot?.zoom ?: overviewZoom).coerceIn(overviewZoom, 18.0)
+            val zoom = (initialSnapshot?.zoom ?: overviewZoom).coerceIn(overviewZoom, WorldMaxZoom)
             map.setBounds(CameraBoundsOptions.Builder().minZoom(overviewZoom).build())
             loadStyle(cameraOptions(lat, lon, zoom))
         } else if (ready) {
@@ -570,7 +589,7 @@ internal class NativeWorldController(
 
     private fun cameraOptions(lat: Double, lon: Double, zoom: Double): CameraOptions {
         val latitude = WorldMapMath.clampLatitude(lat)
-        val level = zoom.coerceIn(0.0, 18.0)
+        val level = zoom.coerceIn(0.0, WorldMaxZoom)
         return CameraOptions.Builder()
             .center(Point.fromLngLat(WorldMapMath.wrapLongitude(lon), latitude))
             .zoom(level)
@@ -637,7 +656,7 @@ internal class NativeWorldController(
             WorldFocusKind.Pin -> camera.zoom
             WorldFocusKind.List -> max(11.0, camera.zoom)
             WorldFocusKind.Street -> 15.0
-        }.coerceIn(overviewZoom, 18.0)
+        }.coerceIn(overviewZoom, WorldMaxZoom)
         moveCamera(
             place.latitude, place.longitude, zoom,
             if (focus.kind == WorldFocusKind.Pin) 360 else 750,
@@ -717,7 +736,7 @@ internal class NativeWorldController(
     fun zoomTo(targetZoom: Double, durationMs: Int = 450) {
         val camera = map.cameraState
         val latitude = camera.center.latitude()
-        moveCamera(latitude, camera.center.longitude(), targetZoom.coerceIn(overviewZoom, 18.0),
+        moveCamera(latitude, camera.center.longitude(), targetZoom.coerceIn(overviewZoom, WorldMaxZoom),
             durationMs, fly = durationMs > 400)
     }
 
@@ -959,7 +978,7 @@ internal class NativeWorldController(
             if (destroyed) return@getGeoJsonClusterExpansionZoom
             val nextZoom = (result.value?.value?.contents as? Number)?.toDouble()?.plus(0.35)
                 ?: (map.cameraState.zoom + 2.0)
-            if (nextZoom < 18.0) {
+            if (nextZoom < WorldMaxZoom) {
                 moveCamera(point.latitude(), point.longitude(), max(nextZoom, map.cameraState.zoom + 0.8), 550, fly = true)
             } else {
                 map.getGeoJsonClusterLeaves(WorldMapboxPins.PLACES, feature, entries.size.toLong(), 0) { leaves ->

@@ -8,8 +8,11 @@ import android.view.MotionEvent
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,7 +21,9 @@ import cn.musicpilgrimage.app.ui.room.NativeWorldController
 import cn.musicpilgrimage.app.ui.room.WorldDiagnosticsSnapshot
 import cn.musicpilgrimage.app.ui.room.WorldMapMath
 import cn.musicpilgrimage.app.ui.room.WorldMapboxPins
+import cn.musicpilgrimage.app.ui.room.WorldMaxZoom
 import cn.musicpilgrimage.app.ui.room.WorldTestRegistry
+import cn.musicpilgrimage.app.ui.room.WorldZoomStop
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -266,23 +271,41 @@ class WorldGestureInputTest {
     }
 
     @Test
-    fun zoomRailKeepsItsScreenPositionAcrossLevelLabels() {
+    fun worldHeaderAlignsWithMusicAndZoomRailMatchesTheCamera() {
         compose.waitUntil(25_000) {
             compose.onAllNodes(hasTestTag("wall-tab-1")).fetchSemanticsNodes().isNotEmpty()
         }
+        val musicNumber = compose.onNodeWithText("01 / MUSIC").fetchSemanticsNode().boundsInRoot.topLeft
+        val musicTitle = compose.onNodeWithText("唱片架").fetchSemanticsNode().boundsInRoot.topLeft
+        val musicSearch = compose.onNodeWithTag("room-search-button").fetchSemanticsNode().boundsInRoot
         compose.onNodeWithTag("wall-tab-1").performClick()
         compose.waitUntil(15_000) { WorldTestRegistry.activeController?.let { diag(it).hasVisual } == true }
         val ctrl = controller()
+        val globe = compose.onNodeWithTag(WorldZoomStop.Globe.tag)
+        globe.performClick()
+        val globeZoom = idle(ctrl).zoom
+        compose.onNodeWithTag("world-zoom-out").assertIsNotEnabled()
+        assertEquals(musicNumber, compose.onNodeWithText("02 / WORLD").fetchSemanticsNode().boundsInRoot.topLeft)
+        assertEquals(musicTitle, compose.onNodeWithText("地图与旅行").fetchSemanticsNode().boundsInRoot.topLeft)
+        assertEquals(musicSearch, compose.onNodeWithTag("world-search").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText("行程").assertIsDisplayed()
+        compose.onNodeWithText("足迹").assertIsDisplayed()
         val zoomIn = compose.onNodeWithTag("world-zoom-in")
         val initialX = zoomIn.fetchSemanticsNode().boundsInRoot.center.x
-        for (tag in listOf("world-zoom-region", "world-zoom-street", "world-zoom-globe")) {
-            compose.onNodeWithTag(tag).performClick()
+        for (stop in listOf(WorldZoomStop.Region, WorldZoomStop.City, WorldZoomStop.Street, WorldZoomStop.Globe)) {
+            val mark = compose.onNodeWithTag(stop.tag)
+            mark.performClick()
             val deadline = SystemClock.uptimeMillis() + 3_000
             do {
-                assertEquals("Zoom rail moved at $tag", initialX, zoomIn.fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
+                assertEquals("Zoom rail moved at ${stop.tag}", initialX, zoomIn.fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
             } while (diag(ctrl).moving && SystemClock.uptimeMillis() < deadline)
-            assertFalse("Camera did not settle at $tag", diag(ctrl).moving)
+            val camera = idle(ctrl)
+            assertEquals(if (stop == WorldZoomStop.Globe) globeZoom else stop.zoom, camera.zoom, 0.03)
+            mark.assertIsSelected()
         }
+        compose.runOnUiThread { ctrl.zoomTo(WorldMaxZoom, durationMs = 0) }
+        assertEquals(WorldMaxZoom, idle(ctrl).zoom, 0.03)
+        zoomIn.assertIsNotEnabled()
     }
 
     @Test
