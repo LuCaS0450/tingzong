@@ -7,7 +7,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -175,16 +174,8 @@ internal fun NativeReleaseArchive(
                         Text("${release.artist} · 发行封面",fontSize = 12.sp,color = RoomColors.Muted)
                         Spacer(Modifier.height(16.dp))
                         Row(Modifier.fillMaxWidth()) {
-                            TextButton(onFavorite, Modifier.weight(1f)) {
-                                ArchiveFavoriteIcon(favorite, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(if(favorite) "已收藏" else "收藏",color = RoomColors.Ink)
-                            }
-                            TextButton(onSearch, Modifier.weight(1f)) {
-                                Icon(Icons.Outlined.Search,null,Modifier.size(20.dp),tint = RoomColors.Ink)
-                                Spacer(Modifier.width(8.dp))
-                                Text("搜索",color = RoomColors.Ink)
-                            }
+                            ArchiveFavoriteAction(favorite, onFavorite, Modifier.testTag("release-archive-favorite"))
+                            ArchiveSearchAction(onSearch, Modifier.testTag("release-archive-search"))
                         }
                         ReleaseSectionTitle("收录作品", "WORKS")
                         release.works.forEachIndexed { index, work ->

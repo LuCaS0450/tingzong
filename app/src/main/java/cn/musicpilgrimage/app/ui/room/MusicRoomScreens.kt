@@ -92,6 +92,6 @@ import kotlinx.coroutines.flow.first
     }
 }
 
-@Composable internal fun RoomSong(work:MusicWork,releaseTitle:String,favorite:Boolean,onFavorite:()->Unit,onPlace:(String)->Unit,onBack:()->Unit={},onRelease:()->Unit={}) {
-    NativeWorkArchive(work,releaseTitle,favorite,onFavorite,onPlace,onBack,onRelease)
+@Composable internal fun RoomSong(work:MusicWork,releaseTitle:String,favorite:Boolean,onFavorite:()->Unit,onPlace:(String)->Unit,onBack:()->Unit={},onSearch:()->Unit={}) {
+    NativeWorkArchive(work,releaseTitle,favorite,onFavorite,onPlace,onBack,onSearch)
 }

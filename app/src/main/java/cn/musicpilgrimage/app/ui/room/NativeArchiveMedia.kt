@@ -130,6 +130,7 @@ internal fun ArchiveImage(
     fullImage: String? = null,
     fullImageSize: IntSize = IntSize.Zero,
     thumbnail: ImageBitmap? = null,
+    sleeve: Boolean = false,
 ) {
     val viewer = LocalPhotoViewerCoordinator.current
     var source by remember(model, fallback) { mutableStateOf(model) }
@@ -142,7 +143,7 @@ internal fun ArchiveImage(
     val unavailable by rememberUpdatedState(onUnavailable)
     val placeholder = remember(thumbnail) { thumbnail?.let { BitmapPainter(it) } }
     Box(
-        modifier.clipToBounds().onGloballyPositioned { coordinates ->
+        modifier.onGloballyPositioned { coordinates ->
             val visible = coordinates.boundsInRoot()
             val measured = coordinates.size
             bounds = visible.takeIf {
@@ -150,6 +151,8 @@ internal fun ArchiveImage(
             }
         }.clickable(enabled = loaded && !hidden, role = Role.Button, onClickLabel = "查看$description") { viewing = true }
             .drawWithContent { if (viewer?.hiddenPhotoId != id) drawContent() }
+            .then(if (sleeve) Modifier.sleeveShadow().coverSleeve() else Modifier)
+            .clipToBounds()
             .background(RoomColors.Line.copy(alpha = .3f)),
     ) {
         AsyncImage(

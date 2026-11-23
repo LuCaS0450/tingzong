@@ -22,9 +22,10 @@ internal fun Modifier.sleeveShadow(): Modifier = drawWithCache {
         val bitmap = Bitmap.createBitmap(272, 272, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.argb(49, 30, 39, 30)
-            maskFilter = BlurMaskFilter(5f, BlurMaskFilter.Blur.NORMAL)
+            color = android.graphics.Color.argb(35, 30, 39, 30)
+            maskFilter = BlurMaskFilter(4f, BlurMaskFilter.Blur.NORMAL)
         }
+        canvas.drawRect(16f, 16f, 256f, 256f, paint)
         val edge = android.graphics.Path().apply {
             moveTo(17f, 16f)
             lineTo(255f, 17f)
@@ -33,6 +34,8 @@ internal fun Modifier.sleeveShadow(): Modifier = drawWithCache {
             quadTo(128f, 252f, 18f, 257f)
             close()
         }
+        paint.color = android.graphics.Color.argb(49, 30, 39, 30)
+        paint.maskFilter = BlurMaskFilter(5f, BlurMaskFilter.Blur.NORMAL)
         canvas.drawPath(edge, paint)
         paint.color = android.graphics.Color.argb(50, 30, 39, 30)
         paint.maskFilter = BlurMaskFilter(1.7f, BlurMaskFilter.Blur.NORMAL)

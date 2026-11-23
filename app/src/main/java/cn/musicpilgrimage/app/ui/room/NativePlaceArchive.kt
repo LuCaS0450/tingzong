@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cn.musicpilgrimage.app.R
 import cn.musicpilgrimage.app.data.Place
 import cn.musicpilgrimage.app.ui.LocalDetailZoom
 import cn.musicpilgrimage.app.ui.LocalRouteEntryId
@@ -93,21 +95,12 @@ internal fun NativePlaceArchive(
             )
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth()) {
-                SwissTextButton(onFavorite, Modifier.weight(1f).testTag("place-archive-favorite"), enabled = !favoriteBusy,
-                    contentPadding = PaddingValues(horizontal = 4.dp)) {
-                    ArchiveFavoriteIcon(favorite, null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(if (favorite) "已收藏" else "收藏", color = RoomColors.Ink)
+                ArchiveFavoriteAction(favorite, onFavorite, Modifier.testTag("place-archive-favorite"), enabled = !favoriteBusy)
+                ArchiveIconAction("加入行程", onAdd, Modifier.testTag("place-archive-add-trip")) {
+                    Icon(painterResource(R.drawable.ic_archive_add_trip), null, it)
                 }
-                SwissTextButton(onAdd, Modifier.weight(1.25f).testTag("place-archive-add-trip"), contentPadding = PaddingValues(horizontal = 4.dp)) {
-                    Icon(Icons.Outlined.Add, null, Modifier.size(18.dp), tint = RoomColors.Ink)
-                    Spacer(Modifier.width(4.dp))
-                    Text("加入行程", color = RoomColors.Ink)
-                }
-                SwissTextButton(onMap, Modifier.weight(1f).testTag("place-archive-map"), contentPadding = PaddingValues(horizontal = 4.dp)) {
-                    Icon(Icons.Outlined.LocationOn, null, Modifier.size(18.dp), tint = RoomColors.Ink)
-                    Spacer(Modifier.width(4.dp))
-                    Text("地图", color = RoomColors.Ink)
+                ArchiveIconAction("地图", onMap, Modifier.testTag("place-archive-map")) {
+                    Icon(Icons.Outlined.LocationOn, null, it)
                 }
             }
             ReleaseSectionTitle("地点与音乐", "THE CONNECTION")

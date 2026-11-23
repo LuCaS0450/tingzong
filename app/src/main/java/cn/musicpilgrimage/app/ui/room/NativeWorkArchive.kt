@@ -3,9 +3,6 @@ package cn.musicpilgrimage.app.ui.room
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -21,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.MusicWork
 import cn.musicpilgrimage.app.ui.LocalDetailZoom
 import cn.musicpilgrimage.app.ui.LocalRouteEntryId
+import cn.musicpilgrimage.app.ui.RELEASE_COVER_SIDE_INSET
 
 @Composable
 internal fun NativeWorkArchive(
@@ -30,7 +28,7 @@ internal fun NativeWorkArchive(
     onFavorite: () -> Unit,
     onPlace: (String) -> Unit,
     onBack: () -> Unit,
-    onRelease: () -> Unit,
+    onSearch: () -> Unit,
 ) {
     val context = LocalContext.current
     val media = remember(context) { SwissDetailMedia(context) }
@@ -46,8 +44,10 @@ internal fun NativeWorkArchive(
     RoomWall(Modifier.fillMaxSize().testTag("native-work-archive")) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val unit = maxWidth / 360
+            val inset = unit * RELEASE_COVER_SIDE_INSET
             val ratio = (art?.aspectRatio ?: 1f).coerceIn(.35f, 3f)
-            val threshold = with(LocalDensity.current) { ((if (cover.isBlank()) 0.dp else maxWidth / ratio) + 105.dp).roundToPx() }
+            val coverHeight = if (cover.isBlank()) 0.dp else unit * 16 + (maxWidth - inset * 2) / ratio
+            val threshold = with(LocalDensity.current) { (coverHeight + 105.dp).roundToPx() }
             val collapsed by remember(scroll, threshold) { derivedStateOf { scroll.value >= threshold } }
             Column(Modifier.fillMaxSize()) {
                 Spacer(Modifier.height(unit * 32))
@@ -56,10 +56,12 @@ internal fun NativeWorkArchive(
                     if (cover.isNotBlank()) {
                         ArchiveImage(
                             "$entryId:work:${work.id}", cover, "作品发行封面",
-                            Modifier.padding(top = unit * 16).fillMaxWidth().aspectRatio(ratio).testTag("work-archive-cover"),
+                            Modifier.padding(start = inset, top = unit * 16, end = inset)
+                                .fillMaxWidth().aspectRatio(ratio).testTag("work-archive-cover"),
                             fallback = art?.imageUrl, credit = art?.imageCredit?.replace(Regex("https?://\\S+"), "")?.trim(' ', '·'),
                             onSources = { sources = true },
                             thumbnail = transitionThumbnail,
+                            sleeve = true,
                         )
                     }
                     Column(Modifier.fillMaxWidth().padding(horizontal = unit * 22).padding(top = 22.dp, bottom = 30.dp)) {
@@ -83,16 +85,8 @@ internal fun NativeWorkArchive(
                         }
                         Spacer(Modifier.height(12.dp))
                         Row(Modifier.fillMaxWidth()) {
-                            SwissTextButton(onFavorite, Modifier.weight(1f)) {
-                                ArchiveFavoriteIcon(favorite, null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(if (favorite) "已收藏" else "收藏", color = RoomColors.Ink)
-                            }
-                            SwissTextButton(onRelease, Modifier.weight(1f)) {
-                                Text("发行详情", color = RoomColors.Ink)
-                                Spacer(Modifier.width(8.dp))
-                                Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(17.dp), tint = RoomColors.Ink)
-                            }
+                            ArchiveFavoriteAction(favorite, onFavorite, Modifier.testTag("work-archive-favorite"))
+                            ArchiveSearchAction(onSearch, Modifier.testTag("work-archive-search"))
                         }
                         ReleaseSectionTitle("关联地点", "PLACES")
                         places.forEach { place ->

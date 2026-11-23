@@ -9,12 +9,14 @@ import android.webkit.WebView
 import androidx.activity.BackEventCompat
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.AnnotatedString
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import cn.musicpilgrimage.app.data.Catalog
+import cn.musicpilgrimage.app.data.MusicCatalogue
 import cn.musicpilgrimage.app.data.Place
 import cn.musicpilgrimage.app.data.Scene
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
@@ -214,6 +216,20 @@ class PrototypeMainNavigationUiTest {
         compose.onNodeWithTag("world-place-list").assertIsDisplayed()
     }
 
+    private fun openShelfReleaseForWork(workId: String): String {
+        val shelf = compose.onNodeWithTag("shelf-pager")
+        compose.waitUntil(10_000) { shelf.isDisplayed() }
+        val services = (compose.activity.application as PilgrimageApplication).services
+        val catalogue = MusicCatalogue.from(services.catalog.value)
+        val releaseId = catalogue.works.first { it.id == workId }.releaseId
+        val releaseIndex = catalogue.releases.indexOfFirst { it.id == releaseId }
+        require(releaseIndex >= 0)
+        shelf.performScrollToIndex(releaseIndex / 6)
+        compose.onNodeWithTag("room-release-$releaseId").performClick()
+        compose.onNodeWithTag("native-release-archive").assertIsDisplayed()
+        return catalogue.releases[releaseIndex].title
+    }
+
     private fun chooseWorldPlace(query: String, placeId: String? = null) {
         compose.onNodeWithTag("world-place-list").performClick()
         val search = compose.onNodeWithTag("world-place-query")
@@ -274,13 +290,25 @@ class PrototypeMainNavigationUiTest {
     @ExtendedDeviceTest
     @Test
     fun archiveLinksOpenTheSelectedPlaceAndReturnToTheRightArchive() {
+        fun link(label: String) = compose.onNode(hasText(label) and hasClickAction())
+        val placeTitle = compose.onNodeWithTag("place-archive-title")
+
+        openShelfReleaseForWork("david|susan说")
+        val releaseTitle = compose.onNodeWithTag("release-archive-title")
+        releaseTitle.assertTextEquals("太平盛世")
+        val nanjing = link("南京")
+        nanjing.performScrollTo().performClick()
+        placeTitle.assertTextEquals("南京")
+        Espresso.pressBack()
+        releaseTitle.assertTextEquals("太平盛世")
+        nanjing.assertIsDisplayed()
+        Espresso.pressBack()
+
         openWorld()
         chooseWorldPlace("Susan说", "taipei-city-reference")
         compose.onNodeWithTag("world-summary-detail").performClick()
-        val placeTitle = compose.onNodeWithTag("place-archive-title")
         placeTitle.assertTextEquals("台北")
 
-        fun link(label: String) = compose.onNode(hasText(label) and hasClickAction())
         link("Susan说").performScrollTo().performClick()
         val workTitle = compose.onNodeWithTag("work-archive-title")
         workTitle.assertTextEquals("Susan说")
@@ -294,19 +322,6 @@ class PrototypeMainNavigationUiTest {
             row.assertIsDisplayed()
         }
 
-        val release = link("发行详情")
-        release.performScrollTo().performClick()
-        val releaseTitle = compose.onNodeWithTag("release-archive-title")
-        releaseTitle.assertTextEquals("太平盛世")
-        val nanjing = link("南京")
-        nanjing.performScrollTo().performClick()
-        placeTitle.assertTextEquals("南京")
-        Espresso.pressBack()
-        releaseTitle.assertTextEquals("太平盛世")
-        nanjing.assertIsDisplayed()
-
-        link("Susan说").performScrollTo().performClick()
-        workTitle.assertTextEquals("Susan说")
         link("台北").performScrollTo().performClick()
         placeTitle.assertTextEquals("台北")
         link("Susan说").assertIsDisplayed()
@@ -662,7 +677,25 @@ class PrototypeMainNavigationUiTest {
         checkThumbnails()
         compose.onNodeWithText("资料来源 ↗").performScrollTo()
         captureAccountScreen("work-related-place-previews", compose)
-        compose.onNodeWithText("发行详情").performScrollTo().performClick()
+
+        compose.onNodeWithTag("work-archive-search").performScrollTo()
+            .assertContentDescriptionEquals("搜索").performClick()
+        val searchInput = compose.onNodeWithTag("room-search-input")
+        searchInput.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("")))
+        Espresso.closeSoftKeyboard()
+        Espresso.pressBack()
+        compose.onNodeWithTag("native-work-archive").assertIsDisplayed()
+        Espresso.pressBack()
+        searchInput.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString("学不会")))
+        Espresso.closeSoftKeyboard()
+        Espresso.pressBack()
+
+        val releaseName = openShelfReleaseForWork("jj|学不会")
+        compose.onNodeWithTag("release-archive-search").performScrollTo()
+            .assertContentDescriptionEquals("搜索").performClick()
+        searchInput.assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(releaseName)))
+        Espresso.closeSoftKeyboard()
+        Espresso.pressBack()
         compose.onNodeWithTag("native-release-archive").assertIsDisplayed()
         checkThumbnails()
         compose.onNodeWithText("资料来源 ↗").performScrollTo()

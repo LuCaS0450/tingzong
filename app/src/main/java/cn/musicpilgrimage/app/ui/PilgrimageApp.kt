@@ -693,7 +693,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
       LaunchedEffect(work.id,libraryOwner){music.browseWork(work.id)}
       RoomSong(work,musicCatalog.releases.find{it.id==work.releaseId}?.title.orEmpty(),work.id in musicFavorites.songs,{music.toggleFavorite(work.id)},
        {openArchivePlace(e,it,work.places)},
-       onBack=back,onRelease={followMusicArchiveLink(e,"album/${Uri.encode(work.releaseId)}")})
+       onBack=back,onSearch={navigate("search")})
      }}
      page("explore"){e->
       SwissWorldWall(sourceCatalog,wallBrowse,archiveState.places.toSet(),archiveState.loading,
