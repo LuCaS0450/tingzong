@@ -301,8 +301,11 @@ private fun WorldSummaryPreview(entry: WorldPlaceEntry) {
 
     val initialRatio = scene?.aspectRatio ?: photo?.let { it.width.toFloat() / it.height.coerceAtLeast(1) } ?: 1f
     var ratio by rememberSaveable(scene?.id, sceneSources) { mutableFloatStateOf(initialRatio.coerceIn(.65f, 1.85f)) }
-    val timestamp = scene?.timestampSeconds?.let { "${(it / 60).toString().padStart(2, '0')}:${(it % 60).toString().padStart(2, '0')}" }
-    val credit = listOfNotNull(scene?.artistName, scene?.archiveMediaLabel()?.takeIf { useScene }, timestamp?.takeIf { useScene })
+    val creditedMedia = scene?.takeIf { useScene }?.takeUnless {
+        it.referenceKind == "release_cover" && it.archiveConnection() != ArchiveConnection.ReleasePhoto
+    }
+    val timestamp = creditedMedia?.timestampSeconds?.let { "${(it / 60).toString().padStart(2, '0')}:${(it % 60).toString().padStart(2, '0')}" }
+    val credit = listOfNotNull(scene?.artistName, creditedMedia?.archiveMediaLabel(), timestamp)
         .filter(String::isNotBlank).joinToString(" · ")
     HorizontalDivider(Modifier.padding(top = 8.dp), color = RoomColors.Line)
     Row(

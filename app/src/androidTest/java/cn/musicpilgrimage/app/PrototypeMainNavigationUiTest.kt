@@ -229,6 +229,32 @@ class PrototypeMainNavigationUiTest {
 
     @ExtendedDeviceTest
     @Test
+    fun worldSummarySeparatesSongArtworkFromCoverPhotography() {
+        openWorld()
+
+        fun checkSummary(query: String, placeId: String, relation: String, credit: String, capture: Boolean = false) {
+            chooseWorldPlace(query, placeId)
+            compose.onNodeWithText(relation, substring = true).assertIsDisplayed()
+            compose.onNodeWithTag("world-summary-media-credit").assertTextEquals(credit)
+            val preview = compose.onNodeWithTag("world-summary-art", useUnmergedTree = true)
+            compose.waitUntil(10_000) { preview.isDisplayed() }
+            if (capture) {
+                val instrumentation = InstrumentationRegistry.getInstrumentation()
+                File(instrumentation.targetContext.filesDir, "world-summary-$placeId.png").outputStream().use {
+                    instrumentation.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+            }
+            compose.onNodeWithTag("world-summary-close").performClick()
+        }
+
+        checkSummary("长安", "changan-city-jay-reference", "歌词提及", "周杰伦", capture = true)
+        checkSummary("东京山手线", "tokyo-yamanote-reference", "歌词提及", "周杰伦", capture = true)
+        checkSummary("爱琴海", "aegean-sea-reference", "歌名关联", "周杰伦")
+        checkSummary("绍兴路", "shaoxing-road-orange-moon-cover-reference", "封面 / 专辑取景", "方大同 · 正式发行封面")
+    }
+
+    @ExtendedDeviceTest
+    @Test
     fun archiveLinksOpenTheSelectedPlaceAndReturnToTheRightArchive() {
         openWorld()
         chooseWorldPlace("Susan说", "taipei-city-reference")
