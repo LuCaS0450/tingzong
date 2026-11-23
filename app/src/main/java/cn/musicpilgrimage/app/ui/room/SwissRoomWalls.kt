@@ -14,9 +14,6 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.selection.selectable
@@ -35,7 +32,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -47,7 +43,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,7 +54,6 @@ import cn.musicpilgrimage.app.ui.LocalRouteEntryId
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.tanh
-import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.max
 import kotlin.math.min
@@ -319,35 +313,12 @@ internal val SwissWallTabsHeight=69.dp
 
 @Composable internal fun SwissPlayWall(entries:List<PerformanceEntry>,artwork:(SongPackage)->ReleaseArtwork?,loaded:Boolean,browse:RoomBrowseState,
     downloads:Map<String,AudioDownloadState>,onSong:(String)->Unit,onRetry:()->Unit) {
-    val list=rememberLazyListState(browse.playIndex.coerceAtLeast(0),browse.playOffset.coerceAtLeast(0))
-    LaunchedEffect(list){snapshotFlow{list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset}.distinctUntilChanged().collect{(index,offset)->browse.play(index,offset)}}
-    LazyColumn(Modifier.fillMaxSize().testTag("performance-list"),state=list,contentPadding=PaddingValues(26.dp,0.dp,26.dp,24.dp)) {
-        item("piano") {
-            AsyncImage(roomAsset("piano-front","png"),"完整正视炭黑缎面立式钢琴",Modifier.fillMaxWidth().aspectRatio(1.5f).padding(top=4.dp,bottom=14.dp),contentScale=ContentScale.Fit)
-        }
-        item("title") {Row(Modifier.fillMaxWidth().padding(top=10.dp,bottom=18.dp),verticalAlignment=Alignment.CenterVertically) {
-            Text("可演奏曲目",Modifier.weight(1f),fontSize=19.sp,fontWeight=FontWeight.Medium,color=SwissInk)
-            Text("${entries.size.toString().padStart(2,'0')} TRACKS",fontSize=10.sp,letterSpacing=1.sp,color=SwissRed)
-        }}
-        if(!loaded)item("loading"){CircularProgressIndicator(Modifier.size(24.dp),color=SwissInk)}
-        items(entries,key={it.song.id}){entry->
-            val status=downloads[entry.song.id]
-            Column(Modifier.fillMaxWidth().testTag("performance-song-${entry.song.id}").clickable(role=Role.Button){onSong(entry.song.id)}) {
-                Row(Modifier.fillMaxWidth().padding(vertical=14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
-                    RoomCover(artwork(entry.song),entry.song.title,Modifier.size(62.dp))
-                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                        Text(entry.song.title,color=SwissInk,fontSize=17.sp,lineHeight=21.sp,fontWeight=FontWeight.SemiBold,
-                            letterSpacing=(-.2).sp,maxLines=2,overflow=TextOverflow.Ellipsis)
-                        Text(entry.song.artist,color=SwissWallMuted,fontSize=12.sp)
-                        val duration="${entry.song.durationUs/60_000_000}:${(entry.song.durationUs/1_000_000%60).toString().padStart(2,'0')}"
-                        Text(if(entry.audioReady)"$duration · 可离线演奏" else status?.label?:"$duration · 音乐准备中",color=if(status?.failed==true)SwissRed else SwissWallMuted,fontSize=11.sp,letterSpacing=.15.sp,maxLines=1)
-                    }
-                    Icon(Icons.Outlined.PlayArrow,"演奏${entry.song.title}",Modifier.size(22.dp),tint=SwissInk)
-                }
-                if(!entry.audioReady&&status?.progress!=null)LinearProgressIndicator(progress={status.progress},Modifier.fillMaxWidth().height(1.dp),color=SwissRed,trackColor=RoomColors.Line)
-                HorizontalDivider(color=RoomColors.Line.copy(alpha=.7f),thickness=.5.dp)
-            }
-        }
-        if(downloads.values.any{it.failed})item("retry"){SwissTextButton(onRetry,Modifier.padding(top=12.dp)){Text("重试未完成曲目",color=SwissRed)}}
-    }
+    RoomBauhausPianoWall(
+        entries = entries,
+        loaded = loaded,
+        browse = browse,
+        downloads = downloads,
+        onSong = onSong,
+        onRetry = onRetry,
+    )
 }
