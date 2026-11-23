@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -40,6 +41,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.Place
@@ -147,6 +149,7 @@ internal fun WorldPlaceChooser(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun WorldPlaceSummary(
     entry: WorldPlaceEntry?,
@@ -201,6 +204,9 @@ internal fun WorldPlaceSummary(
         }
     }
     val presented = entry ?: retained?.takeIf { motion } ?: return
+    val scene = presented.scene
+    val songArtwork = scene?.referenceKind == "release_cover" && scene.archiveConnection() != ArchiveConnection.ReleasePhoto
+    val relation = scene?.kindLabel ?: "音乐地点"
     val drag = rememberDraggableState { delta ->
         offset = (offset + delta).coerceIn(0f, height.coerceAtLeast(1).toFloat())
     }
@@ -248,16 +254,29 @@ internal fun WorldPlaceSummary(
                     }
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f).padding(vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            SwissEyebrow(presented.scene?.kindLabel ?: "音乐地点")
+                            if (!songArtwork) SwissEyebrow(relation)
                             Text(presented.name, Modifier.testTag("world-summary-title"),
                                 color = RoomColors.Ink, fontSize = 24.sp, fontWeight = FontWeight.SemiBold, lineHeight = 30.sp)
-                            if (presented.location.isNotBlank()) Text(presented.location, color = RoomColors.Muted, fontSize = 14.sp)
+                            if (songArtwork) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
+                                    Text(relation, color = RoomColors.Red, fontSize = 11.sp, lineHeight = 17.sp,
+                                        fontWeight = FontWeight.Medium)
+                                    if (presented.location.isNotBlank()) {
+                                        Text(presented.location, color = RoomColors.Muted, fontSize = 12.sp, lineHeight = 17.sp)
+                                    }
+                                }
+                            } else if (presented.location.isNotBlank()) {
+                                Text(presented.location, color = RoomColors.Muted, fontSize = 14.sp)
+                            }
                         }
                         IconButton(onDismiss, Modifier.testTag("world-summary-close"), enabled = actionsEnabled) {
                             Icon(Icons.Outlined.Close, "收起地点摘要", tint = RoomColors.Muted)
                         }
                     }
-                    WorldSummaryPreview(presented)
+                    WorldSummaryPreview(presented, songArtwork)
                     HorizontalDivider(color = RoomColors.Line)
                     Spacer(Modifier.height(10.dp))
                     val id = presented.place.id
@@ -281,7 +300,7 @@ internal fun WorldPlaceSummary(
 }
 
 @Composable
-private fun WorldSummaryPreview(entry: WorldPlaceEntry) {
+private fun WorldSummaryPreview(entry: WorldPlaceEntry, songArtwork: Boolean) {
     val context = LocalContext.current
     val scene = entry.scene
     val sceneSources = remember(context, scene) {
@@ -301,37 +320,55 @@ private fun WorldSummaryPreview(entry: WorldPlaceEntry) {
 
     val initialRatio = scene?.aspectRatio ?: photo?.let { it.width.toFloat() / it.height.coerceAtLeast(1) } ?: 1f
     var ratio by rememberSaveable(scene?.id, sceneSources) { mutableFloatStateOf(initialRatio.coerceIn(.65f, 1.85f)) }
-    val creditedMedia = scene?.takeIf { useScene }?.takeUnless {
-        it.referenceKind == "release_cover" && it.archiveConnection() != ArchiveConnection.ReleasePhoto
-    }
+    val creditedMedia = scene?.takeIf { useScene && !songArtwork }
     val timestamp = creditedMedia?.timestampSeconds?.let { "${(it / 60).toString().padStart(2, '0')}:${(it % 60).toString().padStart(2, '0')}" }
     val credit = listOfNotNull(scene?.artistName, creditedMedia?.archiveMediaLabel(), timestamp)
         .filter(String::isNotBlank).joinToString(" · ")
-    HorizontalDivider(Modifier.padding(top = 8.dp), color = RoomColors.Line)
+    if (songArtwork) Spacer(Modifier.height(7.dp))
+    else HorizontalDivider(Modifier.padding(top = 8.dp), color = RoomColors.Line)
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+        Modifier.fillMaxWidth().padding(vertical = if (songArtwork) 8.dp else 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (songArtwork && scene != null) {
+            WorldSummaryPreviewText(scene, credit, Modifier.weight(1f), songArtwork = true)
+        }
         if (sources.isNotEmpty()) {
-            val width = (78f * ratio).coerceAtMost(120f)
-            val height = (width / ratio).coerceAtLeast(56f)
+            val imageSize = if (songArtwork) Modifier.size(56.dp) else {
+                val width = (78f * ratio).coerceAtMost(120f)
+                Modifier.size(width.dp, (width / ratio).coerceAtLeast(56f).dp)
+            }
             ArchivePreviewImage(
-                sources, Modifier.size(width.dp, height.dp).clipToBounds().background(RoomColors.Wall),
+                sources, imageSize.shadow(3.dp, clip = false).clipToBounds().background(RoomColors.Wall),
                 ContentScale.Fit,
                 loadedTag = if (useScene) "world-summary-art" else "world-summary-place-photo",
                 onLoaded = { drawable ->
-                    if (useScene && drawable.intrinsicWidth > 1 && drawable.intrinsicHeight > 1) {
+                    if (!songArtwork && useScene && drawable.intrinsicWidth > 1 && drawable.intrinsicHeight > 1) {
                         ratio = (drawable.intrinsicWidth.toFloat() / drawable.intrinsicHeight).coerceIn(.65f, 1.85f)
                     }
                 },
                 onUnavailable = { if (useScene) sceneUnavailable = true else photoUnavailable = true },
             )
         }
-        scene?.let {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (it.work.isNotBlank()) Text("《${it.work}》", color = RoomColors.Ink, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                if (credit.isNotBlank()) Text(credit, Modifier.testTag("world-summary-media-credit"), color = RoomColors.Muted, fontSize = 12.sp)
-            }
+        if (!songArtwork && scene != null) {
+            WorldSummaryPreviewText(scene, credit, Modifier.weight(1f), songArtwork = false)
+        }
+    }
+}
+
+@Composable
+private fun WorldSummaryPreviewText(scene: Scene, credit: String, modifier: Modifier, songArtwork: Boolean) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(if (songArtwork) 2.dp else 4.dp)) {
+        if (scene.work.isNotBlank()) {
+            Text(if (songArtwork) scene.work else "《${scene.work}》", color = RoomColors.Ink,
+                fontSize = if (songArtwork) 17.sp else 15.sp, fontWeight = FontWeight.Medium,
+                lineHeight = if (songArtwork) 22.sp else TextUnit.Unspecified)
+        }
+        if (credit.isNotBlank()) {
+            Text(credit, Modifier.testTag("world-summary-media-credit"), color = RoomColors.Muted,
+                fontSize = if (songArtwork) 13.sp else 12.sp,
+                lineHeight = if (songArtwork) 17.sp else TextUnit.Unspecified)
         }
     }
 }

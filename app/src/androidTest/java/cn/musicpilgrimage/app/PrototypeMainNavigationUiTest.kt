@@ -229,27 +229,45 @@ class PrototypeMainNavigationUiTest {
 
     @ExtendedDeviceTest
     @Test
-    fun worldSummarySeparatesSongArtworkFromCoverPhotography() {
+    fun worldSummaryAlignsSongDetailsWithThePlaceTitle() {
         openWorld()
 
-        fun checkSummary(query: String, placeId: String, relation: String, credit: String, capture: Boolean = false) {
+        fun checkSummary(query: String, placeId: String, relation: String, credit: String, work: String? = null, capture: Boolean = false) {
             chooseWorldPlace(query, placeId)
-            compose.onNodeWithText(relation, substring = true).assertIsDisplayed()
-            compose.onNodeWithTag("world-summary-media-credit").assertTextEquals(credit)
+            val relationship = compose.onNodeWithText(relation, substring = true).assertIsDisplayed()
+            val artist = compose.onNodeWithTag("world-summary-media-credit").assertTextEquals(credit)
             val preview = compose.onNodeWithTag("world-summary-art", useUnmergedTree = true)
             compose.waitUntil(10_000) { preview.isDisplayed() }
+            val artworkBounds = preview.fetchSemanticsNode().boundsInRoot
+            val artistBounds = artist.fetchSemanticsNode().boundsInRoot
+            val close = compose.onNodeWithTag("world-summary-close")
+            if (work != null) {
+                val track = compose.onNode(hasText(work) and !hasTestTag("world-summary-title"))
+                    .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                val place = compose.onNodeWithTag("world-summary-title").fetchSemanticsNode().boundsInRoot
+                val metadata = relationship.fetchSemanticsNode().boundsInRoot
+                assertTrue(metadata.top >= place.bottom)
+                assertTrue(track.top >= metadata.bottom)
+                assertEquals(place.left, track.left, 1f)
+                assertEquals(track.left, artistBounds.left, 1f)
+                val detail = compose.onNodeWithTag("world-summary-detail").fetchSemanticsNode().boundsInRoot
+                assertEquals(detail.right, artworkBounds.right, 1f)
+                assertTrue(artworkBounds.left >= track.right)
+            } else {
+                assertTrue(artworkBounds.right <= artistBounds.left)
+            }
             if (capture) {
                 val instrumentation = InstrumentationRegistry.getInstrumentation()
-                File(instrumentation.targetContext.filesDir, "world-summary-$placeId.png").outputStream().use {
+                File(instrumentation.targetContext.filesDir, "world-summary-layout-$placeId.png").outputStream().use {
                     instrumentation.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
                 }
             }
-            compose.onNodeWithTag("world-summary-close").performClick()
+            close.performClick()
         }
 
-        checkSummary("长安", "changan-city-jay-reference", "歌词提及", "周杰伦", capture = true)
-        checkSummary("东京山手线", "tokyo-yamanote-reference", "歌词提及", "周杰伦", capture = true)
-        checkSummary("爱琴海", "aegean-sea-reference", "歌名关联", "周杰伦")
+        checkSummary("长安", "changan-city-jay-reference", "歌词提及", "周杰伦", "乱舞春秋", capture = true)
+        checkSummary("东京山手线", "tokyo-yamanote-reference", "歌词提及", "周杰伦", "忍者", capture = true)
+        checkSummary("爱琴海", "aegean-sea-reference", "歌名关联", "周杰伦", "爱琴海", capture = true)
         checkSummary("绍兴路", "shaoxing-road-orange-moon-cover-reference", "封面 / 专辑取景", "方大同 · 正式发行封面")
     }
 
