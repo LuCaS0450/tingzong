@@ -102,4 +102,12 @@ class RhythmJudgeTest {
         assertEquals(Judgment.PERFECT,restored.down(0,1_000_000)?.judgment)
         restored.tick(2_000_000);assertEquals(100000,restored.score())
     }
+    @Test fun checkpointDecodeRejectsMismatchedTargetCountAfterChartUpdate() {
+        val oldTargets=listOf(target(0,0,1_000_000),target(1,1,2_000_000))
+        val newTargets=listOf(target(0,0,1_000_000),target(1,1,1_800_000),target(2,2,2_500_000))
+        val snapshot=CheckpointCodec.encode(RhythmJudge(oldTargets),1_200_000)
+        assertThrows(IllegalArgumentException::class.java) {
+            CheckpointCodec.decode(newTargets,snapshot)
+        }
+    }
 }

@@ -63,13 +63,13 @@ class MusicPerformanceUiTest {
             compose.onNodeWithText("练习",substring=false).assertDoesNotExist()
             compose.onNodeWithTag("performance-difficulty-1").assertDoesNotExist()
             compose.onNodeWithTag("performance-difficulty-2").assertDoesNotExist()
-            compose.onNodeWithText("标准演奏").assertIsDisplayed()
+            compose.onNodeWithTag("performance-enter").assertIsDisplayed()
             capture("preparation")
             compose.onNodeWithTag("room-back").performClick()
             settle()
             compose.onNodeWithTag("performance-song-greatest-works").performScrollTo().performClick()
             settle()
-            compose.onNodeWithText("标准演奏").assertIsDisplayed()
+            compose.onNodeWithTag("performance-enter").assertIsDisplayed()
         }} finally {prefs.edit().apply{if(previous==null)remove(key)else putInt(key,previous)}.commit()}
     }
     @Test fun localShortSampleCountdownMutePauseExitAndResult() {

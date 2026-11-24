@@ -24,10 +24,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -40,9 +48,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -161,21 +169,129 @@ internal val SwissWallTabsHeight=69.dp
                     if(pressed||!motion)snap()else spring(dampingRatio=.85f,stiffness=680f),
                     label="tab-press",
                 )
+                val iconTint = if (selected) SwissInk else SwissWallMuted
                 Box(
                     Modifier.weight(1f).height(58.dp).then(if(includeTestTags)Modifier.testTag("wall-tab-$index")else Modifier)
+                        .semantics { contentDescription = label }
                         .selectable(selected,interactionSource=interaction,indication=null,enabled=enabled,role=Role.Tab){onChoose(route)},
                     contentAlignment=Alignment.Center,
                 ) {
-                    Text(
-                        label,Modifier.graphicsLayer {
-                            this.alpha=alpha.coerceIn(0f,1f)
-                            compositingStrategy=CompositingStrategy.ModulateAlpha
-                        },color=if(selected)SwissInk else SwissWallMuted,fontSize=16.sp,
-                        fontWeight=if(selected)FontWeight.Bold else FontWeight.Normal,
-                        textDecoration=if(focused)TextDecoration.Underline else TextDecoration.None,
+                    SwissWallTabIcon(
+                        index = index,
+                        tint = iconTint,
+                        focused = focused,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .graphicsLayer {
+                                this.alpha = alpha.coerceIn(0f, 1f)
+                                compositingStrategy = CompositingStrategy.ModulateAlpha
+                            },
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SwissWallTabIcon(index: Int, tint: Color, focused: Boolean, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val strokeWidth = 1.8.dp.toPx()
+        val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val u = size.width / 24f
+        when (index) {
+            // 0: 音乐 - 双八分音符 (Beamed eighth notes)
+            0 -> {
+                val beamLeft = Offset(9.2f * u, 5.2f * u)
+                val beamRight = Offset(19.2f * u, 3.8f * u)
+                drawLine(tint, beamLeft, beamRight, strokeWidth = strokeWidth, cap = StrokeCap.Round)
+                drawLine(tint, Offset(9.2f * u, 5.2f * u), Offset(9.2f * u, 16.5f * u), strokeWidth = strokeWidth, cap = StrokeCap.Round)
+                drawLine(tint, Offset(19.2f * u, 3.8f * u), Offset(19.2f * u, 15.0f * u), strokeWidth = strokeWidth, cap = StrokeCap.Round)
+                rotate(degrees = -18f, pivot = Offset(6.8f * u, 17.5f * u)) {
+                    drawOval(
+                        color = tint,
+                        topLeft = Offset(4.1f * u, 15.3f * u),
+                        size = Size(5.4f * u, 4.2f * u),
+                        style = stroke,
+                    )
+                }
+                rotate(degrees = -18f, pivot = Offset(16.8f * u, 16.0f * u)) {
+                    drawOval(
+                        color = tint,
+                        topLeft = Offset(14.1f * u, 13.8f * u),
+                        size = Size(5.4f * u, 4.2f * u),
+                        style = stroke,
+                    )
+                }
+            }
+            // 1: 世界 - 地图图钉 (Map pin)
+            1 -> {
+                val pinPath = Path().apply {
+                    moveTo(12f * u, 20.6f * u)
+                    cubicTo(12f * u, 20.6f * u, 18.2f * u, 14.3f * u, 18.2f * u, 9.6f * u)
+                    arcTo(
+                        rect = Rect(5.8f * u, 3.4f * u, 18.2f * u, 15.8f * u),
+                        startAngleDegrees = 0f,
+                        sweepAngleDegrees = -180f,
+                        forceMoveTo = false,
+                    )
+                    cubicTo(5.8f * u, 14.3f * u, 12f * u, 20.6f * u, 12f * u, 20.6f * u)
+                    close()
+                }
+                drawPath(pinPath, color = tint, style = stroke)
+                drawCircle(
+                    color = tint,
+                    radius = 2.4f * u,
+                    center = Offset(12f * u, 9.6f * u),
+                    style = stroke,
+                )
+            }
+            // 2: 演奏 - 四轨节拍条 (Four rhythm lanes)
+            2 -> {
+                val laneX = listOf(4.2f * u, 9.4f * u, 14.6f * u, 19.8f * u)
+                val barTops = listOf(9.5f * u, 4.5f * u, 12.0f * u, 6.5f * u)
+                val barBottoms = listOf(18.5f * u, 14.5f * u, 19.5f * u, 17.0f * u)
+                for (i in 0..3) {
+                    drawLine(
+                        color = tint.copy(alpha = 0.28f),
+                        start = Offset(laneX[i], 3.5f * u),
+                        end = Offset(laneX[i], 20.5f * u),
+                        strokeWidth = 1.0.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                    drawLine(
+                        color = tint,
+                        start = Offset(laneX[i], barTops[i]),
+                        end = Offset(laneX[i], barBottoms[i]),
+                        strokeWidth = 2.1.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
+            // 3: 我的 - 个人头像 (Minimal profile silhouette)
+            else -> {
+                drawCircle(
+                    color = tint,
+                    radius = 3.6f * u,
+                    center = Offset(12f * u, 7.6f * u),
+                    style = stroke,
+                )
+                val shoulderPath = Path().apply {
+                    moveTo(5.2f * u, 19.6f * u)
+                    cubicTo(5.2f * u, 15.6f * u, 8.2f * u, 13.8f * u, 12f * u, 13.8f * u)
+                    cubicTo(15.8f * u, 13.8f * u, 18.8f * u, 15.6f * u, 18.8f * u, 19.6f * u)
+                }
+                drawPath(shoulderPath, color = tint, style = stroke)
+            }
+        }
+        if (focused) {
+            drawRoundRect(
+                color = tint.copy(alpha = 0.45f),
+                topLeft = Offset(-2.dp.toPx(), -2.dp.toPx()),
+                size = Size(size.width + 4.dp.toPx(), size.height + 4.dp.toPx()),
+                cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+                style = Stroke(width = 1.dp.toPx()),
+            )
         }
     }
 }

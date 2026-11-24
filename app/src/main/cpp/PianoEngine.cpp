@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <ctime>
 #include <memory>
 #include <vector>
 
@@ -47,7 +48,8 @@ class PianoEngine final : public oboe::AudioStreamDataCallback, public oboe::Aud
     std::atomic<int64_t> visibleUs{0};
     std::atomic<int> countBeat{0};
     std::atomic<int> voiceCount{0};
-    double frame=0, endFrame=0, speed=1;
+    double frame=0, startFrame=0, endFrame=0, speed=1, smoothedLatencyFrames=-1.0;
+    int64_t lastReportedUs=0;
     int rate=48000, modeMask=0, releaseFrames=11520;
     size_t next=0;
     int64_t countRemaining=0, beatFrames=0, clickRemaining=0;
@@ -111,11 +113,13 @@ public:
         if(!backing.empty() && (std::abs(multiplier-backingSpeed)>1e-6 ||
             stopSeconds>static_cast<double>(backing.size()/2)/backingRate*backingSpeed+1e-5))return false;
         commands.clear();for(auto& v:voices)v.id=-1;
-        frame=std::max(0.0,seconds*rate);endFrame=stopSeconds*rate;speed=multiplier;modeMask=mask;
+        frame=std::max(0.0,seconds*rate);startFrame=frame;endFrame=stopSeconds*rate;speed=multiplier;modeMask=mask;
+        smoothedLatencyFrames=-1.0;
+        lastReportedUs=static_cast<int64_t>(frame/rate*1000000);
         next=static_cast<size_t>(std::lower_bound(events.begin(),events.end(),frame,[](const Event&e,double f){return e.start<f;})-events.begin());
         if(backing.empty())restoreAutomaticVoices();
         backingCursor=frame/rate*backingRate/backingSpeed;
-        visibleUs.store(static_cast<int64_t>(frame/rate*1000000));
+        visibleUs.store(lastReportedUs);
         beatFrames=static_cast<int64_t>(rate*60.0/(std::max(1.0,bpm)*speed));
         countRemaining=beatFrames*beats;countBeat.store(beats);clickRemaining=0;
         active.store(true,std::memory_order_release);
@@ -134,10 +138,11 @@ public:
     void setMuted(bool value) {muted.store(value,std::memory_order_release);}
     float outputPeak() const {return lastOutputPeak.load(std::memory_order_acquire);}
 
-    oboe::DataCallbackResult onAudioReady(oboe::AudioStream*,void* data,int32_t numFrames) override {
+    oboe::DataCallbackResult onAudioReady(oboe::AudioStream* audioStream,void* data,int32_t numFrames) override {
         auto* output=static_cast<float*>(data);
         std::fill(output,output+numFrames*2,0);
         if(!active.load(std::memory_order_acquire)){lastOutputPeak.store(0);return oboe::DataCallbackResult::Continue;}
+        const bool wasCounting = countRemaining > 0;
         Command command;
         while(commands.pop(command)) {
             if(command.kind==1)voice(command.id,command.elapsed);
@@ -202,7 +207,41 @@ public:
             peak=std::max(peak,std::abs(output[i]));
         }
         lastOutputPeak.store(peak,std::memory_order_release);
-        visibleUs.store(static_cast<int64_t>(frame/rate*1000000),std::memory_order_release);
+        if(!active.load(std::memory_order_relaxed) && frame>=endFrame) {
+            lastReportedUs=static_cast<int64_t>(endFrame/rate*1000000);
+            visibleUs.store(lastReportedUs,std::memory_order_release);
+        } else if(wasCounting && countRemaining>0) {
+            visibleUs.store(lastReportedUs,std::memory_order_release);
+        } else {
+            double rawLatency=-1.0;
+            if(audioStream!=nullptr) {
+                const auto ts=audioStream->getTimestamp(CLOCK_MONOTONIC);
+                if(ts) {
+                    struct timespec nowTs{};
+                    double elapsedFrames=0.0;
+                    if(clock_gettime(CLOCK_MONOTONIC,&nowTs)==0) {
+                        const int64_t nowNs=static_cast<int64_t>(nowTs.tv_sec)*1000000000LL+nowTs.tv_nsec;
+                        const double elapsedSec=static_cast<double>(nowNs-ts.value().timestamp)*1e-9;
+                        elapsedFrames=std::clamp(elapsedSec*rate,-rate*0.1,rate*0.2);
+                    }
+                    const double hwPosNow=static_cast<double>(ts.value().position)+elapsedFrames;
+                    const double written=static_cast<double>(audioStream->getFramesWritten()+numFrames);
+                    const double delta=written-hwPosNow;
+                    if(delta>=0.0 && delta<=rate*0.35)rawLatency=delta;
+                }
+                if(rawLatency<0.0) {
+                    rawLatency=std::clamp(static_cast<double>(audioStream->getBufferSizeInFrames()),0.0,rate*0.15);
+                }
+            } else {
+                rawLatency=0.0;
+            }
+            if(smoothedLatencyFrames<0.0)smoothedLatencyFrames=rawLatency;
+            else smoothedLatencyFrames=smoothedLatencyFrames*0.85+rawLatency*0.15;
+            const double presentedFrame=std::clamp(frame-smoothedLatencyFrames*speed,startFrame,endFrame);
+            const int64_t candidateUs=static_cast<int64_t>(presentedFrame/rate*1000000);
+            if(candidateUs>lastReportedUs)lastReportedUs=candidateUs;
+            visibleUs.store(lastReportedUs,std::memory_order_release);
+        }
         voiceCount.store(static_cast<int>(std::count_if(voices.begin(),voices.end(),[](const Voice& v){return v.id>=0;})));
         return oboe::DataCallbackResult::Continue;
     }

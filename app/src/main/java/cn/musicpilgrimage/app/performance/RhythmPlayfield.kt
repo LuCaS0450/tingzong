@@ -326,9 +326,10 @@ internal fun MusicLanes(
 
 private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, faded: Boolean) {
     val nw = w * 0.78f
-    val nh = 16.dp.toPx()
+    val nh = 32.dp.toPx()
     val left = x - nw * 0.5f
-    val top = y - nh * 0.5f
+    // Align bottom edge with the judgment line coordinate `y` so the note meets the keycap lip on beat.
+    val top = y - nh
     val alpha = if (faded) 0.28f else 1f
     val corner = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
 
@@ -355,7 +356,7 @@ private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, faded: Bool
         cornerRadius = corner,
     )
     // Subtle front thickness strip + top highlight.
-    val lip = 2.5.dp.toPx()
+    val lip = 3.5.dp.toPx()
     drawRoundRect(
         color = IvoryKeyFront.copy(alpha = alpha),
         topLeft = Offset(left, top + nh - lip),
@@ -379,9 +380,9 @@ private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, faded: Bool
 
 private fun DrawScope.drawHoldHead(x: Float, y: Float, w: Float) {
     val nw = w * 0.76f
-    val nh = 14.dp.toPx()
+    val nh = 16.dp.toPx()
     val left = x - nw * 0.5f
-    val top = y - nh * 0.5f
+    val top = y - nh
     val corner = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
     drawRoundRect(
         color = Color(0xFF0A0C0B).copy(alpha = 0.52f),

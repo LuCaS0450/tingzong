@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,12 +31,15 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -252,9 +256,6 @@ internal fun PerformanceScreen(
     }
 
     val drawLanes = ui.state in listOf(PlayState.PLAYING, PlayState.PAUSED, PlayState.STARTING, PlayState.RECOVERING, PlayState.AUDIO_FAILED)
-    val modeLabel = if (controller.options.mode == PlayMode.COMPARE) "体验演奏"
-    else if (controller.options.difficulty == 1) "轻松演奏"
-    else "标准演奏"
     val progressFraction = (ui.positionUs.toDouble() / song.durationUs.coerceAtLeast(1)).toFloat().coerceIn(0f, 1f)
 
     Box(
@@ -306,7 +307,7 @@ internal fun PerformanceScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "03 / PLAY",
+                            text = "PLAY",
                             color = ConsoleCrimsonDarkText,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -337,13 +338,7 @@ internal fun PerformanceScreen(
                         modifier = Modifier.padding(end = 8.dp),
                     )
                     Spacer(Modifier.height(2.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text(song.artist, fontSize = 12.sp, color = ConsoleSilverMuted)
-                        Text("原速 · $modeLabel", fontSize = 12.sp, color = ConsoleSilverMuted)
-                    }
+                    Text(song.artist, fontSize = 12.sp, color = ConsoleSilverMuted)
                     Spacer(Modifier.height(10.dp))
                     LinearProgressIndicator(
                         progress = { progressFraction },
@@ -430,27 +425,23 @@ internal fun PerformanceScreen(
         // 4. Stage Overlays (Ivory Key Surface + 1.5.dp Matte Dark Edge + 2.dp Crimson Top Seal)
         if (exitConfirm) {
             PerformancePanel(ivory, motion, Modifier.align(Alignment.Center)) {
-                BauhausModalEyebrow("03 / PAUSED")
+                BauhausModalEyebrow("PAUSED")
                 Spacer(Modifier.height(6.dp))
-                Text("确认退出？", fontSize = 30.sp, fontWeight = FontWeight.Medium, color = ModalCardInk)
+                Text("确认退出？", fontSize = 28.sp, fontWeight = FontWeight.Medium, color = ModalCardInk)
                 Spacer(Modifier.height(6.dp))
                 Text("音乐已暂停。", fontSize = 14.sp, color = ModalCardMuted)
                 Spacer(Modifier.height(18.dp))
-                PerformancePanelButton("继续演奏", "performance-stay") {
-                    exitConfirm = false
-                    controller.start()
-                }
-                TextButton(
-                    onClick = {
+                HorizontalDivider(color = ModalCardDivider)
+                Spacer(Modifier.height(18.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PerformancePanelButton("继续演奏", "performance-stay") {
+                        exitConfirm = false
+                        controller.start()
+                    }
+                    PerformancePanelSecondaryButton("返回曲目", "performance-confirm-exit") {
                         exitConfirm = false
                         onPrepare()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                        .testTag("performance-confirm-exit"),
-                ) {
-                    Text("返回曲目", color = ModalCardMuted, fontSize = 14.sp)
+                    }
                 }
             }
         } else if (ui.state == PlayState.STARTING || (ui.state == PlayState.PLAYING && ui.countIn > 0)) {
@@ -496,7 +487,7 @@ internal fun PerformanceScreen(
             }
         } else if (ui.state in listOf(PlayState.READY, PlayState.PAUSED, PlayState.RECOVERING, PlayState.AUDIO_FAILED, PlayState.FAILED)) {
             PerformancePanel(ivory, motion, Modifier.align(Alignment.Center).testTag("performance-pause-panel")) {
-                BauhausModalEyebrow(if (ui.state == PlayState.PAUSED) "03 / PAUSED" else "03 / PLAY")
+                BauhausModalEyebrow(if (ui.state == PlayState.PAUSED) "PAUSED" else "PLAY")
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = when (ui.state) {
@@ -505,58 +496,39 @@ internal fun PerformanceScreen(
                         PlayState.RECOVERING -> "正在恢复声音"
                         else -> "暂时无法开始"
                     },
-                    fontSize = 30.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Medium,
                     color = ModalCardInk,
                 )
-                Spacer(Modifier.height(16.dp))
                 if (ui.message != null) {
+                    Spacer(Modifier.height(8.dp))
                     Text(requireNotNull(ui.message), fontSize = 14.sp, color = ModalCardMuted)
-                    Spacer(Modifier.height(12.dp))
                 }
                 if (ui.state == PlayState.RECOVERING) {
+                    Spacer(Modifier.height(14.dp))
                     CircularProgressIndicator(Modifier.size(24.dp), color = ConsoleCrimson, strokeWidth = 2.dp)
-                    Spacer(Modifier.height(12.dp))
                 }
-                if (ui.state !in listOf(PlayState.FAILED, PlayState.RECOVERING)) {
-                    PerformancePanelButton(
-                        label = when (ui.state) {
-                            PlayState.PAUSED -> "继续演奏"
-                            PlayState.AUDIO_FAILED -> "重试恢复声音"
-                            else -> "开始演奏"
-                        },
-                        tag = "performance-start",
-                        onClick = controller::start,
-                    )
-                    if (ui.state == PlayState.PAUSED) {
-                        TextButton(
-                            onClick = {
-                                attemptGeneration++
-                                controller.restart()
-                                controller.start()
+                Spacer(Modifier.height(18.dp))
+                HorizontalDivider(color = ModalCardDivider)
+                Spacer(Modifier.height(18.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (ui.state !in listOf(PlayState.FAILED, PlayState.RECOVERING)) {
+                        PerformancePanelButton(
+                            label = when (ui.state) {
+                                PlayState.PAUSED -> "继续演奏"
+                                PlayState.AUDIO_FAILED -> "重试恢复声音"
+                                else -> "开始演奏"
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 44.dp)
-                                .testTag("performance-restart"),
-                        ) {
-                            Text("从头开始", color = ModalCardInk, fontSize = 14.sp)
-                        }
+                            tag = "performance-start",
+                            onClick = controller::start,
+                        )
                     }
-                }
-                TextButton(
-                    onClick = onPrepare,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                        .testTag("performance-back"),
-                ) {
-                    Text("返回曲目", color = ModalCardMuted, fontSize = 14.sp)
+                    PerformancePanelSecondaryButton("返回曲目", "performance-back", onPrepare)
                 }
             }
         } else if (ui.state == PlayState.LOADING) {
             PerformancePanel(ivory, motion, Modifier.align(Alignment.Center)) {
-                BauhausModalEyebrow("03 / LOADING")
+                BauhausModalEyebrow("LOADING")
                 Spacer(Modifier.height(8.dp))
                 Text("准备音乐与场景…", color = ModalCardInk, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
@@ -624,28 +596,46 @@ private fun PerformancePanel(
 
 @Composable
 private fun PerformancePanelButton(label: String, tag: String, onClick: () -> Unit) {
-    HorizontalDivider(color = ModalCardDivider)
-    TextButton(
+    Button(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
+            .heightIn(min = 50.dp)
             .testTag(tag),
         shape = RectangleShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = ModalCardInk,
+            contentColor = ConsoleIvory,
+        ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(Modifier.width(3.dp).height(14.dp).background(ConsoleCrimson))
-            Text(
-                text = label,
-                color = ModalCardInk,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        Text(
+            text = label,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.4.sp,
+        )
+    }
+}
+
+@Composable
+private fun PerformancePanelSecondaryButton(label: String, tag: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .testTag(tag),
+        shape = RectangleShape,
+        border = BorderStroke(1.dp, ModalCardDivider),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = ModalCardMuted,
+        ),
+    ) {
+        Text(
+            text = label,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 

@@ -47,12 +47,6 @@ import kotlinx.coroutines.launch
                 }
             }
         }}
-        item("guide") {RoomPaper(Modifier.fillMaxWidth(),woodEdge=true) {
-            Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-                Text("标准演奏",fontSize=18.sp,fontWeight=FontWeight.Medium,color=RoomColors.Ink)
-                Text("跟随人声与旋律的重音，音乐保持原速。",fontSize=14.sp,color=RoomColors.Muted,lineHeight=21.sp)
-            }
-        }}
         item("start") {
             Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
                 SwissButton(onClick=onStart,enabled=entry.audioReady&&!importing,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp).testTag("performance-enter"),shape=androidx.compose.ui.graphics.RectangleShape,
@@ -131,7 +125,7 @@ import kotlinx.coroutines.launch
                 }
             }
             Text(song.title,fontSize=29.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink,modifier=Modifier.testTag("performance-result-title"))
-            Text("${song.artist} · 原速演奏",fontSize=13.sp,color=RoomColors.Muted)
+            Text(song.artist,fontSize=13.sp,color=RoomColors.Muted)
         }}
         item("score") {Column(Modifier.fillMaxWidth().padding(top=10.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(

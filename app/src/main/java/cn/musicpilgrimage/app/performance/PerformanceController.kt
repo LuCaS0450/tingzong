@@ -89,14 +89,25 @@ internal class PerformanceController(application:Application,val song:SongPackag
                 val previousBest=dao.bestResult(owner,song.id,options.difficulty)?.score
                 mutableUi.value=mutableUi.value.copy(highestScore=previousBest)
                 val saved=dao.checkpoint(owner,song.id,song.version,options.difficulty,options.storageKey)
-                if(saved!=null) {
-                    require(saved.positionUs in startUs..endUs)
-                    judge=CheckpointCodec.decode(targets,saved.snapshot,options.speed)
+                val restoredJudge = saved?.let {
+                    runCatching {
+                        require(it.positionUs in startUs..endUs)
+                        CheckpointCodec.decode(targets, it.snapshot, options.speed)
+                    }.getOrNull()
+                }
+                if(saved!=null && restoredJudge!=null) {
+                    judge=restoredJudge
                     val restoredPosition=judge.pause(saved.positionUs).coerceIn(startUs,endUs)
                     attempt=saved.attemptId;revision=saved.revision;persistedAtUs=restoredPosition
                     publish(PlayState.PAUSED,restoredPosition,
                         if(restoredPosition!=saved.positionUs)"上次的长按已回退，继续后重新演奏" else "可以继续上次的旅程",true)
-                } else publish(PlayState.READY,startUs)
+                } else {
+                    if (saved != null) {
+                        dao.removeCheckpoint(owner, saved.attemptId)
+                        dao.closeRun(owner, saved.attemptId)
+                    }
+                    publish(PlayState.READY,startUs)
+                }
                 initialized=true
             } catch(cancel:CancellationException) {throw cancel}
             catch(error:Exception) {
