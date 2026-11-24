@@ -66,7 +66,7 @@ private val WhiteKeyHeight = 76.dp
 private val BlackKeyHeight = 30.dp
 private const val BlackKeyWidthFraction = 0.37f
 
-private object PianoWallTextures {
+internal object PianoWallTextures {
     private val cache = mutableMapOf<String, ImageBitmap?>()
 
     @Synchronized
@@ -83,7 +83,7 @@ private fun hasBlackKeyBelow(index: Int, totalCount: Int): Boolean {
 }
 
 /** Tile a seamless bitmap at a fixed logical density size so textures never stretch across keys. */
-private fun Modifier.tiledMaterial(
+internal fun Modifier.tiledMaterial(
     image: ImageBitmap?,
     tileSize: Dp,
     fallback: Color,
@@ -283,39 +283,45 @@ private fun BauhausTopLid(ebony: ImageBitmap?) {
                 MicroScrew()
             }
         }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(4.dp)
-                .background(Color(0xFF141715))
-                .drawWithCache {
-                    val hairline = 1.dp.toPx()
-                    val crimsonH = 1.5.dp.toPx()
-                    val padX = 11.dp.toPx()
-                    val crimsonBrush = Brush.horizontalGradient(
-                        0f to Color(0xFF742018),
-                        0.24f to Color(0xFFBD382B),
-                        0.50f to Color(0xFFDC4D3F),
-                        0.76f to Color(0xFFBD382B),
-                        1f to Color(0xFF742018),
-                        startX = padX,
-                        endX = (size.width - padX).coerceAtLeast(padX + 1f),
-                    )
-                    onDrawBehind {
-                        drawLine(Color.White.copy(alpha = 0.07f), Offset.Zero, Offset(size.width, 0f), hairline)
-                        drawRect(
-                            crimsonBrush,
-                            topLeft = Offset(padX, size.height - crimsonH),
-                            size = Size((size.width - padX * 2).coerceAtLeast(0f), crimsonH),
-                        )
-                    }
-                }
-        )
+        BauhausCrimsonSeal(horizontalPadding = 11.dp)
     }
 }
 
+/** Recessed dark seal strip with a 1.5dp anodized crimson hairline along the keybed top edge. */
 @Composable
-private fun LidAcousticVent(modifier: Modifier = Modifier) {
+internal fun BauhausCrimsonSeal(modifier: Modifier = Modifier, horizontalPadding: Dp = 11.dp) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .background(Color(0xFF141715))
+            .drawWithCache {
+                val hairline = 1.dp.toPx()
+                val crimsonH = 1.5.dp.toPx()
+                val padX = horizontalPadding.toPx()
+                val crimsonBrush = Brush.horizontalGradient(
+                    0f to Color(0xFF742018),
+                    0.24f to Color(0xFFBD382B),
+                    0.50f to Color(0xFFDC4D3F),
+                    0.76f to Color(0xFFBD382B),
+                    1f to Color(0xFF742018),
+                    startX = padX,
+                    endX = (size.width - padX).coerceAtLeast(padX + 1f),
+                )
+                onDrawBehind {
+                    drawLine(Color.White.copy(alpha = 0.07f), Offset.Zero, Offset(size.width, 0f), hairline)
+                    drawRect(
+                        crimsonBrush,
+                        topLeft = Offset(padX, size.height - crimsonH),
+                        size = Size((size.width - padX * 2).coerceAtLeast(0f), crimsonH),
+                    )
+                }
+            }
+    )
+}
+
+@Composable
+internal fun LidAcousticVent(modifier: Modifier = Modifier) {
     Canvas(modifier.clip(RoundedCornerShape(1.5.dp))) {
         drawRect(Color(0xFF0E100F).copy(alpha = 0.68f))
         drawRect(
@@ -396,7 +402,7 @@ private fun LidScaleIndex(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun MicroScrew() {
+internal fun MicroScrew() {
     Canvas(Modifier.size(5.dp)) {
         val r = size.minDimension * 0.5f
         drawCircle(Color(0xFF0A0C0B).copy(alpha = 0.72f), radius = r + 0.9.dp.toPx())
@@ -420,7 +426,7 @@ private fun MicroScrew() {
 }
 
 @Composable
-private fun SimpleCharcoalCheek(ebony: ImageBitmap?, isLeft: Boolean, modifier: Modifier = Modifier) {
+internal fun SimpleCharcoalCheek(ebony: ImageBitmap?, isLeft: Boolean, modifier: Modifier = Modifier) {
     Box(
         modifier
             .zIndex(8f)
@@ -445,7 +451,7 @@ private fun SimpleCharcoalCheek(ebony: ImageBitmap?, isLeft: Boolean, modifier: 
 }
 
 @Composable
-private fun KeybedCavityShadows(modifier: Modifier = Modifier) {
+internal fun KeybedCavityShadows(modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val topH = 10.dp.toPx()
         val botH = 8.dp.toPx()
@@ -809,7 +815,7 @@ private fun DrawScope.drawBlackKeyWithShadow(
 }
 
 @Composable
-private fun BauhausBottomFooter(ebony: ImageBitmap?, metal: ImageBitmap?) {
+internal fun BauhausBottomFooter(ebony: ImageBitmap?, metal: ImageBitmap?) {
     Row(
         Modifier
             .fillMaxWidth()

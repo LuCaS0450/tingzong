@@ -1,58 +1,179 @@
 package cn.musicpilgrimage.app.performance
 
-import androidx.compose.ui.geometry.*
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
-import kotlin.math.*
+import kotlin.math.PI
+import kotlin.math.sin
 
-private val ivory=Color(0xFFFFEED0)
-internal fun DrawScope.performanceReceptor(x:Float,line:Float,w:Float,color:Color,pressed:Boolean) {
-    if(pressed)drawRect(Brush.verticalGradient(listOf(Color.Transparent,ivory.copy(alpha=.22f)),startY=line-100.dp.toPx(),endY=line+30.dp.toPx()),Offset(x-w/2,line-100.dp.toPx()),Size(w,130.dp.toPx()))
-    drawLine(ivory.copy(alpha=if(pressed)1f else .3f),Offset(x-w*.34f,line),Offset(x+w*.34f,line),if(pressed)3.dp.toPx()else .7.dp.toPx())
-}
-internal fun DrawScope.performanceRibbon(x:Float,top:Float,bottom:Float,w:Float,color:Color,holding:Boolean) {
-    val width=w*.72f
-    drawRect(Brush.horizontalGradient(listOf(Color(0xFF862D23),Color(0xFFC84A37),Color(0xFF9F362A))),Offset(x-width/2,top),Size(width,(bottom-top).coerceAtLeast(0f)),alpha=if(holding)1f else .88f)
-    val start=top+5.dp.toPx()
-    if(bottom>start)drawLine(ivory.copy(alpha=if(holding).8f else .4f),Offset(x,start),Offset(x,bottom),.7.dp.toPx())
-    drawLine(Color(0xFFFFBE95).copy(alpha=.35f),Offset(x-width/2,top),Offset(x-width/2,bottom),.7.dp.toPx())
-}
-internal fun DrawScope.performanceSustain(x:Float,line:Float,w:Float,color:Color,fraction:Float,timeUs:Long,motion:Boolean) {
-    val height=138.dp.toPx()
-    drawRect(Brush.verticalGradient(listOf(Color.Transparent,ivory.copy(alpha=.23f)),line-height,line),Offset(x-w/2,line-height),Size(w,height))
-    if(motion)repeat(5){i->
-        val t=((timeUs/1000f+i*179f)%1200)/1200f
-        val point=Offset(x+sin(i*2.1f)*w*.22f,line-t*height)
-        drawRect(ivory.copy(alpha=(1-t)*.8f),point,Size(2.dp.toPx(),5.dp.toPx()))
+private val IvoryKeyTone = Color(0xFFF8F6F0)
+private val IvoryGlowWarm = Color(0xFFFFEED0)
+private val CrimsonAnodizedDeep = Color(0xFF8A261C)
+private val CrimsonAnodizedBase = Color(0xFFBD382B)
+private val CrimsonAnodizedBright = Color(0xFFD64B3D)
+
+internal fun DrawScope.performanceReceptor(x: Float, line: Float, w: Float, color: Color, pressed: Boolean) {
+    val half = w * 0.46f
+    if (!pressed) return
+    val beamTop = (line - 112.dp.toPx()).coerceAtLeast(0f)
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color.Transparent,
+                IvoryGlowWarm.copy(alpha = 0.06f),
+                IvoryKeyTone.copy(alpha = 0.16f),
+            ),
+            startY = beamTop,
+            endY = line,
+        ),
+        topLeft = Offset(x - half, beamTop),
+        size = Size(half * 2f, line - beamTop),
+    )
+    drawRect(
+        color = CrimsonAnodizedBright.copy(alpha = 0.85f),
+        topLeft = Offset(x - half, line - 2.dp.toPx()),
+        size = Size(half * 2f, 2.dp.toPx()),
+    )
+    // Preserve color parameter hook for calm mode subtle modulation without adding off-palette hues.
+    if (color.alpha > 0f) {
+        drawRect(
+            color = IvoryKeyTone.copy(alpha = 0.28f),
+            topLeft = Offset(x - half * 0.72f, line - 4.dp.toPx()),
+            size = Size(half * 1.44f, 1.5.dp.toPx()),
+        )
     }
-    drawLine(ivory.copy(alpha=.3f),Offset(x-w*.32f,line+22.dp.toPx()),Offset(x+w*.32f,line+22.dp.toPx()),2.dp.toPx())
-    drawLine(ivory,Offset(x-w*.32f,line+22.dp.toPx()),Offset(x-w*.32f+w*.64f*fraction.coerceIn(0f,1f),line+22.dp.toPx()),2.dp.toPx())
 }
-/** Geometric rings and fragments follow actual engine judgments. */
-internal fun DrawScope.performanceImpact(event:MusicFeedback,timeUs:Long,x:Float,line:Float,w:Float,color:Color,motion:Boolean) {
-    val age=(timeUs-event.atUs)/1_000_000f
-    if(age !in 0f..0.65f)return
-    val p=(age/.65f).coerceIn(0f,1f)
-    val fade=(1-p)*(1-p)
-    if(!event.kind.success){drawLine(color.copy(alpha=fade*.8f),Offset(x-w*.25f,line+5.dp.toPx()),Offset(x+w*.25f,line+5.dp.toPx()),1.dp.toPx());return}
-    val complete=event.kind==FeedbackKind.HOLD_COMPLETE
-    val flash=(1-age/.15f).coerceIn(0f,1f)
-    drawRect(Brush.verticalGradient(listOf(Color.Transparent,ivory.copy(alpha=flash*.5f)),line-55.dp.toPx(),line),Offset(x-w*.4f,line-55.dp.toPx()),Size(w*.8f,55.dp.toPx()))
-    drawLine(ivory.copy(alpha=flash),Offset(x-w*.42f,line),Offset(x+w*.42f,line),3.dp.toPx())
-    if(!motion)return
-    repeat(if(complete)3 else 2){i->
-        val t=((p-i*.08f)/.8f).coerceIn(0f,1f)
-        val width=w*(.7f+t*.95f);val height=(9+26*t).dp.toPx()
-        drawRect(ivory.copy(alpha=fade*(1-i*.2f)),Offset(x-width/2,line-height/2),Size(width,height),style=Stroke((if(i==0)1.2f else .7f).dp.toPx()))
+
+internal fun DrawScope.performanceRibbon(x: Float, top: Float, bottom: Float, w: Float, color: Color, holding: Boolean) {
+    if (bottom <= top) return
+    val rw = (w * if (holding) 0.50f else 0.42f).coerceAtLeast(8.dp.toPx())
+    val left = x - rw * 0.5f
+    val height = bottom - top
+    val radius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
+    drawRoundRect(
+        color = Color(0xFF0A0C0B).copy(alpha = 0.48f),
+        topLeft = Offset(left + 1.5.dp.toPx(), top + 2.dp.toPx()),
+        size = Size(rw, height),
+        cornerRadius = radius,
+    )
+    drawRoundRect(
+        brush = Brush.horizontalGradient(
+            colors = if (holding) {
+                listOf(CrimsonAnodizedBase, CrimsonAnodizedBright, CrimsonAnodizedBase)
+            } else {
+                listOf(CrimsonAnodizedDeep, CrimsonAnodizedBase, CrimsonAnodizedDeep)
+            },
+            startX = left,
+            endX = left + rw,
+        ),
+        topLeft = Offset(left, top),
+        size = Size(rw, height),
+        cornerRadius = radius,
+    )
+    drawRoundRect(
+        color = IvoryKeyTone.copy(alpha = if (holding) 0.55f else 0.26f),
+        topLeft = Offset(left, top),
+        size = Size(rw, height),
+        cornerRadius = radius,
+        style = Stroke(width = if (holding) 1.1.dp.toPx() else 0.75.dp.toPx()),
+    )
+    // Crisp central ivory guide wire inside the anodized red ribbon.
+    val guideAlpha = if (holding) 0.92f else 0.58f
+    drawLine(
+        color = if (holding) IvoryKeyTone.copy(alpha = guideAlpha) else color.copy(alpha = 0.45f),
+        start = Offset(x, top + 2.dp.toPx()),
+        end = Offset(x, bottom - 2.dp.toPx()),
+        strokeWidth = 1.dp.toPx(),
+    )
+}
+
+internal fun DrawScope.performanceSustain(
+    x: Float,
+    line: Float,
+    w: Float,
+    color: Color,
+    fraction: Float,
+    timeUs: Long,
+    motion: Boolean,
+) {
+    val pulse = if (motion) 0.85f + 0.15f * sin(timeUs / 120_000.0 * PI).toFloat() else 0.95f
+    val barHalf = w * 0.34f
+    val barY = line - 14.dp.toPx()
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color.Transparent,
+                CrimsonAnodizedBright.copy(alpha = 0.22f * pulse),
+                IvoryGlowWarm.copy(alpha = 0.18f * pulse),
+            ),
+            startY = line - 44.dp.toPx(),
+            endY = line,
+        ),
+        topLeft = Offset(x - w * 0.44f, line - 44.dp.toPx()),
+        size = Size(w * 0.88f, 44.dp.toPx()),
+    )
+    // Dark recessed track + crisp ivory progress bar placed safely above keycap top edge.
+    drawRoundRect(
+        color = Color(0xFF0E100F).copy(alpha = 0.85f),
+        topLeft = Offset(x - barHalf, barY - 2.dp.toPx()),
+        size = Size(barHalf * 2f, 4.dp.toPx()),
+        cornerRadius = CornerRadius(1.dp.toPx(), 1.dp.toPx()),
+    )
+    val fillW = (barHalf * 2f * fraction.coerceIn(0f, 1f)).coerceAtLeast(1.dp.toPx())
+    drawRoundRect(
+        color = if (color.alpha > 0.8f) IvoryKeyTone else IvoryGlowWarm,
+        topLeft = Offset(x - barHalf, barY - 2.dp.toPx()),
+        size = Size(fillW, 4.dp.toPx()),
+        cornerRadius = CornerRadius(1.dp.toPx(), 1.dp.toPx()),
+    )
+}
+
+internal fun DrawScope.performanceImpact(
+    event: MusicFeedback,
+    timeUs: Long,
+    x: Float,
+    line: Float,
+    w: Float,
+    color: Color,
+    motion: Boolean,
+) {
+    val age = ((timeUs - event.atUs).coerceAtLeast(0L) / 360_000f)
+    if (age >= 1f) return
+    val p = if (motion) age else 0.32f
+    val alpha = (1f - age).let { it * it }
+    val tone = when {
+        !event.kind.success -> CrimsonAnodizedBright
+        event.grade == Judgment.PERFECT -> IvoryKeyTone
+        else -> IvoryGlowWarm
     }
-    repeat(if(complete)12 else 9){i->
-        val angle=(-160+i*17)*PI/180
-        val distance=(8f+(1-(1-p).pow(3))*(31f+(i%3)*12)).dp.toPx()
-        val point=Offset(x+(cos(angle)*distance).toFloat(),line+(sin(angle)*distance).toFloat()+p*p*11.dp.toPx())
-        val width=(if(i%3==0)1.5f else 3f).dp.toPx();val height=(if(i%3==0)8f else 3f).dp.toPx()
-        rotate((i*23f+p*55),point){drawRect((if(i%3==0)Color(0xFFE18A68)else ivory).copy(alpha=fade),point,Size(width,height))}
+    val boxW = w * (0.52f + p * 0.34f)
+    val boxH = (16f + p * 22f).dp.toPx()
+    drawRect(
+        color = tone.copy(alpha = 0.82f * alpha),
+        topLeft = Offset(x - boxW * 0.5f, line - boxH * 0.65f),
+        size = Size(boxW, boxH),
+        style = Stroke(width = 1.5.dp.toPx()),
+    )
+    drawRect(
+        color = (if (event.kind.success) CrimsonAnodizedBase else color).copy(alpha = 0.24f * alpha),
+        topLeft = Offset(x - w * 0.42f, line - 5.dp.toPx()),
+        size = Size(w * 0.84f, 6.dp.toPx()),
+    )
+    // Geometric Bauhaus micro-fragments along the judgment plane.
+    for (i in -1..1) {
+        if (i == 0) continue
+        val fx = x + i * (w * (0.20f + p * 0.24f))
+        val fy = line - (8f + p * 24f).dp.toPx()
+        val sq = 3.dp.toPx()
+        drawRect(
+            color = (if (i < 0) IvoryKeyTone else CrimsonAnodizedBright).copy(alpha = 0.88f * alpha),
+            topLeft = Offset(fx - sq * 0.5f, fy - sq * 0.5f),
+            size = Size(sq, sq),
+        )
     }
 }
