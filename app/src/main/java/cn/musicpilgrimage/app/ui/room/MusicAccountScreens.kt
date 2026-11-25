@@ -88,11 +88,7 @@ import org.json.JSONObject
         state.register->"注册听踪"
         else->"登录听踪"
     }
-    val introduction=when {
-        state.help->"检查邮箱地址、垃圾邮件与收件箱空间。"
-        state.register->"用邮箱验证码创建你的音乐空间。"
-        else->"用邮箱验证码进入你的音乐空间。"
-    }
+    val introduction=if(state.help)"检查邮箱地址、垃圾邮件与收件箱空间。" else null
     Column(Modifier.fillMaxSize().testTag("room-email-login")) {
         if(onBack!=null||state.help)Row(Modifier.fillMaxWidth().height(54.dp).padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically){IconButton({if(state.help)onHelp(false)else onBack?.invoke()},enabled=!busy){Icon(Icons.AutoMirrored.Outlined.ArrowBack,"返回登录")}}
         Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal=24.dp)) {
@@ -100,7 +96,7 @@ import org.json.JSONObject
             Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
                 SwissEyebrow("TINGZONG / ACCOUNT")
                 Text(title,fontSize=34.sp,lineHeight=42.sp,fontWeight=FontWeight.SemiBold,color=RoomColors.Ink)
-                Text(introduction,fontSize=14.sp,color=RoomColors.Muted,lineHeight=23.sp)
+                if(introduction!=null)Text(introduction,fontSize=14.sp,color=RoomColors.Muted,lineHeight=23.sp)
             }
             HorizontalDivider(Modifier.padding(top=18.dp,bottom=16.dp),color=RoomColors.Line)
             OutlinedTextField(state.email,onEmail,Modifier.fillMaxWidth().focusRequester(emailFocus).testTag("account-email"),label={Text("邮箱")},singleLine=true,enabled=!busy,isError=state.emailError!=null,
