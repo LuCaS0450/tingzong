@@ -183,24 +183,24 @@ internal fun DrawScope.performanceRibbon(
                 2 -> VelvetCrimson
                 3 -> CoralWarm
                 4 -> SoftPeach
-                else -> SilkBlush
+                else -> VermilionBright
             }
             val activeCol = when (b) {
-                0 -> RoseLuminance
-                1 -> CoralWarm
-                2 -> SoftPeach
-                3 -> SilkBlush
-                4 -> SilkIvory
-                else -> IvoryHotCore
+                0 -> VelvetCrimson
+                1 -> RoseLuminance
+                2 -> CoralWarm
+                3 -> CoralGold
+                4 -> SoftPeach
+                else -> RoseLuminance
             }
-            val cloudColor = lerp(idleCol, activeCol, holdBoost)
+            val cloudColor = lerp(idleCol, activeCol, holdBoost * 0.75f)
             val peakAlpha = (when (b) {
                 0 -> 0.72f
                 1 -> 0.74f
-                2 -> 0.68f
-                3 -> 0.76f
-                4 -> 0.64f + 0.22f * holdBoost
-                else -> 0.48f + 0.34f * holdBoost
+                2 -> 0.70f
+                3 -> 0.74f
+                4 -> 0.56f + 0.14f * holdBoost
+                else -> 0.58f + 0.14f * holdBoost
             }) * alpha
 
             // 6-stop smooth Gaussian falloff eliminates any perceptible circular edge.
@@ -220,30 +220,11 @@ internal fun DrawScope.performanceRibbon(
             )
         }
 
-        // While holding, a silky warm-ivory luminescence blooms organically upward from the strike line contact.
-        if (holding) {
-            val contactR = maxOf(rw * 1.15f, height * (0.34f + 0.28f * frac))
-            val contactAlpha = (0.48f + 0.26f * frac) * breath * alpha
-            drawCircle(
-                brush = Brush.radialGradient(
-                    0.00f to IvoryHotCore.copy(alpha = contactAlpha),
-                    0.28f to SilkIvory.copy(alpha = contactAlpha * 0.72f),
-                    0.58f to SoftPeach.copy(alpha = contactAlpha * 0.30f),
-                    0.82f to CoralWarm.copy(alpha = contactAlpha * 0.08f),
-                    1.00f to Color.Transparent,
-                    center = Offset(x + sin(tSec * 3.1 + seed).toFloat() * rw * 0.12f, bottom),
-                    radius = contactR,
-                ),
-                radius = contactR,
-                center = Offset(x + sin(tSec * 3.1 + seed).toFloat() * rw * 0.12f, bottom),
-            )
-        }
-
         // Ultra-subtle translucent glass glaze along the 11 o'clock edge for refined physical depth.
         drawRect(
             brush = Brush.horizontalGradient(
-                0.00f to Color.White.copy(alpha = (if (holding) 0.18f else 0.11f) * alpha),
-                0.18f to Color.White.copy(alpha = (if (holding) 0.06f else 0.03f) * alpha),
+                0.00f to Color.White.copy(alpha = (if (holding) 0.14f else 0.10f) * alpha),
+                0.18f to Color.White.copy(alpha = (if (holding) 0.05f else 0.03f) * alpha),
                 0.60f to Color.Transparent,
                 1.00f to Color.Transparent,
                 startX = left,
@@ -253,13 +234,41 @@ internal fun DrawScope.performanceRibbon(
             size = Size(rw, height),
         )
 
-        // Delicate, crisp Bauhaus onset ivory edge lip.
-        val lipHeight = (if (holding) 2.2.dp else 3.2.dp).toPx().coerceAtMost(height)
-        drawRect(
-            color = (if (holding) IvoryHotCore else IvoryKeyTone).copy(alpha = (if (holding) 0.95f else 0.90f) * alpha),
-            topLeft = Offset(left, bottom - lipHeight),
-            size = Size(rw, lipHeight),
-        )
+        // Restored dual-phase upward travelling straight shimmer bands & inner rails while holding.
+        if (holding && motion && height > 12.dp.toPx()) {
+            val travelSpan = height + 72.dp.toPx()
+            for (wave in 0..1) {
+                val period = if (wave == 0) 0.68 else 1.12
+                val phaseOffset = if (wave == 0) 0.0 else 0.47
+                val phase = ((tSec / period + phaseOffset) % 1.0).toFloat()
+                val bandCenterY = bottom + 24.dp.toPx() - phase * travelSpan
+                val bandHalfH = (if (wave == 0) 26.dp else 16.dp).toPx()
+                val fadeNearTail = (1f - phase * 0.72f).coerceIn(0.18f, 1f)
+                val peakAlpha = (if (wave == 0) 0.34f else 0.22f) * fadeNearTail * alpha
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0.0f to Color.Transparent,
+                        0.45f to IvoryGlowWarm.copy(alpha = peakAlpha * 0.65f),
+                        0.55f to IvoryHotCore.copy(alpha = peakAlpha),
+                        1.0f to Color.Transparent,
+                        startY = bandCenterY - bandHalfH,
+                        endY = bandCenterY + bandHalfH,
+                    ),
+                    topLeft = Offset(left, bandCenterY - bandHalfH),
+                    size = Size(rw, bandHalfH * 2f),
+                )
+            }
+            val railBrush = Brush.verticalGradient(
+                0.0f to Color.Transparent,
+                0.42f to IvoryGlowWarm.copy(alpha = 0.24f * breath * alpha),
+                1.0f to IvoryHotCore.copy(alpha = 0.68f * breath * alpha),
+                startY = top,
+                endY = bottom,
+            )
+            val railW = 1.25.dp.toPx()
+            drawRect(brush = railBrush, topLeft = Offset(left + 1.dp.toPx(), top), size = Size(railW, height))
+            drawRect(brush = railBrush, topLeft = Offset(left + rw - railW - 1.dp.toPx(), top), size = Size(railW, height))
+        }
     }
 
     // 4. Subtle translucent rim light wrapping the rounded silhouette cleanly.

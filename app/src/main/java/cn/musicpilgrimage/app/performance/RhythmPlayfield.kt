@@ -323,14 +323,7 @@ private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, alphaScale:
         size = Size(nw, nh),
         cornerRadius = corner,
     )
-    // Subtle front thickness strip + top highlight + precision center mark.
-    val lip = 3.5.dp.toPx()
-    drawRoundRect(
-        color = IvoryKeyFront.copy(alpha = alpha),
-        topLeft = Offset(left, top + nh - lip),
-        size = Size(nw, lip),
-        cornerRadius = corner,
-    )
+    // Top highlight + precision center mark (clean bottom edge without any lip bar).
     drawLine(
         color = Color.White.copy(alpha = 0.85f * alpha),
         start = Offset(left + 1.dp.toPx(), top + 1.dp.toPx()),
@@ -381,14 +374,7 @@ private fun DrawScope.drawFlickNote(x: Float, y: Float, w: Float, alphaScale: Fl
         size = Size(nw, nh),
         cornerRadius = corner,
     )
-    // Delicate upper specular rim + refined ivory front lip.
-    val lip = 3.dp.toPx()
-    drawRoundRect(
-        color = Color(0xFFF9F2EA).copy(alpha = 0.92f * alpha),
-        topLeft = Offset(left, top + nh - lip),
-        size = Size(nw, lip),
-        cornerRadius = corner,
-    )
+    // Delicate upper specular rim (clean bottom edge without any white lip bar).
     drawLine(
         color = Color.White.copy(alpha = 0.58f * alpha),
         start = Offset(left + 2.dp.toPx(), top + 1.dp.toPx()),
@@ -396,7 +382,7 @@ private fun DrawScope.drawFlickNote(x: Float, y: Float, w: Float, alphaScale: Fl
         strokeWidth = 1.dp.toPx(),
     )
     // Soft radial inner lift behind the centered ivory directional glyph.
-    val cy = top + (nh - lip) * 0.54f
+    val cy = y + 1.dp.toPx()
     drawCircle(
         brush = Brush.radialGradient(
             0.0f to Color(0xFFFFEDE2).copy(alpha = 0.24f * alpha),
