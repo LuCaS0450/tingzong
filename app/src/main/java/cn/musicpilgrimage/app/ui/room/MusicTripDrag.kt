@@ -5,18 +5,20 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.gestures.drag as trackDrag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -205,19 +207,41 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
         content(drag)
         drag.source?.let{stop->
             Box(Modifier.offset{IntOffset(drag.position.x.roundToInt(),drag.position.y.roundToInt())}
-                .width(with(density){drag.width.toDp()}).shadow(12.dp,androidx.compose.ui.graphics.RectangleShape).testTag("trip-drag-preview")) {
+                .width(with(density){drag.width.toDp()})
+                .shadow(
+                    elevation = 14.dp,
+                    shape = TripStopCardShape,
+                    ambientColor = RoomColors.Ink.copy(alpha = 0.16f),
+                    spotColor = RoomColors.Ink.copy(alpha = 0.24f),
+                    clip = false,
+                )
+                .border(1.2.dp, RoomColors.Red.copy(alpha = 0.55f), TripStopCardShape)
+                .testTag("trip-drag-preview")) {
                 RoomTripStopCard(stop,Modifier.clearAndSetSemantics{},false,false,false,{},{},{},{},{},Modifier)
             }
             if(drag.dragging)drag.target?.let{target->
                 Text(if(target.duplicate)"第${target.day}天已有这个地点" else "放入第${target.day}天 · 第${target.index+1}个地点",
-                    Modifier.align(Alignment.TopCenter).offset{IntOffset(0,(drag.position.y-38*density.density).coerceIn(6*density.density,(drag.container.height-38*density.density).coerceAtLeast(6*density.density)).roundToInt())}
-                        .background(RoomColors.Paper,androidx.compose.ui.graphics.RectangleShape).padding(10.dp,6.dp).testTag("trip-drop-hint"),
-                    color=if(target.duplicate)MaterialTheme.colorScheme.error else RoomColors.Navy,fontSize=13.sp)
+                    Modifier.align(Alignment.TopCenter).offset{IntOffset(0,(drag.position.y-42*density.density).coerceIn(6*density.density,(drag.container.height-42*density.density).coerceAtLeast(6*density.density)).roundToInt())}
+                        .shadow(6.dp, TripPillShape, clip = false)
+                        .clip(TripPillShape)
+                        .background(if(target.duplicate)RoomColors.Red else RoomColors.Ink)
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                        .testTag("trip-drop-hint"),
+                    color=RoomColors.Paper,fontSize=13.sp,fontWeight=FontWeight.Medium)
             }
         }
     }
 }
 
 @Composable internal fun TripDropGuide(drag:MusicTripDragState,key:String,after:Boolean) {
-    if(drag.lineAt(key,after))Box(Modifier.fillMaxWidth().height(2.dp).background(if(drag.target?.duplicate==true)MaterialTheme.colorScheme.error else RoomColors.Navy).testTag("trip-drop-line"))
+    if(drag.lineAt(key,after)) {
+        Box(
+            Modifier.fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .height(3.dp)
+                .clip(TripPillShape)
+                .background(if(drag.target?.duplicate==true)MaterialTheme.colorScheme.error else RoomColors.Red)
+                .testTag("trip-drop-line"),
+        )
+    }
 }

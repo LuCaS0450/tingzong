@@ -13,8 +13,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitVerticalTouchSlopOrCancellation
@@ -34,11 +36,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -60,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import cn.musicpilgrimage.app.ui.room.RoomColors
+import cn.musicpilgrimage.app.ui.room.SwissButton
 import cn.musicpilgrimage.app.ui.room.SwissTextButton
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.CancellationException
@@ -811,11 +814,11 @@ private fun AppBottomSheetHost(
                     }
                 }
                 .offset { IntOffset(0, currentOffsetPx.roundToInt()) }
-                .nestedScroll(sheetNestedScroll)
-                .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp)),
-            shape = RectangleShape,
-            color = RoomColors.Paper,
-            shadowElevation = 0.dp,
+                .nestedScroll(sheetNestedScroll),
+            shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
+            color = lerp(RoomColors.Paper, Color.White, 0.45f),
+            border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.82f)),
+            shadowElevation = 14.dp,
         ) {
             Column(
                 modifier = Modifier
@@ -825,12 +828,11 @@ private fun AppBottomSheetHost(
                             .union(WindowInsets.ime.only(WindowInsetsSides.Bottom))
                     ),
             ) {
-                HorizontalDivider(color = RoomColors.Line)
-                // Tactile Swiss drag handle + accessible toggle fallback when multi-detent active.
+                // Tactile rounded drag handle + accessible toggle fallback when multi-detent active.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(26.dp)
+                        .height(28.dp)
                         .testTag("app-bottom-sheet-handle")
                         .semantics {
                             contentDescription = when {
@@ -857,9 +859,10 @@ private fun AppBottomSheetHost(
                 ) {
                     Box(
                         Modifier
-                            .width(34.dp)
-                            .height(3.dp)
-                            .background(RoomColors.Ink.copy(alpha = 0.22f)),
+                            .width(38.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(RoomColors.Ink.copy(alpha = 0.18f)),
                     )
                 }
                 content(expanded) {
@@ -925,15 +928,13 @@ internal fun AppCenterConfirmDialog(
                         alpha = progress
                     }
                     .pointerInput(Unit) { detectTapGestures { } },
-                shape = RectangleShape,
-                color = RoomColors.Paper,
-                shadowElevation = 0.dp,
+                shape = RoundedCornerShape(18.dp),
+                color = lerp(RoomColors.Paper, Color.White, 0.72f),
+                border = BorderStroke(0.8.dp, RoomColors.Line.copy(alpha = 0.75f)),
+                shadowElevation = 12.dp,
             ) {
-                Column(Modifier.fillMaxWidth()) {
-                    HorizontalDivider(color = RoomColors.Ink, thickness = 1.5.dp)
-                    Box(Modifier.padding(22.dp)) {
-                        content()
-                    }
+                Box(Modifier.padding(22.dp)) {
+                    content()
                 }
             }
         }
@@ -961,20 +962,44 @@ internal fun AppConfirmation(
     ) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = RoomColors.Ink)
-            Text(message, fontSize = 14.sp, color = RoomColors.Muted)
+            Text(message, fontSize = 14.sp, lineHeight = 21.sp, color = RoomColors.Muted)
             details?.invoke()
-            error?.let { Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.error) }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                SwissTextButton(onDismiss, enabled = !busy) {
-                    Text(cancelLabel)
+            error?.let {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(RoomColors.Red.copy(alpha = 0.08f))
+                        .border(0.8.dp, RoomColors.Red.copy(alpha = 0.22f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                ) {
+                    Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
                 }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 SwissTextButton(
+                    onDismiss,
+                    enabled = !busy,
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Text(cancelLabel, color = RoomColors.Muted)
+                }
+                SwissButton(
                     onConfirm,
                     enabled = confirmEnabled && !busy,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = if (destructive) RoomColors.Red else RoomColors.Ink,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (destructive) RoomColors.Red else RoomColors.Ink,
+                        contentColor = RoomColors.Paper,
                     ),
-                ) { Text(confirmLabel) }
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                ) { Text(confirmLabel, fontWeight = FontWeight.Medium) }
             }
         }
     }
