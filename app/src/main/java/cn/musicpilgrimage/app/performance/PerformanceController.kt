@@ -69,21 +69,11 @@ internal class PerformanceController(application:Application,val song:SongPackag
     private var initialized=false
     private var startGeneration=0
     private var muted=respectMute
-    private var audioVisualOffsetMs=0
     private var resultSaving=false
     private val preferences=AppPreferences(application)
     private val focus=PlaybackAudioSession(application){pause("音乐已暂停")}
 
-    private fun chartPositionUs(rawPositionUs:Long):Long =
-        (rawPositionUs + audioVisualOffsetMs * 1_000L).coerceIn(startUs, endUs)
-
-    fun setAudioVisualOffsetMs(offsetMs:Int) {
-        val clamped=offsetMs.coerceIn(AppPreferences.MIN_AV_OFFSET_MS, AppPreferences.MAX_AV_OFFSET_MS)
-        if(clamped==audioVisualOffsetMs && mutableUi.value.audioVisualOffsetMs==clamped)return
-        audioVisualOffsetMs=clamped
-        mutableUi.value=mutableUi.value.copy(audioVisualOffsetMs=clamped)
-        viewModelScope.launch { preferences.setAudioVisualOffsetMs(clamped) }
-    }
+    private fun chartPositionUs(rawPositionUs:Long):Long = rawPositionUs.coerceIn(startUs, endUs)
 
     init {
         viewModelScope.launch {
@@ -91,10 +81,6 @@ internal class PerformanceController(application:Application,val song:SongPackag
                 if(respectMute) {
                     muted=value.muted
                     piano?.let{it.setMuted(it.handle,muted)}
-                }
-                audioVisualOffsetMs=value.audioVisualOffsetMs
-                if(mutableUi.value.audioVisualOffsetMs!=audioVisualOffsetMs) {
-                    mutableUi.value=mutableUi.value.copy(audioVisualOffsetMs=audioVisualOffsetMs)
                 }
             }
         }

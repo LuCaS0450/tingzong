@@ -66,8 +66,10 @@ internal class PerformanceSessionViewModel:ViewModel() {
             onDispose{lifecycle.removeObserver(observer)}
         }
         DisposableEffect(controller){onController(controller);onDispose{onController(null)}}
-        LaunchedEffect(ui.state){
-            onFullscreen(ui.state!=PlayState.FINISHED)
+        val waitingForStage = ui.state == PlayState.LOADING ||
+            (startRequested && lifecycleState == Lifecycle.State.RESUMED && ui.state in listOf(PlayState.READY, PlayState.PAUSED))
+        LaunchedEffect(ui.state, waitingForStage){
+            onFullscreen(!waitingForStage && ui.state!=PlayState.FINISHED)
             if(ui.state==PlayState.RECOVERING)startRequested=false
         }
         LaunchedEffect(startRequested,ui.state,lifecycleState) {
@@ -77,15 +79,32 @@ internal class PerformanceSessionViewModel:ViewModel() {
                 controller.start()
             }
         }
-        PerformanceScreen(controller,{
-            controller.pause()
-            startRequested=false
-            if(directStart)onExit()
-            else {
-                if(controller.ui.value.state==PlayState.FAILED)session.reset()
-                entered=false
-            }
-        },artwork,onExplore,onSpace,origin,revealStage=!directStart)
+        if (waitingForStage) {
+            RoomPerformanceLoading(
+                title = song.title,
+                artist = song.artist,
+                artwork = artwork,
+                statusLabel = "正在加载音乐",
+                progress = null,
+                failed = false,
+                onRetry = {},
+                onBack = {
+                    controller.pause()
+                    startRequested = false
+                    if (directStart) onExit() else entered = false
+                },
+            )
+        } else {
+            PerformanceScreen(controller,{
+                controller.pause()
+                startRequested=false
+                if(directStart)onExit()
+                else {
+                    if(controller.ui.value.state==PlayState.FAILED)session.reset()
+                    entered=false
+                }
+            },artwork,onExplore,onSpace,origin,revealStage=!directStart)
+        }
     } else {
         LaunchedEffect(Unit){onFullscreen(false)}
         Column(Modifier.fillMaxSize()) {

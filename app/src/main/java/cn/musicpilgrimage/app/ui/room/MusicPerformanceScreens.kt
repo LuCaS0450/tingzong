@@ -33,6 +33,52 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+@Composable internal fun RoomPerformanceLoading(
+    title: String,
+    artist: String,
+    artwork: ReleaseArtwork?,
+    statusLabel: String,
+    progress: Float?,
+    failed: Boolean,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().testTag("performance-loading")) {
+        RoomHeader("正在准备音乐", onBack = onBack, onSpace = {})
+        Column(
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(26.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            RoomCover(artwork, title, Modifier.size(132.dp))
+            Spacer(Modifier.height(24.dp))
+            Text(title, color = RoomColors.Ink, style = MaterialTheme.typography.headlineSmall)
+            if (artist.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(artist, color = RoomColors.Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(statusLabel, color = RoomColors.Muted)
+            Spacer(Modifier.height(16.dp))
+            Text("准备好后直接进入演奏", color = RoomColors.Muted, style = MaterialTheme.typography.bodySmall)
+            if (failed) {
+                TextButton(onClick = onRetry) { Text("重试", color = RoomColors.Red) }
+            } else if (progress != null) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                    color = RoomColors.Red,
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                    color = RoomColors.Red,
+                )
+            }
+        }
+    }
+}
+
 @Composable internal fun RoomPerformancePreparation(entry:PerformanceEntry,artwork:ReleaseArtwork?,onStart:()->Unit,onImport:(()->Unit)?=null,
     importing:Boolean=false,importProgress:Float=0f,importMessage:String?=null) {
     val song=entry.song

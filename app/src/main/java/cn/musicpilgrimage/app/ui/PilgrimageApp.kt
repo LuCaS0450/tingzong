@@ -795,22 +795,18 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
          PerformanceFlow(readyEntry,libraryOwner,back,performanceArtwork(song),related,{performanceImmersive=it},
            importing=performanceLibraryUi.importing==song.id,importProgress=performanceLibraryUi.progress,
            importMessage=performanceLibraryUi.error ?: performanceLibraryUi.notice,directStart=true)
-        } else Column(Modifier.fillMaxSize()) {
-          RoomHeader("正在准备音乐",onBack=back,onSpace={})
-          Column(Modifier.fillMaxWidth().weight(1f).padding(26.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
-            RoomCover(performanceArtworkFor(performanceItem.title,performanceItem.artist),performanceItem.title,Modifier.size(132.dp))
-            Spacer(Modifier.height(24.dp));Text(performanceItem.title,color=SwissInk,style=MaterialTheme.typography.headlineSmall)
-            if(performanceItem.artist.isNotBlank()) {
-             Spacer(Modifier.height(4.dp));Text(performanceItem.artist,color=RoomColors.Muted,style=MaterialTheme.typography.bodySmall)
-            }
-            Spacer(Modifier.height(12.dp))
-            val status=performanceLibraryUi.downloads[performanceItem.id]
-            Text(status?.label?:"音乐准备中",color=RoomColors.Muted)
-            Spacer(Modifier.height(16.dp));Text("准备好后直接进入演奏",color=RoomColors.Muted,style=MaterialTheme.typography.bodySmall)
-            if(status?.failed==true)TextButton({performanceLibrary.prepareSong(performanceItem.id,retry=true)}){Text("重试",color=SwissRed)}
-            else if(status?.progress!=null)LinearProgressIndicator(progress={status.progress},modifier=Modifier.fillMaxWidth().padding(top=24.dp),color=SwissRed)
-            else LinearProgressIndicator(modifier=Modifier.fillMaxWidth().padding(top=24.dp),color=SwissRed)
-          }
+        } else {
+          val status=performanceLibraryUi.downloads[performanceItem.id]
+          RoomPerformanceLoading(
+            title=performanceItem.title,
+            artist=performanceItem.artist,
+            artwork=performanceArtworkFor(performanceItem.title,performanceItem.artist),
+            statusLabel=status?.label?:"音乐准备中",
+            progress=status?.progress,
+            failed=status?.failed==true,
+            onRetry={performanceLibrary.prepareSong(performanceItem.id,retry=true)},
+            onBack=back,
+          )
         }
       }
       else if(!performanceLibraryUi.loaded)CircularProgressIndicator(Modifier.padding(24.dp),color=RoomColors.Navy)
