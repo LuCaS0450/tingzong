@@ -87,6 +87,7 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
     var dragging by mutableStateOf(false);private set
     var position by mutableStateOf(Offset.Zero);private set
     var target by mutableStateOf<TripDropTarget?>(null);private set
+    var previewTarget by mutableStateOf<TripDropTarget?>(null);private set
     var notice by mutableStateOf<String?>(null);private set
     var width by mutableFloatStateOf(0f);private set
     private var pointer by mutableStateOf(Offset.Zero)
@@ -96,6 +97,12 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
     val active get()=source!=null
     val pointerY get()=pointer.y
 
+    fun previewTrip(base:MusicTrip):MusicTrip {
+        val stop=source ?: return base
+        val drop=previewTarget?.takeUnless{it.duplicate} ?: return base
+        return runCatching{base.move(stop.id,drop.day,drop.index)}.getOrDefault(base)
+    }
+
     fun handleAt(point:Offset):String? {
         val visible=list.layoutInfo.visibleItemsInfo.map{it.key.toString()}.toSet()
         return handles.entries.firstOrNull{it.key in visible&&it.value.contains(point+container.topLeft)}?.key
@@ -104,7 +111,7 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
         if(active)return
         val stop=trip?.stops?.find{it.id==id} ?: return
         val bounds=cards[id] ?: return
-        generation++;source=stop;dragging=true;notice=null;width=bounds.width
+        generation++;source=stop;dragging=true;notice=null;previewTarget=null;width=bounds.width
         origin=bounds.topLeft-container.topLeft;position=origin;pointer=point;grab=point-origin
         retarget()
     }
@@ -117,14 +124,21 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
     fun retarget() {
         val stop=source ?: return
         val plan=trip ?: return
+        val activePlan=previewTrip(plan)
         val layout=list.layoutInfo
         // Lazy item offsets omit the before-content padding that is applied at placement.
-        target=if(pointer.x in 0f..container.width&&pointer.y in 0f..container.height)
-            resolveTripDrop(plan,stop,pointer.y,layout.visibleItemsInfo.map{TripDragItem(it.key.toString(),(it.offset-layout.viewportStartOffset).toFloat(),it.size.toFloat())}) else null
+        val next=if(pointer.x in 0f..container.width&&pointer.y in 0f..container.height)
+            resolveTripDrop(activePlan,stop,pointer.y,layout.visibleItemsInfo.map{TripDragItem(it.key.toString(),(it.offset-layout.viewportStartOffset).toFloat(),it.size.toFloat())}) else null
+        target=next
+        previewTarget=when {
+            next==null -> previewTarget
+            next.duplicate -> null
+            else -> next
+        }
     }
     fun lineAt(key:String,after:Boolean):Boolean {
         val stop=source ?: return false
-        val drop=target ?: return false
+        val drop=target?.takeIf{it.duplicate} ?: return false
         val group=trip?.stops?.filter{it.day==drop.day&&it.id!=stop.id} ?: return false
         return when {
             drop.index<group.size->!after&&key==group[drop.index].id
@@ -140,8 +154,12 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
         if(commit&&drop?.duplicate==true)notice="这个地点已安排在第${drop.day}天，请选择另一天。"
         val currentIndex=trip?.stops?.filter{it.day==stop.day}?.indexOfFirst{it.id==stop.id}
         if(commit&&drop!=null&&!drop.duplicate&&(drop.day!=stop.day||drop.index!=currentIndex)) {
+            previewTarget=drop
             onDrop(stop.id,drop.day,drop.index){settle(motion)}
-        } else settle(motion)
+        } else {
+            previewTarget=null
+            settle(motion)
+        }
     }
     private fun settle(motion:Boolean) {
         val token=generation
@@ -154,10 +172,10 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
             val destination=if(visible)cards[stop.id]?.topLeft?.minus(container.topLeft) ?: origin
                 else Offset(position.x,if(position.y<container.height/2)-2000f else container.height+200f)
             Animatable(position,Offset.VectorConverter).animateTo(destination,tween(if(motion)180 else 0)) {position=value}
-            if(token==generation){source=null;target=null}
+            if(token==generation){source=null;target=null;previewTarget=null}
         }
     }
-    fun clear() {generation++;dragging=false;source=null;target=null}
+    fun clear() {generation++;dragging=false;source=null;target=null;previewTarget=null}
 }
 
 @Composable internal fun RoomTripDragSurface(

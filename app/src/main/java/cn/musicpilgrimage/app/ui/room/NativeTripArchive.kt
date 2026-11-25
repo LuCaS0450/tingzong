@@ -1,5 +1,8 @@
 package cn.musicpilgrimage.app.ui.room
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,6 +22,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -26,11 +35,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.Catalog
 import cn.musicpilgrimage.app.data.MusicTrip
 import cn.musicpilgrimage.app.data.MusicTripStop
+import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 
 @Composable
 internal fun NativeTripArchive(
@@ -51,10 +62,16 @@ internal fun NativeTripArchive(
 ) {
     val context = LocalContext.current
     val list = rememberLazyListState()
+    val motion = LocalPhysicalMotion.current
     var revealedStopId by remember(trip.id) { mutableStateOf<String?>(null) }
     val linkedPlaces = remember(catalog) { catalog.places.associateBy { it.id } }
-    val days = remember(scheduled) { scheduled.groupBy { it.day } }
     val destinations = remember(trip.cities) { trip.cities.distinctBy { it.pickerKey }.joinToString(" · ") { it.label } }
+    val placementSpec = remember(motion) {
+        if (motion) spring<IntOffset>(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ) else snap()
+    }
     RoomWall(Modifier.fillMaxSize().testTag("native-trip-archive")) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val unit = maxWidth / 360
@@ -80,6 +97,11 @@ internal fun NativeTripArchive(
                     LaunchedEffect(drag.active) {
                         if (drag.active) revealedStopId = null
                     }
+                    val activeStops = remember(trip, scheduled, drag.source, drag.previewTarget) {
+                        if (drag.source == null) scheduled
+                        else drag.previewTrip(trip).stops.filter { it.day != null }
+                    }
+                    val days = remember(activeStops) { activeStops.groupBy { it.day } }
                     LazyColumn(
                         Modifier.fillMaxSize().testTag("trip-archive-scroll"),
                         state = list,
@@ -168,7 +190,8 @@ internal fun NativeTripArchive(
                             item("day:$day") {
                                 Column(
                                     Modifier.fillMaxWidth()
-                                        .padding(top = 26.dp, bottom = if (stops.isEmpty()) 6.dp else 2.dp),
+                                        .animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = placementSpec)
+                                        .padding(top = 24.dp, bottom = if (stops.isEmpty()) 6.dp else 6.dp),
                                 ) {
                                     Row(
                                         Modifier.fillMaxWidth()
@@ -221,40 +244,73 @@ internal fun NativeTripArchive(
                                 }
                                 val lifted = drag.source?.id == stop.id
                                 TripDropGuide(drag, stop.id, after = false)
-                                RoomTripStopCard(
-                                    stop = display,
-                                    modifier = Modifier.fillMaxWidth()
-                                        .padding(top = 12.dp)
+                                Box(
+                                    Modifier.fillMaxWidth()
+                                        .animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = placementSpec)
+                                        .padding(vertical = 6.dp)
                                         .onGloballyPositioned {
                                             val bounds = it.tripDragBounds()
                                             drag.cards[stop.id] = bounds
                                             drag.handles[stop.id] = bounds
-                                        }
-                                        .graphicsLayer { alpha = if (lifted) 0f else 1f }
-                                        .then(if (lifted) Modifier.clearAndSetSemantics {} else Modifier)
-                                        .testTag("trip-stop-${stop.id}"),
-                                    enabled = !busy && !lifted,
-                                    canUp = position > 0,
-                                    canDown = position < stops.lastIndex,
-                                    onPlace = { revealedStopId = null; stop.placeId?.let(onPlace) },
-                                    onUp = { onReorder(stop.id, day, position - 1) {} },
-                                    onDown = { onReorder(stop.id, day, position + 1) {} },
-                                    onMoveDay = { revealedStopId = null; onMoveDay(stop.id) },
-                                    onRemove = { revealedStopId = null; onRemove(stop.id) },
-                                    handleModifier = Modifier,
-                                    placeEnabled = !lifted,
-                                    revealed = revealedStopId == stop.id,
-                                    onReveal = { revealed ->
-                                        if (revealed) revealedStopId = stop.id
-                                        else if (revealedStopId == stop.id) revealedStopId = null
-                                    },
-                                )
+                                        },
+                                ) {
+                                    if (lifted) {
+                                        val strokeColor = RoomColors.Red.copy(alpha = 0.36f)
+                                        Box(
+                                            Modifier.matchParentSize()
+                                                .clip(TripStopCardShape)
+                                                .background(RoomColors.Red.copy(alpha = 0.045f))
+                                                .drawBehind {
+                                                    val strokePx = 1.2.dp.toPx()
+                                                    val radiusPx = 14.dp.toPx()
+                                                    drawRoundRect(
+                                                        color = strokeColor,
+                                                        topLeft = Offset(strokePx / 2f, strokePx / 2f),
+                                                        size = Size(size.width - strokePx, size.height - strokePx),
+                                                        cornerRadius = CornerRadius(radiusPx, radiusPx),
+                                                        style = Stroke(
+                                                            width = strokePx,
+                                                            pathEffect = PathEffect.dashPathEffect(
+                                                                floatArrayOf(6.dp.toPx(), 5.dp.toPx()),
+                                                                0f,
+                                                            ),
+                                                        ),
+                                                    )
+                                                }
+                                                .testTag("trip-drop-placeholder"),
+                                        )
+                                    }
+                                    RoomTripStopCard(
+                                        stop = display,
+                                        modifier = Modifier.fillMaxWidth()
+                                            .graphicsLayer { alpha = if (lifted) 0f else 1f }
+                                            .then(if (lifted) Modifier.clearAndSetSemantics {} else Modifier)
+                                            .testTag("trip-stop-${stop.id}"),
+                                        enabled = !busy && !lifted,
+                                        canUp = position > 0,
+                                        canDown = position < stops.lastIndex,
+                                        onPlace = { revealedStopId = null; stop.placeId?.let(onPlace) },
+                                        onUp = { onReorder(stop.id, day, position - 1) {} },
+                                        onDown = { onReorder(stop.id, day, position + 1) {} },
+                                        onMoveDay = { revealedStopId = null; onMoveDay(stop.id) },
+                                        onRemove = { revealedStopId = null; onRemove(stop.id) },
+                                        handleModifier = Modifier,
+                                        placeEnabled = !lifted,
+                                        revealed = revealedStopId == stop.id,
+                                        onReveal = { revealed ->
+                                            if (revealed) revealedStopId = stop.id
+                                            else if (revealedStopId == stop.id) revealedStopId = null
+                                        },
+                                    )
+                                }
                                 TripDropGuide(drag, stop.id, after = true)
                             }
                         }
                         item("discover") {
                             Box(
-                                Modifier.fillMaxWidth().padding(top = 28.dp),
+                                Modifier.fillMaxWidth()
+                                    .animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = placementSpec)
+                                    .padding(top = 28.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 SwissTextButton(

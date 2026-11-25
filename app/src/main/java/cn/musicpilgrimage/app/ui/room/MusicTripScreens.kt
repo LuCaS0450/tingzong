@@ -60,43 +60,35 @@ import java.time.format.DateTimeFormatter
     val deleting=state.trips.find{it.id==deleteId}
     LazyColumn(
         Modifier.fillMaxSize().testTag("room-trips"),
-        contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 22.dp, top = 16.dp, end = 22.dp, bottom = 36.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         item {
             Row(
-                Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                Modifier.fillMaxWidth().padding(bottom = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        "出发的日子",
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = (-0.3).sp,
-                        color = RoomColors.Ink,
-                    )
-                    if (state.trips.isNotEmpty()) {
-                        Text(
-                            "${state.trips.size} 个行程",
-                            fontSize = 13.sp,
-                            color = RoomColors.Muted,
-                        )
-                    }
-                }
+                Text(
+                    "出发的日子",
+                    Modifier.weight(1f),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.4).sp,
+                    color = RoomColors.Ink,
+                )
                 SwissButton(
                     onClick = { vm.dismissError(); create = true; revealedId = null },
-                    modifier = Modifier.heightIn(min = 40.dp),
+                    modifier = Modifier.heightIn(min = 38.dp),
                     enabled = !state.busy,
-                    shape = TripPrimaryButtonShape,
+                    shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = RoomColors.Red, contentColor = RoomColors.Paper),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp),
+                    contentPadding = PaddingValues(horizontal = 13.dp, vertical = 8.dp),
                 ) {
-                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("新建行程", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("新建行程", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -246,8 +238,8 @@ internal val tripCardBorder = Brush.verticalGradient(
                 },
         ) {
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(
@@ -277,51 +269,20 @@ internal val tripCardBorder = Brush.verticalGradient(
                             )
                         }
                     }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Outlined.CalendarToday,
-                            contentDescription = null,
-                            modifier = Modifier.size(13.dp),
-                            tint = RoomColors.Muted.copy(alpha = 0.78f),
-                        )
-                        Text(
-                            "${trip.start} — ${trip.end}",
-                            fontSize = 13.sp,
-                            letterSpacing = 0.2.sp,
-                            color = RoomColors.Muted,
-                        )
-                    }
+                    Text(
+                        "${trip.start} — ${trip.end}",
+                        fontSize = 13.sp,
+                        letterSpacing = 0.2.sp,
+                        color = RoomColors.Muted,
+                    )
                 }
                 if (destinations.isNotBlank()) {
-                    HorizontalDivider(thickness = 0.5.dp, color = RoomColors.Line.copy(alpha = 0.55f))
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Outlined.Place,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp),
-                            tint = RoomColors.Red.copy(alpha = 0.78f),
-                        )
-                        Text(
-                            destinations,
-                            Modifier.weight(1f),
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            color = RoomColors.Ink.copy(alpha = 0.9f),
-                        )
-                        Icon(
-                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = RoomColors.Muted.copy(alpha = 0.55f),
-                        )
-                    }
+                    Text(
+                        destinations,
+                        fontSize = 14.sp,
+                        lineHeight = 21.sp,
+                        color = RoomColors.Ink.copy(alpha = 0.86f),
+                    )
                 }
             }
         }
@@ -676,18 +637,7 @@ private enum class TripSettingsPane { Menu, Dates, Details }
     TripPanel("修改出行日期",busy,onClose) {
         DateChoice("出发",first){from=it.toString();attempted=false}
         DateChoice("结束",last){to=it.toString();attempted=false}
-        Box(
-            Modifier.fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (valid) RoomColors.Red.copy(alpha = 0.06f) else RoomColors.Red.copy(alpha = 0.09f))
-                .padding(horizontal = 12.dp, vertical = 9.dp),
-        ) {
-            Text(
-                if (valid) "共 ${count} 天。原活动保留在对应的第几天。" else "结束日期不能早于出发日期，最长365天。",
-                fontSize = 13.sp,
-                color = if (valid) RoomColors.Muted else MaterialTheme.colorScheme.error,
-            )
-        }
+        if(!valid) TripError("结束日期不能早于出发日期，最长365天。")
         if(overflow.isNotEmpty()) {
             TripError("以下活动超出新日期，请先移到保留的天数内。")
             LazyColumn(Modifier.weight(1f,fill=false),verticalArrangement=Arrangement.spacedBy(6.dp)) {
@@ -733,19 +683,7 @@ private enum class TripSettingsPane { Menu, Dates, Details }
         if(step==0) {
             DateChoice("出发",from){start=it.toString()}
             DateChoice("结束",to){end=it.toString()}
-            Box(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (valid) RoomColors.Red.copy(alpha = 0.06f) else RoomColors.Red.copy(alpha = 0.09f))
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
-            ) {
-                Text(
-                    if (valid) "共 ${count} 天" else "结束日期不能早于出发日期，最长365天。",
-                    fontSize = 13.sp,
-                    fontWeight = if (valid) FontWeight.Medium else FontWeight.Normal,
-                    color = if (valid) RoomColors.Red else MaterialTheme.colorScheme.error,
-                )
-            }
+            if(!valid) TripError("结束日期不能早于出发日期，最长365天。")
         } else {
             TripDestinationFields(name,{name=it},cities,selected,{selection=it.destinationFields()},busy,Modifier.weight(1f,fill=false))
         }
