@@ -110,4 +110,23 @@ class RhythmJudgeTest {
             CheckpointCodec.decode(newTargets,snapshot)
         }
     }
+    @Test fun chordTargetsJudgeIndependentlyAtSameOnset() {
+        val targets=listOf(target(0,0,1_000_000),target(1,2,1_000_000))
+        val judge=RhythmJudge(targets)
+        assertEquals(Judgment.PERFECT,judge.down(0,1_020_000)?.judgment)
+        assertEquals(Judgment.PERFECT,judge.down(2,1_035_000)?.judgment)
+        assertEquals(2,judge.combo)
+        assertEquals(100000,judge.score())
+    }
+    @Test fun flickTargetDoesNotPenalizeInitialTouchAndResolvesOnSwipe() {
+        val targets=listOf(Target(0,emptyList(),1,1_000_000,160_000,hold=false,flick=true))
+        val judge=RhythmJudge(targets)
+        assertTrue(judge.isFlickPending(1,1_010_000))
+        assertNull(judge.down(1,1_010_000))
+        assertEquals(0,judge.wrongInputs)
+        val hit=judge.flick(1,1_045_000,touchDownUs=1_010_000)
+        assertEquals(Judgment.PERFECT,hit?.judgment)
+        assertEquals(1,judge.combo)
+        assertEquals(100000,judge.score())
+    }
 }

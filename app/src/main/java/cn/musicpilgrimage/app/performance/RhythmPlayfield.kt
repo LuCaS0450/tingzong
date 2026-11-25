@@ -30,6 +30,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -43,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
+import kotlin.math.atan2
 
 private const val HorizonUs = 1_550_000L
 private val StrikeLineFromBottom = 72.dp
@@ -120,6 +124,32 @@ internal fun MusicLanes(
             )
 
             clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
+                // Draw subtle horizontal Bauhaus sync bars connecting simultaneous chord pairs.
+                var prevVisible: Target? = null
+                controller.targets.forEach { t ->
+                    if (t.endUs < min || t.onsetUs > max) return@forEach
+                    val j = ui.judgments.getOrElse(t.id) { Judgment.WAITING }
+                    if (j in listOf(Judgment.PERFECT, Judgment.GOOD, Judgment.PARTIAL)) return@forEach
+                    val prev = prevVisible
+                    if (prev != null && prev.onsetUs == t.onsetUs && prev.lane != t.lane) {
+                        val y = line - (t.onsetUs - timeUs) * pps
+                        val passAlpha = if (y > line) {
+                            (1f - ((y - line) / (StrikeLineFromBottom.toPx() * 0.92f))).coerceIn(0f, 1f)
+                        } else 1f
+                        if (passAlpha > 0.04f) {
+                            val x1 = prev.lane * w + w / 2f
+                            val x2 = t.lane * w + w / 2f
+                            drawLine(
+                                color = IvoryKeyFace.copy(alpha = 0.44f * passAlpha),
+                                start = Offset(x1, y),
+                                end = Offset(x2, y),
+                                strokeWidth = 1.25.dp.toPx(),
+                            )
+                        }
+                    }
+                    prevVisible = t
+                }
+
                 controller.targets.forEach { t ->
                     if (t.endUs < min || t.onsetUs > max) return@forEach
                     val j = ui.judgments.getOrElse(t.id) { Judgment.WAITING }
@@ -149,6 +179,12 @@ internal fun MusicLanes(
                                 alphaScale = holdAlpha,
                             )
                         }
+                    } else if (t.flick) {
+                        val passAlpha = if (y > line) {
+                            (1f - ((y - line) / (StrikeLineFromBottom.toPx() * 0.92f))).coerceIn(0f, 1f)
+                        } else 1f
+                        if (passAlpha <= 0.02f) return@forEach
+                        drawFlickNote(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.26f * passAlpha else passAlpha)
                     } else {
                         val passAlpha = if (y > line) {
                             (1f - ((y - line) / (StrikeLineFromBottom.toPx() * 0.92f))).coerceIn(0f, 1f)
@@ -160,7 +196,7 @@ internal fun MusicLanes(
             }
         }
 
-        // 2. Judgment beams, sustain hold progress, and geometric impact bursts centered on the strike line.
+        // 2. Judgment beams, sustain hold light effects, and layered Bauhaus impact bursts.
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width / 4f
             val line = (size.height - StrikeLineFromBottom.toPx()).coerceAtLeast(1f)
@@ -181,11 +217,12 @@ internal fun MusicLanes(
             }
             ui.feedbacks.forEach { event ->
                 val x = event.lane * w + w / 2f
-                performanceImpact(event, timeUs, x, line, w, noteRedColor, motion)
+                val partnerX = event.chordPartnerLane?.let { it * w + w / 2f }
+                performanceImpact(event, timeUs, x, line, w, noteRedColor, motion, partnerX = partnerX)
             }
         }
 
-        // 3. Full-height touch & semantics layer with minimalist lane numerals below the strike line.
+        // 3. Full-height multi-touch & omnidirectional flick layer keeping testTags intact.
         if (!listen) {
             Row(Modifier.fillMaxSize()) {
                 for (lane in 0..3) {
@@ -197,14 +234,18 @@ internal fun MusicLanes(
                             .fillMaxHeight()
                             .testTag("performance-lane-$lane")
                             .semantics {
-                                contentDescription = "轨道 ${lane + 1}，轻点短音，按住长音"
+                                contentDescription = "轨道 ${lane + 1}，轻点短音，按住长音，轻划滑键"
                                 stateDescription = if (hold != null) "长按中" else "等待音符"
                             }
                             .pointerInput(controller, lane, view, acceptsInput) {
                                 if (acceptsInput) {
+                                    val flickThresholdPx = 12.dp.toPx()
                                     awaitEachGesture {
                                         val down = awaitFirstDown(requireUnconsumed = false)
                                         down.consume()
+                                        val downPos = down.position
+                                        val downChartUs = controller.currentChartPositionUs()
+                                        var flicked = false
                                         pressed = pressed + lane
                                         if (controller.down(lane)) {
                                             view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -213,6 +254,16 @@ internal fun MusicLanes(
                                             do {
                                                 val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
                                                 change.consume()
+                                                if (!flicked && change.pressed) {
+                                                    val delta = change.position - downPos
+                                                    if (delta.getDistance() >= flickThresholdPx) {
+                                                        val angleRad = atan2(delta.y, delta.x)
+                                                        if (controller.flick(lane, angleRad, downChartUs)) {
+                                                            flicked = true
+                                                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                                                        }
+                                                    }
+                                                }
                                             } while (change.pressed)
                                         } finally {
                                             pressed = pressed - lane
@@ -296,6 +347,82 @@ private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, alphaScale:
         size = Size(nw, nh),
         cornerRadius = corner,
         style = Stroke(width = 0.75.dp.toPx()),
+    )
+}
+
+private fun DrawScope.drawFlickNote(x: Float, y: Float, w: Float, alphaScale: Float) {
+    val nw = w * NoteWidthRatio
+    val nh = 32.dp.toPx()
+    val left = x - nw * 0.5f
+    val top = y - nh * 0.5f
+    val alpha = alphaScale.coerceIn(0f, 1f)
+    val corner = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
+
+    // 11 o'clock cast shadow.
+    drawRoundRect(
+        color = Color(0xFF0A0C0B).copy(alpha = 0.58f * alpha),
+        topLeft = Offset(left + 1.5.dp.toPx(), top + 2.5.dp.toPx()),
+        size = Size(nw, nh),
+        cornerRadius = corner,
+    )
+    // Monochrome matte charcoal Bauhaus body to contrast crisply against ivory taps and crimson holds.
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF282E2B).copy(alpha = alpha),
+                Color(0xFF1A1F1D).copy(alpha = alpha),
+                Color(0xFF141816).copy(alpha = alpha),
+            ),
+            startY = top,
+            endY = top + nh,
+        ),
+        topLeft = Offset(left, top),
+        size = Size(nw, nh),
+        cornerRadius = corner,
+    )
+    // Crisp Swiss crimson bottom actuation lip + ivory top edge highlight.
+    val lip = 3.5.dp.toPx()
+    drawRoundRect(
+        color = CrimsonHighlight.copy(alpha = alpha),
+        topLeft = Offset(left, top + nh - lip),
+        size = Size(nw, lip),
+        cornerRadius = corner,
+    )
+    drawLine(
+        color = IvoryKeyFace.copy(alpha = 0.72f * alpha),
+        start = Offset(left + 1.dp.toPx(), top + 1.dp.toPx()),
+        end = Offset(left + nw - 1.dp.toPx(), top + 1.dp.toPx()),
+        strokeWidth = 1.dp.toPx(),
+    )
+    // Dual Bauhaus upward chevrons (upper ivory + primary Swiss crimson) for instant flick recognition.
+    val chevW = nw * 0.22f
+    val chevH = 5.5.dp.toPx()
+    val upperPath = Path().apply {
+        moveTo(x - chevW, y - 0.5.dp.toPx())
+        lineTo(x, y - chevH - 0.5.dp.toPx())
+        lineTo(x + chevW, y - 0.5.dp.toPx())
+    }
+    drawPath(
+        path = upperPath,
+        color = IvoryKeyFace.copy(alpha = 0.92f * alpha),
+        style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Square, join = StrokeJoin.Miter),
+    )
+    val lowerPath = Path().apply {
+        moveTo(x - chevW, y + 5.dp.toPx())
+        lineTo(x, y + 5.dp.toPx() - chevH)
+        lineTo(x + chevW, y + 5.dp.toPx())
+    }
+    drawPath(
+        path = lowerPath,
+        color = CrimsonHighlight.copy(alpha = alpha),
+        style = Stroke(width = 2.1.dp.toPx(), cap = StrokeCap.Square, join = StrokeJoin.Miter),
+    )
+    drawRoundRect(
+        color = IvoryKeyFace.copy(alpha = 0.68f * alpha),
+        topLeft = Offset(left, top),
+        size = Size(nw, nh),
+        cornerRadius = corner,
+        style = Stroke(width = 0.9.dp.toPx()),
     )
 }
 

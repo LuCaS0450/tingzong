@@ -16,16 +16,43 @@ internal class RhythmJudge(val targets:List<Target>,val progress:List<TargetProg
     private val goodWindow=(220_000*speed).toLong()
     private val perfectWindow=(90_000*speed).toLong()
     private fun success(){combo++;bestCombo=maxOf(bestCombo,combo)}
+    fun isFlickPending(lane:Int,musicUs:Long):Boolean {
+        if(paused)return false
+        val target=targets.filter{it.lane==lane && progress[it.id].judgment==Judgment.WAITING && abs(it.onsetUs-musicUs)<=goodWindow}
+            .minByOrNull{abs(it.onsetUs-musicUs)}
+        return target?.flick==true
+    }
     fun down(lane:Int,musicUs:Long):Hit? {
         if(paused)return null
         tick(musicUs)
         val target=targets.filter{it.lane==lane && progress[it.id].judgment==Judgment.WAITING && abs(it.onsetUs-musicUs)<=goodWindow}
             .minByOrNull{abs(it.onsetUs-musicUs)}
         if(target==null){wrongInputs++;combo=0;return null}
+        // Flick targets wait for swipe displacement without penalizing the initial finger touch.
+        if(target.flick)return null
         val grade=if(abs(target.onsetUs-musicUs)<=perfectWindow)Judgment.PERFECT else Judgment.GOOD
         val row=progress[target.id];row.startedUs=musicUs;row.attack=grade
         if(target.hold){row.judgment=Judgment.HOLDING;row.holdingFromUs=maxOf(musicUs,target.onsetUs)}
         else {row.judgment=grade;success()}
+        return Hit(target,grade)
+    }
+    fun flick(lane:Int,musicUs:Long,touchDownUs:Long?=null):Hit? {
+        if(paused)return null
+        tick(musicUs)
+        val candidates=targets.filter{it.lane==lane && it.flick && progress[it.id].judgment==Judgment.WAITING}
+        val target=candidates.filter{t->
+            val dFlick=abs(t.onsetUs-musicUs)
+            val dDown=touchDownUs?.let{abs(t.onsetUs-it)} ?: Long.MAX_VALUE
+            minOf(dFlick,dDown)<=goodWindow
+        }.minByOrNull{t->
+            val dFlick=abs(t.onsetUs-musicUs)
+            val dDown=touchDownUs?.let{abs(t.onsetUs-it)} ?: Long.MAX_VALUE
+            minOf(dFlick,dDown)
+        } ?: return null
+        val bestDelta=minOf(abs(target.onsetUs-musicUs), touchDownUs?.let{abs(target.onsetUs-it)} ?: Long.MAX_VALUE)
+        val grade=if(bestDelta<=perfectWindow)Judgment.PERFECT else Judgment.GOOD
+        val row=progress[target.id];row.startedUs=musicUs;row.attack=grade;row.judgment=grade
+        success()
         return Hit(target,grade)
     }
     fun up(lane:Int,musicUs:Long):Target? {

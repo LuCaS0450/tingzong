@@ -5,7 +5,7 @@ import org.json.JSONObject
 internal data class MusicEvent(val id:Int,val onsetUs:Long,val durationUs:Long,val pitch:Int,val velocity:Int,val mask:Int) {
     val endUs get()=onsetUs+durationUs
 }
-internal data class Target(val id:Int,val eventIds:List<Int>,val lane:Int,val onsetUs:Long,val durationUs:Long,val hold:Boolean) {
+internal data class Target(val id:Int,val eventIds:List<Int>,val lane:Int,val onsetUs:Long,val durationUs:Long,val hold:Boolean,val flick:Boolean=false) {
     val endUs get()=onsetUs+durationUs
 }
 internal data class SongSection(val name:String,val startUs:Long,val endUs:Long,val scene:String,val bpm:Double)
@@ -31,15 +31,22 @@ internal data class SongPackage(val id:String,val version:Int,val title:String,v
                 val result=List(a.length()){i->a.getJSONObject(i).let {n->
                     if(recording!=null) {
                         require(!n.has("eventIds")){"录音互动谱不分配音符所有权"}
-                        return@let Target(i,emptyList(),n.getInt("lane"),n.getLong("onsetUs"),n.getLong("durationUs"),n.getBoolean("hold"))
+                        val isHold=n.getBoolean("hold")
+                        val isFlick=n.optBoolean("flick",false)
+                        require(!(isHold && isFlick)){"长按与轻滑不能同时启用"}
+                        return@let Target(i,emptyList(),n.getInt("lane"),n.getLong("onsetUs"),n.getLong("durationUs"),isHold,isFlick)
                     }
                     val ids=n.getJSONArray("eventIds").let{v->List(v.length()){v.getInt(it)}}
                     val notes=ids.map{events[it]}
                     require(notes.isNotEmpty() && notes.all{(it.mask and mask)!=0} && notes.all{it.onsetUs==notes[0].onsetUs})
-                    Target(i,ids,n.getInt("lane"),notes[0].onsetUs,notes.maxOf{it.durationUs},n.getBoolean("hold"))
+                    Target(i,ids,n.getInt("lane"),notes[0].onsetUs,notes.maxOf{it.durationUs},n.getBoolean("hold"),n.optBoolean("flick",false))
                 }}
-                require(result.isNotEmpty() && result.all{it.lane in 0..3 && it.onsetUs>=0 && it.durationUs>0 && it.endUs<=json.getLong("durationUs")})
-                require(result.zipWithNext().all{(a,b)->a.onsetUs<b.onsetUs && (!a.hold || a.endUs<=b.onsetUs)})
+                require(result.isNotEmpty() && result.all{it.lane in 0..3 && it.onsetUs>=0 && it.durationUs>0 && it.endUs<=json.getLong("durationUs") && !(it.hold && it.flick)})
+                require(result.zipWithNext().all{(a,b)->a.onsetUs<=b.onsetUs})
+                // Allow simultaneous chords across distinct lanes; enforce strict non-overlap within each lane.
+                require(result.groupBy{it.lane}.values.all{laneNotes->
+                    laneNotes.zipWithNext().all{(a,b)->a.onsetUs<b.onsetUs && (!a.hold || a.endUs<=b.onsetUs)}
+                })
                 // Retain legacy MIDI provenance validation, independent of playback policy.
                 val assigned=result.flatMap{it.eventIds}
                 if(recording==null)require(assigned.size==assigned.distinct().size && assigned.toSet()==events.filter{(it.mask and mask)!=0}.map{it.id}.toSet())

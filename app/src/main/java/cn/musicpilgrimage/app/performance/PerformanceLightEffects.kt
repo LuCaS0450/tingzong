@@ -374,18 +374,43 @@ internal fun DrawScope.performanceImpact(
     w: Float,
     color: Color,
     motion: Boolean,
+    partnerX: Float? = null,
 ) {
     val isHoldComplete = event.kind == FeedbackKind.HOLD_COMPLETE
-    val durationUs = if (isHoldComplete) 460_000f else 340_000f
+    val isFlick = event.kind == FeedbackKind.FLICK
+    val durationUs = when {
+        isHoldComplete -> 460_000f
+        isFlick -> 380_000f
+        event.kind == FeedbackKind.TAP && event.grade == Judgment.PERFECT -> 380_000f
+        else -> 320_000f
+    }
     val age = ((timeUs - event.atUs).coerceAtLeast(0L) / durationUs)
     if (age >= 1f) return
-    val p = if (motion) age else 0.32f
+    val p = if (motion) age else 0.30f
     val easeOut = 1f - (1f - p) * (1f - p)
     val alpha = (1f - age).let { it * it }
     val rw = (w * NoteWidthRatio).coerceAtLeast(10.dp.toPx())
 
+    // Cross-lane Bauhaus resonance string when hitting a chord pair simultaneously.
+    if (partnerX != null && event.kind.success) {
+        val leftX = minOf(x, partnerX)
+        val rightX = maxOf(x, partnerX)
+        val vib = if (motion) sin(p * 4.5 * PI).toFloat() * (1f - p) * 2.5.dp.toPx() else 0f
+        drawLine(
+            color = CrimsonAnodizedBright.copy(alpha = 0.42f * alpha),
+            start = Offset(leftX, line + vib),
+            end = Offset(rightX, line - vib),
+            strokeWidth = (4.5f - easeOut * 2.5f).dp.toPx().coerceAtLeast(1.dp.toPx()),
+        )
+        drawLine(
+            color = IvoryHotCore.copy(alpha = 0.92f * alpha),
+            start = Offset(leftX, line),
+            end = Offset(rightX, line),
+            strokeWidth = (1.8f - easeOut * 0.9f).dp.toPx().coerceAtLeast(0.6.dp.toPx()),
+        )
+    }
+
     if (isHoldComplete) {
-        // Layered Bauhaus completion burst: radiant flash + staggered dual frames + 6 symmetric micro-shards.
         val burstRadius = rw * (0.55f + easeOut * 0.45f)
         drawCircle(
             brush = Brush.radialGradient(
@@ -398,8 +423,6 @@ internal fun DrawScope.performanceImpact(
             radius = burstRadius,
             center = Offset(x, line),
         )
-
-        // Horizontal light arc sweeping outward along the judgment line.
         val arcHalfW = rw * (0.52f + easeOut * 0.42f)
         drawRect(
             brush = Brush.horizontalGradient(
@@ -414,8 +437,6 @@ internal fun DrawScope.performanceImpact(
             topLeft = Offset(x - arcHalfW, line - 2.dp.toPx()),
             size = Size(arcHalfW * 2f, 4.dp.toPx()),
         )
-
-        // Inner sharp ivory expanding frame.
         val innerW = rw * (0.96f + easeOut * 0.38f)
         val innerH = (12f + easeOut * 28f).dp.toPx()
         drawRoundRect(
@@ -425,8 +446,6 @@ internal fun DrawScope.performanceImpact(
             cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
             style = Stroke(width = (1.6f - easeOut * 0.9f).dp.toPx().coerceAtLeast(0.6.dp.toPx())),
         )
-
-        // Staggered outer crimson-coral frame.
         val outerP = ((p - 0.12f) / 0.88f).coerceIn(0f, 1f)
         if (outerP > 0f) {
             val outerEase = 1f - (1f - outerP) * (1f - outerP)
@@ -441,10 +460,8 @@ internal fun DrawScope.performanceImpact(
                 style = Stroke(width = (1.3f - outerEase * 0.7f).dp.toPx().coerceAtLeast(0.5.dp.toPx())),
             )
         }
-
-        // Six symmetric Bauhaus micro-shards dispersing gracefully upward/outward.
         for (k in 0 until 6) {
-            val angle = -PI * (0.14 + k * 0.144) // fan across upper arc
+            val angle = -PI * (0.14 + k * 0.144)
             val dist = (10f + easeOut * (32f + (k % 2) * 14f)).dp.toPx()
             val fx = x + cos(angle).toFloat() * dist * 1.15f
             val fy = line + sin(angle).toFloat() * dist
@@ -459,34 +476,177 @@ internal fun DrawScope.performanceImpact(
         return
     }
 
-    val tone = when {
-        !event.kind.success -> CrimsonAnodizedBright
-        event.grade == Judgment.PERFECT -> IvoryKeyTone
-        else -> IvoryGlowWarm
-    }
-    val boxW = rw * (0.78f + easeOut * 0.34f)
-    val boxH = (14f + easeOut * 20f).dp.toPx()
-    drawRoundRect(
-        color = tone.copy(alpha = 0.78f * alpha),
-        topLeft = Offset(x - boxW * 0.5f, line - boxH * 0.55f),
-        size = Size(boxW, boxH),
-        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
-        style = Stroke(width = 1.4.dp.toPx()),
-    )
-    drawRect(
-        color = (if (event.kind.success) CrimsonAnodizedBase else color).copy(alpha = 0.22f * alpha),
-        topLeft = Offset(x - rw * 0.52f, line - 3.dp.toPx()),
-        size = Size(rw * 1.04f, 5.dp.toPx()),
-    )
-    for (i in -1..1) {
-        if (i == 0) continue
-        val fx = x + i * (rw * (0.26f + easeOut * 0.28f))
-        val fy = line - (6f + easeOut * 22f).dp.toPx()
-        val sq = (2.6f - easeOut * 0.8f).dp.toPx()
-        drawRect(
-            color = (if (i < 0) IvoryKeyTone else CrimsonAnodizedBright).copy(alpha = 0.84f * alpha),
-            topLeft = Offset(fx - sq * 0.5f, fy - sq * 0.5f),
-            size = Size(sq, sq),
+    if (isFlick) {
+        // Directional crimson-ivory slash blade along the player's actual swipe vector + trailing micro-sparks.
+        val dirX = cos(event.angleRad.toDouble()).toFloat()
+        val dirY = sin(event.angleRad.toDouble()).toFloat()
+        val perpX = -dirY
+        val perpY = dirX
+
+        // Core flash at strike line.
+        val flashR = rw * (0.48f + easeOut * 0.36f)
+        drawCircle(
+            brush = Brush.radialGradient(
+                0.0f to IvoryKeyTone.copy(alpha = 0.58f * alpha),
+                0.35f to CrimsonAnodizedBright.copy(alpha = 0.34f * alpha),
+                1.0f to Color.Transparent,
+                center = Offset(x, line),
+                radius = flashR,
+            ),
+            radius = flashR,
+            center = Offset(x, line),
         )
+
+        // Sharp dual-layer directional slash blade.
+        val tailLen = (16f + easeOut * 10f).dp.toPx()
+        val headLen = (18f + easeOut * 62f).dp.toPx()
+        val startPt = Offset(x - dirX * tailLen, line - dirY * tailLen)
+        val endPt = Offset(x + dirX * headLen, line + dirY * headLen)
+        drawLine(
+            color = CrimsonAnodizedBright.copy(alpha = 0.68f * alpha),
+            start = startPt,
+            end = endPt,
+            strokeWidth = (8.5f - easeOut * 6.5f).dp.toPx().coerceAtLeast(1.5.dp.toPx()),
+        )
+        drawLine(
+            color = IvoryHotCore.copy(alpha = 0.96f * alpha),
+            start = startPt,
+            end = endPt,
+            strokeWidth = (2.8f - easeOut * 2.0f).dp.toPx().coerceAtLeast(0.75.dp.toPx()),
+        )
+
+        // Crisp crimson-ivory expanding frame around strike contact.
+        val frameW = rw * (0.88f + easeOut * 0.44f)
+        val frameH = (12f + easeOut * 22f).dp.toPx()
+        drawRoundRect(
+            color = CrimsonAnodizedBright.copy(alpha = 0.84f * alpha),
+            topLeft = Offset(x - frameW * 0.5f, line - frameH * 0.52f),
+            size = Size(frameW, frameH),
+            cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+            style = Stroke(width = (1.6f - easeOut * 0.9f).dp.toPx().coerceAtLeast(0.6.dp.toPx())),
+        )
+
+        // 8 directional trail micro-sparks streaming along the swipe cone.
+        if (motion) {
+            for (k in 0 until 8) {
+                val spread = ((k - 3.5f) / 3.5f) * (10f + easeOut * 16f).dp.toPx()
+                val advance = (8f + easeOut * (26f + (k % 3) * 18f)).dp.toPx()
+                val sx = x + dirX * advance + perpX * spread
+                val sy = line + dirY * advance + perpY * spread
+                val sz = (2.6f - easeOut * 1.3f).dp.toPx().coerceAtLeast(1.dp.toPx())
+                val sparkColor = if (k % 2 == 0) CrimsonAnodizedBright else IvoryKeyTone
+                drawCircle(
+                    color = sparkColor.copy(alpha = 0.28f * alpha),
+                    radius = sz * 1.9f,
+                    center = Offset(sx, sy),
+                )
+                drawRect(
+                    color = sparkColor.copy(alpha = 0.94f * alpha),
+                    topLeft = Offset(sx - sz * 0.5f, sy - sz * 0.5f),
+                    size = Size(sz, sz),
+                )
+            }
+        }
+        return
+    }
+
+    if (!event.kind.success) {
+        // Restrained crimson signal for misses / empty taps.
+        val boxW = rw * (0.76f + easeOut * 0.24f)
+        val boxH = (12f + easeOut * 14f).dp.toPx()
+        drawRoundRect(
+            color = CrimsonAnodizedBright.copy(alpha = 0.62f * alpha),
+            topLeft = Offset(x - boxW * 0.5f, line - boxH * 0.52f),
+            size = Size(boxW, boxH),
+            cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()),
+            style = Stroke(width = 1.2.dp.toPx()),
+        )
+        return
+    }
+
+    // Refined monochrome + Swiss crimson layered tap impact (PERFECT vs GOOD tier).
+    val isPerfect = event.grade == Judgment.PERFECT
+    val coreR = rw * (if (isPerfect) (0.50f + easeOut * 0.36f) else (0.38f + easeOut * 0.24f))
+    drawCircle(
+        brush = Brush.radialGradient(
+            0.0f to (if (isPerfect) Color.White else IvoryKeyTone).copy(alpha = (if (isPerfect) 0.52f else 0.30f) * alpha),
+            0.38f to IvoryKeyTone.copy(alpha = (if (isPerfect) 0.24f else 0.14f) * alpha),
+            0.72f to CrimsonAnodizedBright.copy(alpha = (if (isPerfect) 0.12f else 0.05f) * alpha),
+            1.0f to Color.Transparent,
+            center = Offset(x, line),
+            radius = coreR,
+        ),
+        radius = coreR,
+        center = Offset(x, line),
+    )
+
+    // Horizontal sweep glint along the pure ivory judgment line.
+    val sweepHalf = rw * (if (isPerfect) (0.48f + easeOut * 0.44f) else (0.42f + easeOut * 0.26f))
+    drawRect(
+        brush = Brush.horizontalGradient(
+            0.0f to Color.Transparent,
+            0.22f to IvoryKeyTone.copy(alpha = (if (isPerfect) 0.88f else 0.56f) * alpha),
+            0.50f to Color.White.copy(alpha = (if (isPerfect) 0.96f else 0.66f) * alpha),
+            0.78f to IvoryKeyTone.copy(alpha = (if (isPerfect) 0.88f else 0.56f) * alpha),
+            1.0f to Color.Transparent,
+            startX = x - sweepHalf,
+            endX = x + sweepHalf,
+        ),
+        topLeft = Offset(x - sweepHalf, line - (if (isPerfect) 1.8.dp else 1.3.dp).toPx()),
+        size = Size(sweepHalf * 2f, (if (isPerfect) 3.6.dp else 2.6.dp).toPx()),
+    )
+
+    // Inner sharp ivory Bauhaus frame.
+    val innerW = rw * (0.90f + easeOut * (if (isPerfect) 0.38f else 0.24f))
+    val innerH = (12f + easeOut * (if (isPerfect) 24f else 16f)).dp.toPx()
+    drawRoundRect(
+        color = IvoryKeyTone.copy(alpha = (if (isPerfect) 0.92f else 0.68f) * alpha),
+        topLeft = Offset(x - innerW * 0.5f, line - innerH * 0.55f),
+        size = Size(innerW, innerH),
+        cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+        style = Stroke(width = (1.5f - easeOut * 0.85f).dp.toPx().coerceAtLeast(0.55.dp.toPx())),
+    )
+
+    // Staggered outer Swiss crimson frame exclusively for PERFECT hits.
+    if (isPerfect) {
+        val outerP = ((p - 0.11f) / 0.89f).coerceIn(0f, 1f)
+        if (outerP > 0f) {
+            val outerEase = 1f - (1f - outerP) * (1f - outerP)
+            val outerAlpha = (1f - outerP) * (1f - outerP)
+            val outerW = rw * (0.96f + outerEase * 0.50f)
+            val outerH = (16f + outerEase * 32f).dp.toPx()
+            drawRoundRect(
+                color = CrimsonAnodizedBright.copy(alpha = 0.72f * outerAlpha),
+                topLeft = Offset(x - outerW * 0.5f, line - outerH * 0.55f),
+                size = Size(outerW, outerH),
+                cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+                style = Stroke(width = (1.25f - outerEase * 0.7f).dp.toPx().coerceAtLeast(0.5.dp.toPx())),
+            )
+        }
+    }
+
+    // Crisp dispersing Bauhaus micro-sparks (8 for PERFECT in ivory & crimson, 4 subtle ivory for GOOD).
+    if (motion) {
+        val count = if (isPerfect) 8 else 4
+        for (k in 0 until count) {
+            val tFrac = (k + 0.5f) / count
+            val angle = -PI * (0.12 + tFrac * 0.76)
+            val speedScale = if (isPerfect) (26f + (k % 3) * 12f) else (18f + (k % 2) * 8f)
+            val dist = (8f + easeOut * speedScale).dp.toPx()
+            val fx = x + cos(angle).toFloat() * dist * 1.18f
+            val fy = line + sin(angle).toFloat() * dist
+            val sz = ((if (isPerfect) 2.7f else 2.0f) - easeOut * 1.1f).dp.toPx().coerceAtLeast(1.dp.toPx())
+            val sparkColor = if (isPerfect && k % 2 == 1) CrimsonAnodizedBright else IvoryKeyTone
+            drawCircle(
+                color = sparkColor.copy(alpha = 0.24f * alpha),
+                radius = sz * 1.85f,
+                center = Offset(fx, fy),
+            )
+            drawRect(
+                color = sparkColor.copy(alpha = (if (isPerfect) 0.92f else 0.72f) * alpha),
+                topLeft = Offset(fx - sz * 0.5f, fy - sz * 0.5f),
+                size = Size(sz, sz),
+            )
+        }
     }
 }

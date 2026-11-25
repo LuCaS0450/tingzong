@@ -22,11 +22,23 @@ internal data class PlayOptions(val difficulty:Int=2,val mode:PlayMode=PlayMode.
         else if(mode==PlayMode.COMPARE) "compare:1.0" else mode.name.lowercase()
 }
 internal enum class FeedbackKind(val label:String,val success:Boolean) {
-    TAP("正好",true), HOLD_START("按住",true), HOLD_COMPLETE("长按完成",true),
+    TAP("正好",true), FLICK("轻划",true), HOLD_START("按住",true), HOLD_COMPLETE("长按完成",true),
     HOLD_BREAK("松早了",false), MISS("错过",false), EMPTY("未接住",false)
 }
-internal data class MusicFeedback(val lane:Int,val atUs:Long,val kind:FeedbackKind,val grade:Judgment=Judgment.WAITING) {
-    val label get()=if(kind==FeedbackKind.TAP && grade==Judgment.GOOD)"接住" else kind.label
+internal data class MusicFeedback(
+    val lane:Int,
+    val atUs:Long,
+    val kind:FeedbackKind,
+    val grade:Judgment=Judgment.WAITING,
+    val angleRad:Float=-1.5707964f,
+    val chordPartnerLane:Int?=null,
+) {
+    val label get()=when {
+        kind==FeedbackKind.TAP && grade==Judgment.GOOD -> "接住"
+        kind==FeedbackKind.FLICK && grade==Judgment.PERFECT -> "轻划"
+        kind==FeedbackKind.FLICK && grade==Judgment.GOOD -> "划中"
+        else -> kind.label
+    }
 }
 internal data class PerformanceUi(val state:PlayState=PlayState.LOADING,val positionUs:Long=0,
     val countIn:Int=0,val score:Int=0,val combo:Int=0,val bestCombo:Int=0,
@@ -266,19 +278,44 @@ internal class PerformanceController(application:Application,val song:SongPackag
             if(rawPosition>=endUs-20_000)finish() else pause("音乐已暂停")
         }
     }
+    private fun chordPartnerLane(hitTarget:Target):Int? =
+        targets.firstOrNull{it.id!=hitTarget.id && it.onsetUs==hitTarget.onsetUs}?.lane
+
+    internal fun currentChartPositionUs():Long {
+        val engine=piano ?: return mutableUi.value.positionUs
+        return chartPositionUs(engine.position(engine.handle))
+    }
+
     fun down(lane:Int):Boolean {
         if(mutableUi.value.state!=PlayState.PLAYING || mutableUi.value.countIn>0 || options.mode==PlayMode.LISTEN)return false
         val engine=piano ?: return false
         val rawPosition=engine.position(engine.handle)
         val chartPosition=chartPositionUs(rawPosition)
+        if(judge.isFlickPending(lane,chartPosition)) {
+            publish(PlayState.PLAYING,chartPosition)
+            return false
+        }
         val previous=mutableUi.value.judgments
         val hit=judge.down(lane,chartPosition)
         publish(PlayState.PLAYING,chartPosition)
         val kind=when {hit==null->FeedbackKind.EMPTY;hit.target.hold->FeedbackKind.HOLD_START;else->FeedbackKind.TAP}
+        val partner=hit?.target?.let(::chordPartnerLane)
         mutableUi.value=mutableUi.value.copy(feedbacks=(mutableUi.value.feedbacks+
-            MusicFeedback(lane,chartPosition,kind,hit?.judgment ?: Judgment.WAITING)).takeLast(8))
+            MusicFeedback(lane,chartPosition,kind,hit?.judgment ?: Judgment.WAITING,chordPartnerLane=partner)).takeLast(12))
         if(holdChanged(previous))saveProgress(rawPosition)
         return hit!=null
+    }
+    fun flick(lane:Int,angleRad:Float,touchDownChartUs:Long?=null):Boolean {
+        if(mutableUi.value.state!=PlayState.PLAYING || mutableUi.value.countIn>0 || options.mode==PlayMode.LISTEN)return false
+        val engine=piano ?: return false
+        val rawPosition=engine.position(engine.handle)
+        val chartPosition=chartPositionUs(rawPosition)
+        val hit=judge.flick(lane,chartPosition,touchDownChartUs) ?: return false
+        publish(PlayState.PLAYING,chartPosition)
+        val partner=chordPartnerLane(hit.target)
+        mutableUi.value=mutableUi.value.copy(feedbacks=(mutableUi.value.feedbacks+
+            MusicFeedback(lane,chartPosition,FeedbackKind.FLICK,hit.judgment,angleRad=angleRad,chordPartnerLane=partner)).takeLast(12))
+        return true
     }
     fun up(lane:Int) {
         if(mutableUi.value.state!=PlayState.PLAYING || mutableUi.value.countIn>0)return
