@@ -111,24 +111,13 @@ internal fun MusicLanes(
             val min = timeUs - 340_000L
             val max = timeUs + HorizonUs
 
-            // Clean, minimalist Bauhaus judgment hairline with subtle lane center indicators.
+            // Clean, minimalist solid-color Bauhaus judgment line.
             drawLine(
-                color = IvoryKeyFace.copy(alpha = 0.62f * clarity),
+                color = IvoryKeyFace.copy(alpha = 0.78f * clarity),
                 start = Offset(0f, line),
                 end = Offset(size.width, line),
-                strokeWidth = 1.25.dp.toPx(),
+                strokeWidth = 1.5.dp.toPx(),
             )
-            for (lane in 0..3) {
-                val active = lane in pressed || held.any { it.lane == lane }
-                val cx = lane * w + w / 2f
-                val halfMark = w * if (active) 0.36f else 0.14f
-                drawLine(
-                    color = if (active) CrimsonHighlight else CrimsonSignal.copy(alpha = 0.78f * clarity),
-                    start = Offset(cx - halfMark, line),
-                    end = Offset(cx + halfMark, line),
-                    strokeWidth = (if (active) 2.5.dp else 1.75.dp).toPx(),
-                )
-            }
 
             clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
                 controller.targets.forEach { t ->
@@ -137,18 +126,31 @@ internal fun MusicLanes(
                     if (j in listOf(Judgment.PERFECT, Judgment.GOOD, Judgment.PARTIAL)) return@forEach
                     val x = t.lane * w + w / 2f
                     val y = line - (t.onsetUs - timeUs) * pps
-                    val passAlpha = if (y > line) {
-                        (1f - ((y - line) / (StrikeLineFromBottom.toPx() * 0.92f))).coerceIn(0f, 1f)
-                    } else 1f
-                    if (passAlpha <= 0.02f) return@forEach
                     if (t.hold) {
-                        val heldY = if (j == Judgment.HOLDING) line else y
+                        val isHolding = j == Judgment.HOLDING
+                        val heldY = if (isHolding) line else y
                         val topY = (line - (t.endUs - timeUs) * pps).coerceAtLeast(-20f)
-                        performanceRibbon(x, topY, heldY, w, noteRedColor, j == Judgment.HOLDING)
-                        if (j != Judgment.HOLDING) {
-                            drawHoldHead(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.26f * passAlpha else passAlpha)
+                        val holdAlpha = when {
+                            isHolding -> 1f
+                            j == Judgment.MISSED -> 0.28f
+                            else -> 1f
+                        }
+                        if (heldY > topY) {
+                            performanceRibbon(x, topY, heldY, w, noteRedColor.copy(alpha = holdAlpha), isHolding)
+                        }
+                        if (!isHolding) {
+                            val headAlpha = if (y > line) {
+                                (1f - ((y - line) / (StrikeLineFromBottom.toPx() * 0.95f))).coerceIn(0f, 1f)
+                            } else 1f
+                            if (headAlpha > 0.02f) {
+                                drawHoldHead(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.26f * headAlpha else headAlpha)
+                            }
                         }
                     } else {
+                        val passAlpha = if (y > line) {
+                            (1f - ((y - line) / (StrikeLineFromBottom.toPx() * 0.92f))).coerceIn(0f, 1f)
+                        } else 1f
+                        if (passAlpha <= 0.02f) return@forEach
                         drawIvoryTapNote(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.26f * passAlpha else passAlpha)
                     }
                 }
