@@ -488,7 +488,6 @@ internal val tripCardBorder = Brush.verticalGradient(
 
 @Composable private fun TripSettingsActionCard(
     title: String,
-    subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     enabled: Boolean,
     onClick: () -> Unit,
@@ -521,10 +520,7 @@ internal val tripCardBorder = Brush.verticalGradient(
             ) {
                 Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = RoomColors.Red)
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = RoomColors.Ink)
-                Text(subtitle, fontSize = 12.sp, color = RoomColors.Muted)
-            }
+            Text(title, Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = RoomColors.Ink)
             Icon(
                 Icons.AutoMirrored.Outlined.KeyboardArrowRight,
                 contentDescription = null,
@@ -560,22 +556,15 @@ private enum class TripSettingsPane { Menu, Dates, Details }
         TripPanel("行程设置",state.busy,{settings=null},animated=false) {
             TripSettingsActionCard(
                 title = "修改日期",
-                subtitle = "调整出发与结束日期",
                 icon = Icons.Outlined.CalendarToday,
                 enabled = !state.busy,
             ) { vm.dismissError(); settings = TripSettingsPane.Dates }
             TripSettingsActionCard(
                 title = "名称与目的地",
-                subtitle = "修改行程标题和目的地列表",
                 icon = Icons.Outlined.Edit,
                 enabled = !state.busy,
             ) { vm.dismissError(); settings = TripSettingsPane.Details }
             TripError(state.error)
-            SwissTextButton(
-                onClick = { settings = null },
-                modifier = Modifier.align(Alignment.End),
-                shape = RoundedCornerShape(10.dp),
-            ) { Text("关闭", color = RoomColors.Muted) }
         }
     }
 

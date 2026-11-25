@@ -217,7 +217,20 @@ internal fun tripDragScrollSpeed(y:Float,height:Float,edge:Float,maxSpeed:Float)
                 )
                 .border(1.2.dp, RoomColors.Red.copy(alpha = 0.55f), TripStopCardShape)
                 .testTag("trip-drag-preview")) {
-                RoomTripStopCard(stop,Modifier.clearAndSetSemantics{},false,false,false,{},{},{},{},{},Modifier)
+                RoomTripStopCard(
+                    stop,
+                    Modifier.clearAndSetSemantics {},
+                    enabled = false,
+                    canUp = false,
+                    canDown = false,
+                    onPlace = {},
+                    onUp = {},
+                    onDown = {},
+                    onMoveDay = {},
+                    onRemove = {},
+                    handleModifier = Modifier,
+                    swipeEnabled = false,
+                )
             }
             if(drag.dragging)drag.target?.let{target->
                 Text(if(target.duplicate)"第${target.day}天已有这个地点" else "放入第${target.day}天 · 第${target.index+1}个地点",

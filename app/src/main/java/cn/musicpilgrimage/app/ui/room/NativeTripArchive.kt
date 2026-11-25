@@ -1,31 +1,25 @@
 package cn.musicpilgrimage.app.ui.room
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarToday
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -37,7 +31,6 @@ import androidx.compose.ui.unit.sp
 import cn.musicpilgrimage.app.data.Catalog
 import cn.musicpilgrimage.app.data.MusicTrip
 import cn.musicpilgrimage.app.data.MusicTripStop
-import java.time.format.DateTimeFormatter
 
 @Composable
 internal fun NativeTripArchive(
@@ -58,48 +51,45 @@ internal fun NativeTripArchive(
 ) {
     val context = LocalContext.current
     val list = rememberLazyListState()
-    val dates = remember { DateTimeFormatter.ofPattern("MM-dd") }
+    var revealedStopId by remember(trip.id) { mutableStateOf<String?>(null) }
     val linkedPlaces = remember(catalog) { catalog.places.associateBy { it.id } }
     val days = remember(scheduled) { scheduled.groupBy { it.day } }
     val destinations = remember(trip.cities) { trip.cities.distinctBy { it.pickerKey }.joinToString(" · ") { it.label } }
     RoomWall(Modifier.fillMaxSize().testTag("native-trip-archive")) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val unit = maxWidth / 360
-            Column(Modifier.fillMaxSize()) {
-                Spacer(Modifier.height(unit * 32))
-                Row(Modifier.fillMaxWidth().height(unit * 56), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars)) {
+                Row(
+                    Modifier.fillMaxWidth().height(56.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     RoomHeader("行程档案", onBack = onBack, onSpace = {}, modifier = Modifier.weight(1f))
-                    SwissOutlinedButton(
-                        onClick = onSettings,
-                        modifier = Modifier.padding(end = 14.dp).heightIn(min = 36.dp).testTag("trip-archive-settings"),
+                    IconButton(
+                        onClick = { revealedStopId = null; onSettings() },
+                        modifier = Modifier.padding(end = 8.dp).testTag("trip-archive-settings"),
                         enabled = !busy,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = lerp(RoomColors.Paper, Color.White, 0.78f),
-                            contentColor = RoomColors.Ink,
-                        ),
-                        border = BorderStroke(0.8.dp, RoomColors.Line.copy(alpha = 0.88f)),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Icon(
                             Icons.Outlined.Tune,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp),
-                            tint = RoomColors.Ink.copy(alpha = 0.85f),
+                            contentDescription = "行程设置",
+                            tint = RoomColors.Ink,
                         )
-                        Spacer(Modifier.width(5.dp))
-                        Text("行程设置", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = RoomColors.Ink)
                     }
                 }
-                HorizontalDivider(thickness = 0.5.dp, color = RoomColors.Line.copy(alpha = 0.65f))
                 RoomTripDragSurface(trip, owner, list, busy, onReorder, Modifier.testTag("room-trip-detail")) { drag ->
+                    LaunchedEffect(drag.active) {
+                        if (drag.active) revealedStopId = null
+                    }
                     LazyColumn(
-                        Modifier.fillMaxSize().testTag("trip-archive-scroll"), state = list,
-                        contentPadding = PaddingValues(start = unit * 20, end = unit * 20, top = 18.dp, bottom = 32.dp),
+                        Modifier.fillMaxSize().testTag("trip-archive-scroll"),
+                        state = list,
+                        contentPadding = PaddingValues(start = unit * 22, end = unit * 22, top = 16.dp, bottom = 44.dp),
                     ) {
                         item("itinerary") {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                SwissEyebrow("JOURNEY / MUSIC & PLACES")
+                            Column(
+                                Modifier.padding(bottom = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
                                 Row(
                                     Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -109,8 +99,8 @@ internal fun NativeTripArchive(
                                         trip.displayName,
                                         Modifier.weight(1f).testTag("trip-archive-title"),
                                         color = RoomColors.Ink,
-                                        fontSize = 26.sp,
-                                        lineHeight = 33.sp,
+                                        fontSize = 27.sp,
+                                        lineHeight = 34.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         letterSpacing = (-0.4).sp,
                                     )
@@ -136,7 +126,7 @@ internal fun NativeTripArchive(
                                         Icons.Outlined.CalendarToday,
                                         contentDescription = null,
                                         modifier = Modifier.size(13.dp),
-                                        tint = RoomColors.Muted.copy(alpha = 0.78f),
+                                        tint = RoomColors.Muted.copy(alpha = 0.75f),
                                     )
                                     Text(
                                         "${trip.start} — ${trip.end}",
@@ -153,12 +143,12 @@ internal fun NativeTripArchive(
                                         Icon(
                                             Icons.Outlined.Place,
                                             contentDescription = null,
-                                            modifier = Modifier.size(15.dp),
-                                            tint = RoomColors.Red.copy(alpha = 0.78f),
+                                            modifier = Modifier.size(14.dp),
+                                            tint = RoomColors.Red.copy(alpha = 0.74f),
                                         )
                                         Text(
                                             destinations,
-                                            color = RoomColors.Ink.copy(alpha = 0.9f),
+                                            color = RoomColors.Ink.copy(alpha = 0.86f),
                                             fontSize = 14.sp,
                                             lineHeight = 20.sp,
                                         )
@@ -168,7 +158,7 @@ internal fun NativeTripArchive(
                         }
                         if (error != null || drag.notice != null) {
                             item("itinerary-error") {
-                                Box(Modifier.padding(top = 12.dp)) {
+                                Box(Modifier.padding(top = 8.dp)) {
                                     TripError(error ?: drag.notice)
                                 }
                             }
@@ -178,97 +168,45 @@ internal fun NativeTripArchive(
                             item("day:$day") {
                                 Column(
                                     Modifier.fillMaxWidth()
-                                        .padding(top = if (day == 1) 22.dp else 20.dp)
-                                        .clip(TripStopCardShape)
-                                        .clickable(enabled = !busy, role = Role.Button, onClick = { onEditDay(day) })
-                                        .testTag("trip-day-$day"),
+                                        .padding(top = 26.dp, bottom = if (stops.isEmpty()) 6.dp else 2.dp),
                                 ) {
                                     Row(
-                                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        Modifier.fillMaxWidth()
+                                            .heightIn(min = 40.dp)
+                                            .clip(TripControlShape)
+                                            .clickable(
+                                                enabled = !busy,
+                                                role = Role.Button,
+                                                onClickLabel = "为第${day}天添加活动",
+                                            ) {
+                                                revealedStopId = null
+                                                onEditDay(day)
+                                            }
+                                            .testTag("trip-day-$day")
+                                            .padding(vertical = 4.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Box(
-                                                Modifier
-                                                    .clip(RoundedCornerShape(7.dp))
-                                                    .background(RoomColors.Red.copy(alpha = 0.09f))
-                                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                                            ) {
-                                                Text(
-                                                    "DAY ${day.toString().padStart(2, '0')}",
-                                                    color = RoomColors.Red,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 11.sp,
-                                                    letterSpacing = 0.8.sp,
-                                                )
-                                            }
-                                            Text(
-                                                trip.start.plusDays(day - 1L).format(dates),
-                                                color = RoomColors.Ink,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 14.sp,
-                                            )
-                                            if (stops.isNotEmpty()) {
-                                                Text(
-                                                    "· ${stops.size} 项",
-                                                    color = RoomColors.Muted,
-                                                    fontSize = 12.sp,
-                                                )
-                                            }
-                                        }
-                                        Row(
-                                            Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(lerp(RoomColors.Paper, Color.White, 0.72f))
-                                                .border(0.7.dp, RoomColors.Line.copy(alpha = 0.82f), RoundedCornerShape(8.dp))
-                                                .padding(horizontal = 10.dp, vertical = 5.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Icon(
-                                                Icons.Outlined.Edit,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(13.dp),
-                                                tint = RoomColors.Muted,
-                                            )
-                                            Text(
-                                                "编辑当天",
-                                                color = RoomColors.Ink.copy(alpha = 0.86f),
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Medium,
-                                            )
-                                        }
+                                        Text(
+                                            "DAY ${day.toString().padStart(2, '0')}",
+                                            color = RoomColors.Red,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.sp,
+                                            letterSpacing = 1.4.sp,
+                                        )
+                                        Icon(
+                                            Icons.Outlined.Add,
+                                            contentDescription = "为第${day}天添加活动",
+                                            modifier = Modifier.size(20.dp),
+                                            tint = RoomColors.Muted,
+                                        )
                                     }
                                     if (stops.isEmpty()) {
-                                        Spacer(Modifier.height(8.dp))
-                                        Row(
-                                            Modifier.fillMaxWidth()
-                                                .clip(TripStopCardShape)
-                                                .background(lerp(RoomColors.Paper, Color.White, 0.56f))
-                                                .border(0.8.dp, RoomColors.Line.copy(alpha = 0.76f), TripStopCardShape)
-                                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Box(
-                                                Modifier.size(28.dp)
-                                                    .clip(TripDaysBadgeShape)
-                                                    .background(RoomColors.Red.copy(alpha = 0.08f)),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                Icon(
-                                                    Icons.Outlined.Add,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(16.dp),
-                                                    tint = RoomColors.Red,
-                                                )
-                                            }
-                                            Text("添加当天活动", color = RoomColors.Muted, fontSize = 14.sp)
-                                        }
+                                        HorizontalDivider(
+                                            Modifier.padding(top = 4.dp),
+                                            thickness = 0.5.dp,
+                                            color = RoomColors.Line.copy(alpha = 0.6f),
+                                        )
                                     }
                                     TripDropGuide(drag, "day:$day", after = true)
                                 }
@@ -284,36 +222,55 @@ internal fun NativeTripArchive(
                                 val lifted = drag.source?.id == stop.id
                                 TripDropGuide(drag, stop.id, after = false)
                                 RoomTripStopCard(
-                                    display,
-                                    Modifier.fillMaxWidth()
-                                        .padding(top = 10.dp)
-                                        .onGloballyPositioned { drag.cards[stop.id] = it.tripDragBounds() }
+                                    stop = display,
+                                    modifier = Modifier.fillMaxWidth()
+                                        .padding(top = 12.dp)
+                                        .onGloballyPositioned {
+                                            val bounds = it.tripDragBounds()
+                                            drag.cards[stop.id] = bounds
+                                            drag.handles[stop.id] = bounds
+                                        }
                                         .graphicsLayer { alpha = if (lifted) 0f else 1f }
                                         .then(if (lifted) Modifier.clearAndSetSemantics {} else Modifier)
                                         .testTag("trip-stop-${stop.id}"),
-                                    enabled = !busy && !lifted, canUp = position > 0, canDown = position < stops.lastIndex,
-                                    onPlace = { stop.placeId?.let(onPlace) },
+                                    enabled = !busy && !lifted,
+                                    canUp = position > 0,
+                                    canDown = position < stops.lastIndex,
+                                    onPlace = { revealedStopId = null; stop.placeId?.let(onPlace) },
                                     onUp = { onReorder(stop.id, day, position - 1) {} },
                                     onDown = { onReorder(stop.id, day, position + 1) {} },
-                                    onMoveDay = { onMoveDay(stop.id) }, onRemove = { onRemove(stop.id) },
-                                    handleModifier = Modifier.onGloballyPositioned { drag.handles[stop.id] = it.tripDragBounds() },
+                                    onMoveDay = { revealedStopId = null; onMoveDay(stop.id) },
+                                    onRemove = { revealedStopId = null; onRemove(stop.id) },
+                                    handleModifier = Modifier,
                                     placeEnabled = !lifted,
+                                    revealed = revealedStopId == stop.id,
+                                    onReveal = { revealed ->
+                                        if (revealed) revealedStopId = stop.id
+                                        else if (revealedStopId == stop.id) revealedStopId = null
+                                    },
                                 )
                                 TripDropGuide(drag, stop.id, after = true)
                             }
                         }
                         item("discover") {
-                            SwissButton(
-                                onClick = onDiscover,
-                                modifier = Modifier.fillMaxWidth().padding(top = 24.dp).heightIn(min = 48.dp),
-                                shape = TripPrimaryButtonShape,
-                                colors = tripPrimaryButtonColors(),
-                                elevation = tripPrimaryButtonElevation(),
-                                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 13.dp),
+                            Box(
+                                Modifier.fillMaxWidth().padding(top = 28.dp),
+                                contentAlignment = Alignment.Center,
                             ) {
-                                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("继续发现地点", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                                SwissTextButton(
+                                    onClick = { revealedStopId = null; onDiscover() },
+                                    shape = TripControlShape,
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = RoomColors.Muted,
+                                    )
+                                    Spacer(Modifier.width(5.dp))
+                                    Text("继续发现地点", fontSize = 14.sp, color = RoomColors.Muted)
+                                }
                             }
                         }
                     }

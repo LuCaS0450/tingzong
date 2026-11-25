@@ -115,10 +115,11 @@ class MusicTripUiTest {
         compose.onNodeWithText("修改出行日期").assertIsDisplayed()
         compose.onNodeWithText("名称与目的地").assertDoesNotExist()
         compose.onNodeWithText("取消").performClick()
+        val stopId = trip.stops.single().id
         compose.onNodeWithTag("trip-archive-scroll")
-            .performScrollToNode(hasTestTag("trip-stop-${trip.stops.single().id}"))
-        compose.onNodeWithContentDescription("地点安排操作").performClick()
-        compose.onNodeWithText("从行程移出").performClick()
+            .performScrollToNode(hasTestTag("trip-stop-$stopId"))
+        compose.onNodeWithTag("trip-stop-$stopId").performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("trip-stop-remove-$stopId").assertIsDisplayed().performClick()
         compose.onNodeWithText("从行程移出这个活动？").assertIsDisplayed()
         capture("shared-remove-activity")
         compose.onNodeWithText("取消").performClick()
@@ -236,14 +237,7 @@ class MusicTripUiTest {
         compose.waitUntil(8_000){current().stops.any{it.day==1&&it.name=="火车"}}
         capture("day-editor")
         compose.onNodeWithText("完成").performClick()
-
-        openDay(3)
-        compose.onNodeWithText("换一天").performClick()
-        compose.onNodeWithTag("trip-date-1").assertIsNotEnabled()
-        compose.onNodeWithTag("trip-date-2").performClick()
-        compose.waitUntil(8_000){current().stops.any{it.day==2&&it.placeId==place.id}}
-        assertEquals(listOf(1,1,2),store.read(key).first{it.name==name}.stops.map{it.day})
-        compose.onNodeWithText("完成").performClick()
+        assertEquals(listOf(1,1,3),store.read(key).first{it.name==name}.stops.mapNotNull{it.day}.sorted())
         capture("trip-overview")
     }
 }

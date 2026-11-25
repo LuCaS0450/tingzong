@@ -447,13 +447,15 @@ internal fun searchTripDestinations(options:List<MusicTripCity>,query:String,cat
             .sortedBy{!it.name.equals(term,true)&&!titles[it.id].equals(term,true)}
     }
     val stops=trip.stops.filter{it.day==day}
-    TripPanel("第 ${day} 天 · ${trip.start.plusDays(day-1L)}",state.busy,onClose) {
+    TripPanel("添加到第 ${day} 天",state.busy,onClose) {
         TripSearch(query,{query=it},"搜索听踪地点","trip-day-search",state.busy)
-        LazyColumn(Modifier.weight(1f,fill=false).fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            if(term.isNotEmpty()) {
-                if(matches.isEmpty()) item { Text("没有找到匹配的地点，也可以手动添加活动。",fontSize=13.sp,color=RoomColors.Muted) }
-                items(matches,key={it.id}) { place ->
-                    val added=stops.any{it.placeId==place.id}
+        if (term.isNotEmpty()) {
+            LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (matches.isEmpty()) {
+                    item { Text("没有找到匹配的地点", fontSize = 13.sp, color = RoomColors.Muted) }
+                }
+                items(matches, key = { it.id }) { place ->
+                    val added = stops.any { it.placeId == place.id }
                     val itemEnabled = !state.busy && !added
                     Box(
                         Modifier.fillMaxWidth()
@@ -475,7 +477,11 @@ internal fun searchTripDestinations(options:List<MusicTripCity>,query:String,cat
                             }
                             .padding(horizontal = 15.dp, vertical = 12.dp),
                     ) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text(
                                     titles[place.id] ?: place.name,
@@ -498,123 +504,57 @@ internal fun searchTripDestinations(options:List<MusicTripCity>,query:String,cat
                                     Text("已安排", fontSize = 11.sp, color = RoomColors.Muted)
                                 }
                             } else {
-                                Box(
-                                    Modifier.size(28.dp)
-                                        .clip(TripDaysBadgeShape)
-                                        .background(RoomColors.Red.copy(alpha = 0.09f)),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = RoomColors.Red)
-                                }
+                                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp), tint = RoomColors.Red)
                             }
                         }
                     }
                 }
-            } else {
-                if(stops.isEmpty()) item {
-                    Box(
-                        Modifier.fillMaxWidth()
-                            .clip(TripControlShape)
-                            .background(lerp(RoomColors.Paper, Color.White, 0.56f))
-                            .border(0.8.dp, RoomColors.Line.copy(alpha = 0.72f), TripControlShape)
-                            .padding(horizontal = 16.dp, vertical = 16.dp),
-                    ) {
-                        Text("这一天还没有活动。", fontSize = 14.sp, color = RoomColors.Muted)
-                    }
+            }
+        }
+        Box(
+            Modifier.fillMaxWidth()
+                .shadow(
+                    elevation = 2.dp,
+                    shape = TripControlShape,
+                    ambientColor = RoomColors.Ink.copy(alpha = 0.06f),
+                    spotColor = RoomColors.Ink.copy(alpha = 0.10f),
+                    clip = false,
+                )
+                .clip(TripControlShape)
+                .background(tripBoardFace)
+                .border(0.8.dp, tripCardBorder, TripControlShape)
+                .clickable(enabled = !state.busy, role = Role.Button, onClick = onCustom)
+                .padding(horizontal = 15.dp, vertical = 14.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(RoomColors.Red.copy(alpha = 0.09f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp), tint = RoomColors.Red)
                 }
-                itemsIndexed(stops,key={_,stop->stop.id}) { index,stop ->
-                    Column(
-                        Modifier.fillMaxWidth()
-                            .shadow(
-                                elevation = 2.5.dp,
-                                shape = TripStopCardShape,
-                                ambientColor = RoomColors.Ink.copy(alpha = 0.07f),
-                                spotColor = RoomColors.Ink.copy(alpha = 0.11f),
-                                clip = false,
-                            )
-                            .clip(TripStopCardShape)
-                            .background(tripBoardFace)
-                            .border(0.8.dp, tripCardBorder, TripStopCardShape)
-                            .padding(start = 15.dp, end = 12.dp, top = 12.dp, bottom = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        Text(
-                            "${index+1}. ${titles[stop.placeId]?:stop.name}",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = RoomColors.Ink,
-                        )
-                        Text(
-                            stop.note.ifBlank{trip.cities.find{it.name==stop.city&&it.country==stop.country}?.label?:stop.city},
-                            fontSize = 12.sp,
-                            color = RoomColors.Muted,
-                        )
-                        HorizontalDivider(
-                            Modifier.padding(top = 4.dp),
-                            thickness = 0.5.dp,
-                            color = RoomColors.Line.copy(alpha = 0.55f),
-                        )
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            SwissTextButton(
-                                { vm.move(owner, trip.id, stop.id, day, index - 1) },
-                                enabled = !state.busy && index > 0,
-                                shape = TripDaysBadgeShape,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            ) { Text("上移", fontSize = 13.sp) }
-                            SwissTextButton(
-                                { vm.move(owner, trip.id, stop.id, day, index + 1) },
-                                enabled = !state.busy && index < stops.lastIndex,
-                                shape = TripDaysBadgeShape,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            ) { Text("下移", fontSize = 13.sp) }
-                            SwissTextButton(
-                                { onMove(stop) },
-                                enabled = !state.busy && trip.days > 1,
-                                shape = TripDaysBadgeShape,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            ) { Text("换一天", fontSize = 13.sp) }
-                            SwissTextButton(
-                                { onRemove(stop) },
-                                enabled = !state.busy,
-                                shape = TripDaysBadgeShape,
-                                colors = ButtonDefaults.textButtonColors(contentColor = RoomColors.Red),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            ) { Text("移除", fontSize = 13.sp) }
-                        }
-                    }
-                }
+                Text("手动添加活动", Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = RoomColors.Ink)
+                Icon(
+                    Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = RoomColors.Muted.copy(alpha = 0.65f),
+                )
             }
         }
         TripError(state.error)
-        Row(
-            Modifier.fillMaxWidth().padding(top = 2.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SwissOutlinedButton(
-                onClick = onCustom,
-                enabled = !state.busy,
-                shape = TripControlShape,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = lerp(RoomColors.Paper, Color.White, 0.78f),
-                    contentColor = RoomColors.Ink,
-                ),
-                border = BorderStroke(0.8.dp, RoomColors.Line.copy(alpha = 0.88f)),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-            ) {
-                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = RoomColors.Red)
-                Spacer(Modifier.width(4.dp))
-                Text("手动添加活动", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            }
-            SwissButton(
-                onClick = onClose,
-                enabled = !state.busy,
-                shape = TripPrimaryButtonShape,
-                colors = tripPrimaryButtonColors(),
-                elevation = tripPrimaryButtonElevation(),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-            ) { Text("完成", fontSize = 14.sp, fontWeight = FontWeight.Medium) }
-        }
+        SwissTextButton(
+            onClick = onClose,
+            modifier = Modifier.align(Alignment.End),
+            enabled = !state.busy,
+            shape = RoundedCornerShape(10.dp),
+        ) { Text("完成", color = RoomColors.Muted) }
     }
 }
 
