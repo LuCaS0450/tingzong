@@ -132,19 +132,22 @@ internal fun MusicLanes(
                         val topY = (line - (t.endUs - timeUs) * pps).coerceAtLeast(-20f)
                         val holdAlpha = when {
                             isHolding -> 1f
-                            j == Judgment.MISSED -> 0.28f
+                            j == Judgment.MISSED -> 0.30f
+                            y > line -> (1f - ((y - line) / (StrikeLineFromBottom.toPx() * 1.25f))).coerceIn(0.30f, 1f)
                             else -> 1f
                         }
                         if (heldY > topY) {
-                            performanceRibbon(x, topY, heldY, w, noteRedColor.copy(alpha = holdAlpha), isHolding)
-                        }
-                        if (!isHolding) {
-                            val headAlpha = if (y > line) {
-                                (1f - ((y - line) / (StrikeLineFromBottom.toPx() * 0.95f))).coerceIn(0f, 1f)
-                            } else 1f
-                            if (headAlpha > 0.02f) {
-                                drawHoldHead(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.26f * headAlpha else headAlpha)
-                            }
+                            performanceRibbon(
+                                x = x,
+                                top = topY,
+                                bottom = heldY,
+                                w = w,
+                                color = noteRedColor,
+                                holding = isHolding,
+                                timeUs = timeUs,
+                                motion = motion,
+                                alphaScale = holdAlpha,
+                            )
                         }
                     } else {
                         val passAlpha = if (y > line) {
@@ -220,25 +223,15 @@ internal fun MusicLanes(
                             },
                         contentAlignment = Alignment.BottomCenter,
                     ) {
-                        if (hold != null) {
-                            Text(
-                                text = "按住 ${(ui.holdFractions.getOrElse(hold.id) { 0f } * 100).toInt()}%",
-                                modifier = Modifier
-                                    .padding(bottom = 24.dp)
-                                    .testTag("performance-hold-$lane"),
-                                color = CrimsonHighlight,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        } else {
-                            Text(
-                                text = (lane + 1).toString(),
-                                modifier = Modifier.padding(bottom = 24.dp),
-                                color = if (active) IvoryKeyFace.copy(alpha = 0.88f) else MutedSilverText.copy(alpha = 0.36f),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
+                        Text(
+                            text = (lane + 1).toString(),
+                            modifier = Modifier
+                                .padding(bottom = 24.dp)
+                                .let { if (hold != null) it.testTag("performance-hold-$lane") else it },
+                            color = if (active) IvoryKeyFace.copy(alpha = 0.88f) else MutedSilverText.copy(alpha = 0.36f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
                     }
                 }
             }
@@ -247,7 +240,7 @@ internal fun MusicLanes(
 }
 
 private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, alphaScale: Float) {
-    val nw = w * 0.78f
+    val nw = w * NoteWidthRatio
     val nh = 32.dp.toPx()
     val left = x - nw * 0.5f
     // Align note center with the elevated judgment line coordinate `y` for unambiguous strike timing.
@@ -299,40 +292,6 @@ private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, alphaScale:
     )
     drawRoundRect(
         color = IvoryKeyBorder.copy(alpha = 0.85f * alpha),
-        topLeft = Offset(left, top),
-        size = Size(nw, nh),
-        cornerRadius = corner,
-        style = Stroke(width = 0.75.dp.toPx()),
-    )
-}
-
-private fun DrawScope.drawHoldHead(x: Float, y: Float, w: Float, alphaScale: Float = 1f) {
-    val nw = w * 0.76f
-    val nh = 16.dp.toPx()
-    val left = x - nw * 0.5f
-    val top = y - nh * 0.5f
-    val alpha = alphaScale.coerceIn(0f, 1f)
-    val corner = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
-    drawRoundRect(
-        color = Color(0xFF0A0C0B).copy(alpha = 0.52f * alpha),
-        topLeft = Offset(left + 1.5.dp.toPx(), top + 2.5.dp.toPx()),
-        size = Size(nw, nh),
-        cornerRadius = corner,
-    )
-    drawRoundRect(
-        color = CrimsonSignal.copy(alpha = alpha),
-        topLeft = Offset(left, top),
-        size = Size(nw, nh),
-        cornerRadius = corner,
-    )
-    drawLine(
-        color = IvoryKeyFace.copy(alpha = 0.88f * alpha),
-        start = Offset(left + 2.dp.toPx(), y),
-        end = Offset(left + nw - 2.dp.toPx(), y),
-        strokeWidth = 1.5.dp.toPx(),
-    )
-    drawRoundRect(
-        color = IvoryKeyBorder.copy(alpha = 0.9f * alpha),
         topLeft = Offset(left, top),
         size = Size(nw, nh),
         cornerRadius = corner,
