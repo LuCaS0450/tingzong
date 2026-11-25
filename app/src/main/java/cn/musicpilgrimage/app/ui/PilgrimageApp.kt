@@ -375,13 +375,24 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    var playFilterOpen by rememberSaveable{mutableStateOf(false)}
    var playSearchQuery by rememberSaveable{mutableStateOf("")}
    var playSelectedArtist by rememberSaveable{mutableStateOf<String?>(null)}
-   val performanceArtworkFor:(String,String)->ReleaseArtwork?={title,artist->
+   val performanceArtworkFor:(String,String,String,List<String>)->ReleaseArtwork?={title,artist,workKey,placeIds->
     val normTitle=musicTerm(title);val normArtist=musicTerm(artist)
-    musicCatalog.works.firstOrNull{musicTerm(it.title)==normTitle&&musicTerm(it.artist)==normArtist}?.artwork
+    val publicPlaces=sourceCatalog.publicOnly().places
+    val byWorkKey=if(workKey.isNotEmpty()) {
+     musicCatalog.works.firstOrNull{it.id==workKey}?.artwork
+      ?: publicPlaces.asSequence().flatMap{it.scenes.asSequence()}
+       .firstOrNull{"${it.artistId}|${musicTerm(it.work)}"==workKey&&it.displayCover?.approved==true}?.displayCover
+    } else null
+    byWorkKey
+     ?: musicCatalog.works.firstOrNull{musicTerm(it.title)==normTitle&&musicTerm(it.artist)==normArtist}?.artwork
      ?: musicCatalog.releases.firstOrNull{musicTerm(it.title)==normTitle&&musicTerm(it.artist)==normArtist}?.artwork
+     ?: if(placeIds.isNotEmpty()) {
+      val placeSet=placeIds.toSet()
+      publicPlaces.asSequence().filter{it.id in placeSet}.flatMap{it.scenes.asSequence()}
+       .firstOrNull{musicTerm(it.artistName)==normArtist&&it.displayCover?.approved==true}?.displayCover
+     } else null
      ?: musicCatalog.works.firstOrNull{musicTerm(it.title)==normTitle}?.artwork
    }
-   val performanceArtwork:(SongPackage)->ReleaseArtwork?={song->performanceArtworkFor(song.title,song.artist)}
    fun findPerformanceForWork(work:MusicWork):PerformanceCatalogItem? {
     val normTitle=musicTerm(work.title);val normArtist=musicTerm(work.artist)
     return performanceItems.firstOrNull{it.workKey.isNotEmpty()&&it.workKey==work.id}
@@ -792,7 +803,9 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
          }
          val related:(()->Unit)?=work?.takeIf{it.places.isNotEmpty()}?.let{match->{navigate("song/${Uri.encode(match.id)}")}}
            ?: song.placeIds.firstOrNull()?.let{id->{navigate("place/${Uri.encode(id)}")}}
-         PerformanceFlow(readyEntry,libraryOwner,back,performanceArtwork(song),related,{performanceImmersive=it},
+         PerformanceFlow(readyEntry,libraryOwner,back,
+           performanceArtworkFor(song.title,song.artist,performanceItem.workKey,song.placeIds.ifEmpty{performanceItem.placeIds}),
+           related,{performanceImmersive=it},
            importing=performanceLibraryUi.importing==song.id,importProgress=performanceLibraryUi.progress,
            importMessage=performanceLibraryUi.error ?: performanceLibraryUi.notice,directStart=true)
         } else {
@@ -800,7 +813,7 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
           RoomPerformanceLoading(
             title=performanceItem.title,
             artist=performanceItem.artist,
-            artwork=performanceArtworkFor(performanceItem.title,performanceItem.artist),
+            artwork=performanceArtworkFor(performanceItem.title,performanceItem.artist,performanceItem.workKey,performanceItem.placeIds),
             statusLabel=status?.label?:"音乐准备中",
             progress=status?.progress,
             failed=status?.failed==true,
