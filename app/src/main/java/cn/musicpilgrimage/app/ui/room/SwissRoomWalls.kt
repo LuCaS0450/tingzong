@@ -169,6 +169,15 @@ internal val SwissWallTabsHeight=69.dp
                     if(pressed||!motion)snap()else spring(dampingRatio=.85f,stiffness=680f),
                     label="tab-press",
                 )
+                val iconScale by animateFloatAsState(
+                    targetValue = when {
+                        pressed -> 0.82f
+                        selected -> 1f
+                        else -> 24f / 27.5f
+                    },
+                    animationSpec = if (!motion) snap() else spring(dampingRatio = 0.72f, stiffness = 520f),
+                    label = "tab-scale",
+                )
                 val iconTint = if (selected) SwissInk else SwissWallMuted
                 Box(
                     Modifier.weight(1f).height(58.dp).then(if(includeTestTags)Modifier.testTag("wall-tab-$index")else Modifier)
@@ -181,8 +190,10 @@ internal val SwissWallTabsHeight=69.dp
                         tint = iconTint,
                         focused = focused,
                         modifier = Modifier
-                            .size(24.dp)
+                            .size(27.5.dp)
                             .graphicsLayer {
+                                scaleX = iconScale
+                                scaleY = iconScale
                                 this.alpha = alpha.coerceIn(0f, 1f)
                                 compositingStrategy = CompositingStrategy.ModulateAlpha
                             },
