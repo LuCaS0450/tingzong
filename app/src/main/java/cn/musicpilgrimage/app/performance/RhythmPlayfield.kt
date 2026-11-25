@@ -1,8 +1,6 @@
 package cn.musicpilgrimage.app.performance
 
 import android.view.HapticFeedbackConstants
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,12 +10,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -40,26 +34,18 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cn.musicpilgrimage.app.ui.AppNavEasing
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
-import cn.musicpilgrimage.app.ui.room.PianoWallTextures
-import cn.musicpilgrimage.app.ui.room.tiledMaterial
-import kotlin.math.roundToInt
 
 private const val HorizonUs = 1_550_000L
-private val KeycapZoneHeight = 84.dp
-private val StrikeLineElevation = 36.dp
-private val StrikeBandHalfHeight = 17.dp
+private val StrikeLineFromBottom = 72.dp
 private val CavitySlotDark = Color(0xFF141715)
 private val CavitySlotAlternate = Color(0xFF171B19)
 private val LaneDividerSilver = Color(0xFFE2E8E8)
@@ -77,43 +63,22 @@ internal fun MusicLaneBackdrop(modifier: Modifier, stageClarity: Float = 1f) {
     val clarity = stageClarity.coerceIn(0.6f, 1.3f)
     Canvas(modifier.fillMaxSize()) {
         val laneWidth = size.width / 4f
-        val keycapTop = (size.height - KeycapZoneHeight.toPx()).coerceAtLeast(1f)
-        val line = (keycapTop - StrikeLineElevation.toPx()).coerceAtLeast(1f)
-        val bandHalf = StrikeBandHalfHeight.toPx()
         for (lane in 0..3) {
             val left = lane * laneWidth
             drawRect(
                 color = if (lane % 2 == 0) CavitySlotDark.copy(alpha = 0.42f) else CavitySlotAlternate.copy(alpha = 0.30f),
                 topLeft = Offset(left, 0f),
-                size = Size(laneWidth, keycapTop),
+                size = Size(laneWidth, size.height),
             )
             if (lane > 0) {
                 drawLine(
-                    color = LaneDividerSilver.copy(alpha = 0.10f * clarity),
+                    color = LaneDividerSilver.copy(alpha = 0.09f * clarity),
                     start = Offset(left, 0f),
-                    end = Offset(left, keycapTop),
+                    end = Offset(left, size.height),
                     strokeWidth = 0.75.dp.toPx(),
                 )
             }
         }
-        // Subtle Bauhaus strike-zone recess centered on the judgment line so players see the exact target band.
-        drawRect(
-            color = Color(0xFF0A0D0C).copy(alpha = 0.56f * clarity),
-            topLeft = Offset(0f, line - bandHalf),
-            size = Size(size.width, bandHalf * 2f),
-        )
-        drawLine(
-            color = IvoryKeyFace.copy(alpha = 0.16f * clarity),
-            start = Offset(0f, line - bandHalf),
-            end = Offset(size.width, line - bandHalf),
-            strokeWidth = 0.75.dp.toPx(),
-        )
-        drawLine(
-            color = IvoryKeyFace.copy(alpha = 0.16f * clarity),
-            start = Offset(0f, line + bandHalf),
-            end = Offset(size.width, line + bandHalf),
-            strokeWidth = 0.75.dp.toPx(),
-        )
     }
 }
 
@@ -127,8 +92,6 @@ internal fun MusicLanes(
 ) {
     val listen = controller.options.mode == PlayMode.LISTEN
     val view = LocalView.current
-    val context = LocalContext.current
-    val ivory = remember(context) { PianoWallTextures.load(context, "design/music-space/piano-ivory.jpg") }
     var pressed by remember(controller) { mutableStateOf(emptySet<Int>()) }
     val held = controller.targets.filter {
         it.hold && ui.judgments.getOrNull(it.id) == Judgment.HOLDING
@@ -140,43 +103,34 @@ internal fun MusicLanes(
     val noteRedColor = CrimsonSignal
 
     Box(modifier.fillMaxSize().clipToBounds()) {
-        // 1. Falling tap blocks & hold ribbons clipped at the keycap top edge (passing smoothly through the elevated strike line).
+        // 1. Minimalist judgment hairline & falling notes passing cleanly through the strike line.
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width / 4f
-            val keycapTop = (size.height - KeycapZoneHeight.toPx()).coerceAtLeast(1f)
-            val line = (keycapTop - StrikeLineElevation.toPx()).coerceAtLeast(1f)
+            val line = (size.height - StrikeLineFromBottom.toPx()).coerceAtLeast(1f)
             val pps = line / HorizonUs
-            val min = timeUs - 320_000L
+            val min = timeUs - 340_000L
             val max = timeUs + HorizonUs
 
-            // Draw the elevated Bauhaus precision judgment hairline & lane ticks beneath notes.
+            // Clean, minimalist Bauhaus judgment hairline with subtle lane center indicators.
             drawLine(
-                color = IvoryKeyFace.copy(alpha = 0.78f * clarity),
+                color = IvoryKeyFace.copy(alpha = 0.62f * clarity),
                 start = Offset(0f, line),
                 end = Offset(size.width, line),
-                strokeWidth = 1.5.dp.toPx(),
+                strokeWidth = 1.25.dp.toPx(),
             )
             for (lane in 0..3) {
-                val left = lane * w
-                val cx = left + w / 2f
-                // Subtle center calibration guide mark inside each lane's strike band.
+                val active = lane in pressed || held.any { it.lane == lane }
+                val cx = lane * w + w / 2f
+                val halfMark = w * if (active) 0.36f else 0.14f
                 drawLine(
-                    color = CrimsonSignal.copy(alpha = 0.85f * clarity),
-                    start = Offset(cx - w * 0.14f, line),
-                    end = Offset(cx + w * 0.14f, line),
-                    strokeWidth = 2.dp.toPx(),
+                    color = if (active) CrimsonHighlight else CrimsonSignal.copy(alpha = 0.78f * clarity),
+                    start = Offset(cx - halfMark, line),
+                    end = Offset(cx + halfMark, line),
+                    strokeWidth = (if (active) 2.5.dp else 1.75.dp).toPx(),
                 )
-                if (lane > 0) {
-                    drawLine(
-                        color = CrimsonSignal.copy(alpha = 0.72f * clarity),
-                        start = Offset(left, line - 5.dp.toPx()),
-                        end = Offset(left, line + 5.dp.toPx()),
-                        strokeWidth = 1.25.dp.toPx(),
-                    )
-                }
             }
 
-            clipRect(left = 0f, top = 0f, right = size.width, bottom = keycapTop) {
+            clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
                 controller.targets.forEach { t ->
                     if (t.endUs < min || t.onsetUs > max) return@forEach
                     val j = ui.judgments.getOrElse(t.id) { Judgment.WAITING }
@@ -184,116 +138,27 @@ internal fun MusicLanes(
                     val x = t.lane * w + w / 2f
                     val y = line - (t.onsetUs - timeUs) * pps
                     val passAlpha = if (y > line) {
-                        (1f - ((y - line) / (StrikeLineElevation.toPx() * 1.15f))).coerceIn(0.18f, 1f)
+                        (1f - ((y - line) / (StrikeLineFromBottom.toPx() * 0.92f))).coerceIn(0f, 1f)
                     } else 1f
+                    if (passAlpha <= 0.02f) return@forEach
                     if (t.hold) {
                         val heldY = if (j == Judgment.HOLDING) line else y
                         val topY = (line - (t.endUs - timeUs) * pps).coerceAtLeast(-20f)
                         performanceRibbon(x, topY, heldY, w, noteRedColor, j == Judgment.HOLDING)
                         if (j != Judgment.HOLDING) {
-                            drawHoldHead(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.28f else passAlpha)
+                            drawHoldHead(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.26f * passAlpha else passAlpha)
                         }
                     } else {
-                        drawIvoryTapNote(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.28f * passAlpha else passAlpha)
-                    }
-                }
-            }
-
-            // Keycap top seam groove directly above the ivory keycaps.
-            drawRect(
-                color = Color(0xFF0B0D0C),
-                topLeft = Offset(0f, keycapTop - 1.5.dp.toPx()),
-                size = Size(size.width, 3.dp.toPx()),
-            )
-            drawLine(
-                color = IvoryKeyFace.copy(alpha = 0.22f * clarity),
-                start = Offset(0f, keycapTop),
-                end = Offset(size.width, keycapTop),
-                strokeWidth = 0.75.dp.toPx(),
-            )
-        }
-
-        // 2. Four micro-3D ivory keycaps across the bottom strike zone.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(KeycapZoneHeight)
-                .align(Alignment.BottomCenter)
-                .background(Color(0xFF141715))
-                .padding(top = 1.5.dp),
-            horizontalArrangement = Arrangement.spacedBy(1.5.dp),
-        ) {
-            for (lane in 0..3) {
-                val active = lane in pressed || held.any { it.lane == lane }
-                val keyDrop by animateDpAsState(
-                    targetValue = if (active) 2.dp else 0.dp,
-                    animationSpec = if (motion) tween(60, easing = AppNavEasing) else tween(0),
-                    label = "keycap-drop-$lane",
-                )
-                val keyShape = RoundedCornerShape(
-                    topStart = 1.dp,
-                    topEnd = 1.dp,
-                    bottomStart = 2.dp,
-                    bottomEnd = 2.dp,
-                )
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .offset { IntOffset(0, keyDrop.toPx().roundToInt()) }
-                        .clip(keyShape)
-                        .background(IvoryKeyFace)
-                        .tiledMaterial(ivory, 220.dp, IvoryKeyFace),
-                ) {
-                    Canvas(Modifier.fillMaxSize()) {
-                        // Top crimson actuation bar or resting ivory specular lip.
-                        if (active) {
-                            drawRect(
-                                color = Color(0x160C0E0D),
-                                topLeft = Offset.Zero,
-                                size = size,
-                            )
-                            drawRect(
-                                color = CrimsonSignal,
-                                topLeft = Offset.Zero,
-                                size = Size(size.width, 2.5.dp.toPx()),
-                            )
-                        } else {
-                            drawRect(
-                                color = Color.White.copy(alpha = 0.72f),
-                                topLeft = Offset.Zero,
-                                size = Size(size.width, 1.2.dp.toPx()),
-                            )
-                        }
-                        // Left 11 o'clock bevel highlight.
-                        drawRect(
-                            color = Color.White.copy(alpha = if (active) 0.16f else 0.34f),
-                            topLeft = Offset.Zero,
-                            size = Size(1.dp.toPx(), size.height),
-                        )
-                        // Bottom key front thickness (thinner when pressed down into the keybed).
-                        val frontHeight = (if (active) 2.dp else 4.dp).toPx()
-                        drawRect(
-                            color = IvoryKeyFront,
-                            topLeft = Offset(0f, size.height - frontHeight),
-                            size = Size(size.width, frontHeight),
-                        )
-                        drawLine(
-                            color = IvoryKeyBorder.copy(alpha = 0.16f),
-                            start = Offset(0f, size.height - frontHeight),
-                            end = Offset(size.width, size.height - frontHeight),
-                            strokeWidth = 0.75.dp.toPx(),
-                        )
+                        drawIvoryTapNote(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.26f * passAlpha else passAlpha)
                     }
                 }
             }
         }
 
-        // 3. Judgment beams, sustain hold progress above keycaps, and geometric impact bursts.
+        // 2. Judgment beams, sustain hold progress, and geometric impact bursts centered on the strike line.
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width / 4f
-            val keycapTop = (size.height - KeycapZoneHeight.toPx()).coerceAtLeast(1f)
-            val line = (keycapTop - StrikeLineElevation.toPx()).coerceAtLeast(1f)
+            val line = (size.height - StrikeLineFromBottom.toPx()).coerceAtLeast(1f)
             for (lane in 0..3) {
                 val x = lane * w + w / 2f
                 performanceReceptor(x, line, w, noteIvoryColor, lane in pressed)
@@ -315,11 +180,12 @@ internal fun MusicLanes(
             }
         }
 
-        // 4. Full-height touch & semantics layer keeping existing testTags and labels intact.
+        // 3. Full-height touch & semantics layer with minimalist lane numerals below the strike line.
         if (!listen) {
             Row(Modifier.fillMaxSize()) {
                 for (lane in 0..3) {
                     val hold = held.firstOrNull { it.lane == lane }
+                    val active = lane in pressed || hold != null
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -356,19 +222,19 @@ internal fun MusicLanes(
                             Text(
                                 text = "按住 ${(ui.holdFractions.getOrElse(hold.id) { 0f } * 100).toInt()}%",
                                 modifier = Modifier
-                                    .padding(bottom = 30.dp)
+                                    .padding(bottom = 24.dp)
                                     .testTag("performance-hold-$lane"),
-                                color = CrimsonSignal,
-                                fontSize = 14.sp,
+                                color = CrimsonHighlight,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                             )
                         } else {
                             Text(
                                 text = (lane + 1).toString(),
-                                modifier = Modifier.padding(bottom = 30.dp),
-                                color = IvoryKeyBorder.copy(alpha = 0.42f),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(bottom = 24.dp),
+                                color = if (active) IvoryKeyFace.copy(alpha = 0.88f) else MutedSilverText.copy(alpha = 0.36f),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
                             )
                         }
                     }
