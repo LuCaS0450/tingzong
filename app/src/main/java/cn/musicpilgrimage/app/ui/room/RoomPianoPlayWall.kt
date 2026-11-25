@@ -7,24 +7,40 @@ import android.graphics.BlurMaskFilter
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Matrix
 import android.graphics.Paint
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
@@ -38,6 +54,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -45,18 +62,23 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import cn.musicpilgrimage.app.data.musicQueryWords
+import cn.musicpilgrimage.app.data.musicTerm
 import cn.musicpilgrimage.app.performance.AudioDownloadState
-import cn.musicpilgrimage.app.performance.PerformanceEntry
+import cn.musicpilgrimage.app.performance.PerformanceCatalogItem
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.ceil
@@ -135,7 +157,7 @@ private fun Modifier.pianoCaseShadow(cornerRadius: Dp): Modifier = drawWithCache
 /** Bauhaus vertical piano keyboard wall matching the approved Play Web prototype. */
 @Composable
 internal fun RoomBauhausPianoWall(
-    entries: List<PerformanceEntry>,
+    entries: List<PerformanceCatalogItem>,
     loaded: Boolean,
     browse: RoomBrowseState,
     downloads: Map<String, AudioDownloadState>,
@@ -143,6 +165,11 @@ internal fun RoomBauhausPianoWall(
     onRetry: () -> Unit,
     catalogError: String? = null,
     onRefreshCatalog: () -> Unit = {},
+    filterExpanded: Boolean = false,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
+    selectedArtist: String? = null,
+    onSelectArtist: (String?) -> Unit = {},
 ) {
     val context = LocalContext.current
     val ivory = remember(context) { PianoWallTextures.load(context, "design/music-space/piano-ivory.jpg") }
@@ -150,20 +177,65 @@ internal fun RoomBauhausPianoWall(
     val metal = remember(context) { PianoWallTextures.load(context, "design/materials/aluminum.webp") }
     val listState = rememberLazyListState(browse.playIndex.coerceAtLeast(0), browse.playOffset.coerceAtLeast(0))
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-            .distinctUntilChanged()
-            .collect { (index, offset) -> browse.play(index, offset) }
+    val artists = remember(entries) {
+        entries.groupingBy { it.artist }.eachCount()
+            .entries
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .map { it.key }
+    }
+    val hasActiveFilter = searchQuery.isNotBlank() || selectedArtist != null
+    val visibleEntries = remember(entries, searchQuery, selectedArtist) {
+        val words = musicQueryWords(searchQuery)
+        entries.filter { item ->
+            val artistOk = selectedArtist == null || item.artist == selectedArtist
+            val queryOk = words.isEmpty() || run {
+                val terms = listOf(musicTerm(item.title), musicTerm(item.artist))
+                words.all { word -> terms.any { it.contains(word) } }
+            }
+            artistOk && queryOk
+        }
     }
 
-    Box(
+    LaunchedEffect(searchQuery, selectedArtist) {
+        if (hasActiveFilter) {
+            listState.scrollToItem(0, 0)
+        }
+    }
+
+    LaunchedEffect(listState, hasActiveFilter) {
+        if (!hasActiveFilter) {
+            snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+                .distinctUntilChanged()
+                .collect { (index, offset) -> browse.play(index, offset) }
+        }
+    }
+
+    Column(
         Modifier
             .fillMaxSize()
             .padding(start = 15.dp, top = 2.dp, end = 15.dp, bottom = 14.dp)
     ) {
+        AnimatedVisibility(
+            visible = filterExpanded || hasActiveFilter,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            BauhausPlayFilterTray(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                artists = artists,
+                selectedArtist = selectedArtist,
+                onSelectArtist = onSelectArtist,
+                matchedCount = visibleEntries.size,
+                totalCount = entries.size,
+                hasActiveFilter = hasActiveFilter,
+            )
+        }
+
         Column(
             Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .weight(1f)
                 .pianoCaseShadow(2.dp)
                 .clip(RoundedCornerShape(2.dp))
                 .background(Color(0xFF1A1E1C))
@@ -221,12 +293,40 @@ internal fun RoomBauhausPianoWall(
                                     )
                                 }
                             }
+                        } else if (entries.isNotEmpty() && visibleEntries.isEmpty()) {
+                            item("filter-empty") {
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(76.dp)
+                                        .tiledMaterial(ivory, 260.dp, Color(0xFFF8F6F0))
+                                        .clickable(role = Role.Button) {
+                                            onSearchQueryChange("")
+                                            onSelectArtist(null)
+                                        }
+                                        .padding(horizontal = 20.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        text = "未找到匹配曲目",
+                                        color = SwissWallMuted,
+                                        fontSize = 14.sp,
+                                    )
+                                    Text(
+                                        text = "清除筛选",
+                                        color = RoomColors.Red,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                }
+                            }
                         }
-                        itemsIndexed(entries, key = { _, entry -> entry.song.id }) { _, entry ->
+                        itemsIndexed(visibleEntries, key = { _, entry -> entry.id }) { _, entry ->
                             BauhausWhiteKeyRow(
                                 entry = entry,
                                 ivory = ivory,
-                                onClick = { onSong(entry.song.id) },
+                                onClick = { onSong(entry.id) },
                             )
                         }
                         if (downloads.values.any { it.failed }) {
@@ -248,7 +348,7 @@ internal fun RoomBauhausPianoWall(
 
                     BlackKeysOverlay(
                         listState = listState,
-                        totalEntries = entries.size,
+                        totalEntries = visibleEntries.size,
                         ebony = ebony,
                     )
 
@@ -261,6 +361,138 @@ internal fun RoomBauhausPianoWall(
 
             BauhausBottomFooter(ebony, metal)
         }
+    }
+}
+
+@Composable
+private fun BauhausPlayFilterTray(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    artists: List<String>,
+    selectedArtist: String?,
+    onSelectArtist: (String?) -> Unit,
+    matchedCount: Int,
+    totalCount: Int,
+    hasActiveFilter: Boolean,
+) {
+    val keyboard = LocalSoftwareKeyboardController.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 10.dp)
+            .testTag("play-wall-filter-tray"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(RoomColors.Paper)
+                .border(1.dp, if (query.isNotEmpty()) RoomColors.Ink else RoomColors.Line, RoundedCornerShape(2.dp))
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(Icons.Outlined.Search, null, Modifier.size(16.dp), tint = SwissWallMuted)
+            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (query.isEmpty()) {
+                    Text("搜索曲名或歌手", fontSize = 13.sp, color = SwissWallMuted, maxLines = 1)
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.fillMaxWidth().testTag("play-wall-search-input"),
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = 13.sp, color = RoomColors.Ink),
+                    cursorBrush = SolidColor(RoomColors.Red),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                )
+            }
+            if (hasActiveFilter && totalCount > 0) {
+                Text(
+                    text = "$matchedCount/$totalCount",
+                    fontSize = 11.sp,
+                    color = SwissWallMuted,
+                    letterSpacing = 0.5.sp,
+                )
+            }
+            if (hasActiveFilter) {
+                Box(
+                    Modifier
+                        .size(24.dp)
+                        .clickable(role = Role.Button, onClickLabel = "清除筛选") {
+                            onQueryChange("")
+                            onSelectArtist(null)
+                            keyboard?.hide()
+                        }
+                        .testTag("play-wall-filter-clear"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.Close, "清除筛选", Modifier.size(15.dp), tint = RoomColors.Ink)
+                }
+            }
+        }
+
+        if (artists.size > 1) {
+            LazyRow(
+                Modifier
+                    .fillMaxWidth()
+                    .testTag("play-wall-artist-chips"),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                item("all") {
+                    BauhausArtistChip(
+                        label = "全部",
+                        selected = selectedArtist == null,
+                        onClick = { onSelectArtist(null) },
+                    )
+                }
+                items(artists, key = { it }) { artist ->
+                    BauhausArtistChip(
+                        label = artist,
+                        selected = selectedArtist == artist,
+                        onClick = { onSelectArtist(if (selectedArtist == artist) null else artist) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BauhausArtistChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .height(28.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(if (selected) Color(0xFF1A1E1C) else RoomColors.Paper)
+            .then(
+                if (selected) {
+                    Modifier.drawBehind {
+                        val barH = 1.5.dp.toPx()
+                        drawRect(RoomColors.Red, topLeft = Offset(0f, size.height - barH), size = Size(size.width, barH))
+                    }
+                } else {
+                    Modifier.border(1.dp, RoomColors.Line, RoundedCornerShape(2.dp))
+                }
+            )
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            color = if (selected) Color(0xFFF8F6F0) else SwissWallMuted,
+            maxLines = 1,
+        )
     }
 }
 
@@ -522,7 +754,7 @@ internal fun KeybedCavityShadows(modifier: Modifier = Modifier) {
 
 @Composable
 private fun BauhausWhiteKeyRow(
-    entry: PerformanceEntry,
+    entry: PerformanceCatalogItem,
     ivory: ImageBitmap?,
     onClick: () -> Unit,
 ) {
@@ -535,12 +767,12 @@ private fun BauhausWhiteKeyRow(
         Modifier
             .fillMaxWidth()
             .height(WhiteKeyHeight)
-            .testTag("performance-song-${entry.song.id}")
+            .testTag("performance-song-${entry.id}")
             .clickable(
                 interactionSource = interaction,
                 indication = null,
                 role = Role.Button,
-                onClickLabel = "演奏${entry.song.title}",
+                onClickLabel = "演奏${entry.title}",
                 onClick = onClick,
             )
             .background(Color(0xFF9D988B))
@@ -640,7 +872,7 @@ private fun BauhausWhiteKeyRow(
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Text(
-                    entry.song.title,
+                    entry.title,
                     fontSize = 16.5.sp,
                     lineHeight = 20.5.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -650,7 +882,7 @@ private fun BauhausWhiteKeyRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    entry.song.artist,
+                    entry.artist,
                     fontSize = 12.sp,
                     lineHeight = 15.5.sp,
                     color = SwissWallMuted,

@@ -16,10 +16,12 @@ import android.os.Bundle
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,6 +44,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
@@ -83,9 +86,14 @@ internal fun NavGraphBuilder.appDestination(
  composable(route,arguments=arguments,content=content)
 }
 
-@Composable private fun NativeWallTab(section:Int,onSearch:()->Unit,content:@Composable ()->Unit) {
+@Composable private fun NativeWallTab(
+ section:Int,
+ onSearch:()->Unit,
+ beforeSearch:@Composable ()->Unit={},
+ content:@Composable ()->Unit,
+) {
  Column(Modifier.fillMaxSize()) {
-  SwissWallHeader(section,onSearch)
+  SwissWallHeader(section,onSearch,beforeSearch=beforeSearch)
   Box(Modifier.fillMaxWidth().weight(1f)){content()}
  }
 }
@@ -360,11 +368,25 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
     if(route=="performance"||route=="perform/{song}")performanceLibrary.onWallEntered()
    }
    val previewPlayable=LocalPerformancePreviews.current
-   val performanceEntries=performanceLibraryUi.entries+previewPlayable.filter{preview->performanceLibraryUi.entries.none{it.song.id==preview.song.id}}
+   val performanceItems=remember(performanceLibraryUi.items,previewPlayable) {
+    performanceLibraryUi.items+previewPlayable.filter{preview->performanceLibraryUi.items.none{it.id==preview.song.id}}.map{it.toCatalogItem()}
+   }
    var performanceImmersive by remember{mutableStateOf(false)}
-   val performanceArtwork:(SongPackage)->ReleaseArtwork?={song->
-    musicCatalog.works.firstOrNull{it.title==song.title&&it.artist==song.artist}?.artwork
-     ?: musicCatalog.releases.firstOrNull{it.title==song.title&&it.artist==song.artist}?.artwork
+   var playFilterOpen by rememberSaveable{mutableStateOf(false)}
+   var playSearchQuery by rememberSaveable{mutableStateOf("")}
+   var playSelectedArtist by rememberSaveable{mutableStateOf<String?>(null)}
+   val performanceArtworkFor:(String,String)->ReleaseArtwork?={title,artist->
+    val normTitle=musicTerm(title);val normArtist=musicTerm(artist)
+    musicCatalog.works.firstOrNull{musicTerm(it.title)==normTitle&&musicTerm(it.artist)==normArtist}?.artwork
+     ?: musicCatalog.releases.firstOrNull{musicTerm(it.title)==normTitle&&musicTerm(it.artist)==normArtist}?.artwork
+     ?: musicCatalog.works.firstOrNull{musicTerm(it.title)==normTitle}?.artwork
+   }
+   val performanceArtwork:(SongPackage)->ReleaseArtwork?={song->performanceArtworkFor(song.title,song.artist)}
+   fun findPerformanceForWork(work:MusicWork):PerformanceCatalogItem? {
+    val normTitle=musicTerm(work.title);val normArtist=musicTerm(work.artist)
+    return performanceItems.firstOrNull{it.workKey.isNotEmpty()&&it.workKey==work.id}
+     ?: performanceItems.firstOrNull{musicTerm(it.title)==normTitle&&musicTerm(it.artist)==normArtist}
+     ?: performanceItems.firstOrNull{musicTerm(it.title)==normTitle}
    }
    val libraryOwner=remember(owner){owner?.let{"user:$it"} ?: LibraryDatabase.guestOwner(context)}
    val tripState=storedTrips.takeIf{it.owner==libraryOwner}?:MusicTripState(libraryOwner,busy=true)
@@ -690,45 +712,104 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
      }
      page("song/{id}"){e->musicCatalog.works.find{it.id==e.arguments?.getString("id")}?.let {work->
       LaunchedEffect(work.id,libraryOwner){music.browseWork(work.id)}
+      val playableTrack=findPerformanceForWork(work)
       RoomSong(work,musicCatalog.releases.find{it.id==work.releaseId}?.title.orEmpty(),work.id in musicFavorites.songs,{music.toggleFavorite(work.id)},
        {openArchivePlace(e,it,work.places)},
-       onBack=back,onSearch={navigate("search")})
+       onBack=back,onSearch={navigate("search")},
+       onPerform=playableTrack?.let{track-> {navigate("perform/${Uri.encode(track.id)}")}})
      }}
      page("explore"){e->
       SwissWorldWall(sourceCatalog,wallBrowse,archiveState.places.toSet(),archiveState.loading,
        {navigate("place/${Uri.encode(it)}")},togglePlace,addToTrip,
        {navigate("search")},back,archiveState.visits.map{it.location}.toSet(),active=entry==e)
      }
-     page("performance"){NativeWallTab(2,{navigate("search")}){
-      SwissPlayWall(
-       performanceEntries,performanceArtwork,performanceLibraryUi.loaded,wallBrowse,
-       performanceLibraryUi.downloads,{navigate("perform/${Uri.encode(it)}")},
-       {performanceLibrary.prepareAll(retry=true)},
-       catalogError=performanceLibraryUi.catalogError,
-       onRefreshCatalog=performanceLibrary::retryCatalog,
-      )
-     }}
+     page("performance"){
+      val hasPlayFilter=playSearchQuery.isNotBlank()||playSelectedArtist!=null
+      NativeWallTab(
+       section=2,
+       onSearch={navigate("search")},
+       beforeSearch={
+        Box(Modifier.size(48.dp),contentAlignment=Alignment.Center) {
+         IconButton(
+          onClick={
+           if(playFilterOpen&&hasPlayFilter) {
+            playSearchQuery="";playSelectedArtist=null;playFilterOpen=false
+           } else {
+            playFilterOpen=!playFilterOpen
+           }
+          },
+          modifier=Modifier.size(48.dp).testTag("play-wall-filter-button"),
+         ) {
+          Icon(
+           Icons.Outlined.FilterList,
+           contentDescription="筛选曲目",
+           modifier=Modifier.size(22.dp),
+           tint=if(playFilterOpen||hasPlayFilter)SwissRed else RoomColors.Ink,
+          )
+         }
+         if(hasPlayFilter&&!playFilterOpen) {
+          Box(Modifier.align(Alignment.TopEnd).padding(top=11.dp,end=11.dp).size(5.dp).background(SwissRed,CircleShape))
+         }
+        }
+       },
+      ){
+       SwissPlayWall(
+        entries=performanceItems,
+        loaded=performanceLibraryUi.loaded,
+        browse=wallBrowse,
+        downloads=performanceLibraryUi.downloads,
+        onSong={navigate("perform/${Uri.encode(it)}")},
+        onRetry={
+         performanceLibraryUi.downloads.entries.firstOrNull{it.value.failed}?.key?.let{failedId->
+          performanceLibrary.prepareSong(failedId,retry=true)
+         }
+        },
+        catalogError=performanceLibraryUi.catalogError,
+        onRefreshCatalog=performanceLibrary::retryCatalog,
+        filterExpanded=playFilterOpen,
+        searchQuery=playSearchQuery,
+        onSearchQueryChange={playSearchQuery=it},
+        selectedArtist=playSelectedArtist,
+        onSelectArtist={playSelectedArtist=it},
+       )
+      }
+     }
      page("perform/{song}"){e->
-      val performanceEntry=performanceEntries.find{it.song.id==e.arguments?.getString("song")}
-      if(performanceEntry!=null)key(libraryOwner){
-        val song=performanceEntry.song
-        val work=musicCatalog.works.firstOrNull{it.title==song.title&&it.artist==song.artist}
-        val related:(()->Unit)?=work?.takeIf{it.places.isNotEmpty()}?.let{match->{navigate("song/${Uri.encode(match.id)}")}}
-          ?: song.placeIds.firstOrNull()?.let{id->{navigate("place/${Uri.encode(id)}")}}
-        if(performanceEntry.audioReady)PerformanceFlow(performanceEntry,libraryOwner,back,performanceArtwork(song),related,{performanceImmersive=it},
-          importing=performanceLibraryUi.importing==song.id,importProgress=performanceLibraryUi.progress,
-          importMessage=performanceLibraryUi.error ?: performanceLibraryUi.notice,directStart=true)
-        else Column(Modifier.fillMaxSize()) {
+      val songId=e.arguments?.getString("song").orEmpty()
+      val performanceItem=performanceItems.find{it.id==songId}
+      LaunchedEffect(songId,performanceItem?.chartReady,performanceItem?.audioReady) {
+       if(performanceItem!=null&&(!performanceItem.chartReady||!performanceItem.audioReady)) {
+        performanceLibrary.prepareSong(songId)
+       }
+      }
+      if(performanceItem!=null)key(libraryOwner){
+        val readyEntry=performanceItem.entry
+        if(readyEntry!=null&&readyEntry.audioReady) {
+         val song=readyEntry.song
+         val work=musicCatalog.works.firstOrNull{
+          (performanceItem.workKey.isNotEmpty()&&it.id==performanceItem.workKey) ||
+           (musicTerm(it.title)==musicTerm(song.title)&&musicTerm(it.artist)==musicTerm(song.artist))
+         }
+         val related:(()->Unit)?=work?.takeIf{it.places.isNotEmpty()}?.let{match->{navigate("song/${Uri.encode(match.id)}")}}
+           ?: song.placeIds.firstOrNull()?.let{id->{navigate("place/${Uri.encode(id)}")}}
+         PerformanceFlow(readyEntry,libraryOwner,back,performanceArtwork(song),related,{performanceImmersive=it},
+           importing=performanceLibraryUi.importing==song.id,importProgress=performanceLibraryUi.progress,
+           importMessage=performanceLibraryUi.error ?: performanceLibraryUi.notice,directStart=true)
+        } else Column(Modifier.fillMaxSize()) {
           RoomHeader("正在准备音乐",onBack=back,onSpace={})
           Column(Modifier.fillMaxWidth().weight(1f).padding(26.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
-            RoomCover(performanceArtwork(song),song.title,Modifier.size(132.dp))
-            Spacer(Modifier.height(24.dp));Text(song.title,color=SwissInk,style=MaterialTheme.typography.headlineSmall)
+            RoomCover(performanceArtworkFor(performanceItem.title,performanceItem.artist),performanceItem.title,Modifier.size(132.dp))
+            Spacer(Modifier.height(24.dp));Text(performanceItem.title,color=SwissInk,style=MaterialTheme.typography.headlineSmall)
+            if(performanceItem.artist.isNotBlank()) {
+             Spacer(Modifier.height(4.dp));Text(performanceItem.artist,color=RoomColors.Muted,style=MaterialTheme.typography.bodySmall)
+            }
             Spacer(Modifier.height(12.dp))
-            val status=performanceLibraryUi.downloads[song.id]
+            val status=performanceLibraryUi.downloads[performanceItem.id]
             Text(status?.label?:"音乐准备中",color=RoomColors.Muted)
             Spacer(Modifier.height(16.dp));Text("准备好后直接进入演奏",color=RoomColors.Muted,style=MaterialTheme.typography.bodySmall)
-            if(status?.failed==true)TextButton({performanceLibrary.prepareAll(retry=true)}){Text("重试",color=SwissRed)}
-            else LinearProgressIndicator(progress={status?.progress?:0f},modifier=Modifier.fillMaxWidth().padding(top=24.dp),color=SwissRed)
+            if(status?.failed==true)TextButton({performanceLibrary.prepareSong(performanceItem.id,retry=true)}){Text("重试",color=SwissRed)}
+            else if(status?.progress!=null)LinearProgressIndicator(progress={status.progress},modifier=Modifier.fillMaxWidth().padding(top=24.dp),color=SwissRed)
+            else LinearProgressIndicator(modifier=Modifier.fillMaxWidth().padding(top=24.dp),color=SwissRed)
           }
         }
       }
@@ -854,15 +935,14 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    }
    AppPhotoViewerPortal(photoViewerCoordinator)
    if(discardAction!=null)RoomDiscardProfileDialog({discardAction=null},{val action=discardAction;discardAction=null;editor.discard();action?.invoke()})
-   if(performanceLibraryUi.mobileConfirmation) {
-    val missing=performanceLibraryUi.entries.filterNot{it.downloadReady}
-    val bytes=missing.sumOf{it.song.recording?.downloadFile?.second?.bytes?:0L}
+   performanceLibraryUi.mobileConfirmationSongId?.let { pendingId ->
+    val pending=performanceItems.find{it.id==pendingId}
+    val mbText=pending?.opusBytes?.takeIf{it>0L}?.let{"约 %.1f MB".format(it/1048576.0)}?:"约 1.3 MB"
     AppConfirmation(
      title="用移动网络准备音乐？",
-     message="共 ${missing.size} 首，约 ${bytes/1048576} MB。下载完成后可离线演奏。",
-     confirmLabel="下载全部",onConfirm=performanceLibrary::allowMobile,
+     message="将下载《${pending?.title ?: "当前曲目"}》（$mbText），完成后可离线演奏。",
+     confirmLabel="开始准备",onConfirm=performanceLibrary::allowMobile,
      cancelLabel="等待 Wi-Fi",onDismiss=performanceLibrary::waitForWifi,
-     details={Text(missing.joinToString("、"){it.song.title},style=MaterialTheme.typography.bodySmall)},
     )
    }
    }

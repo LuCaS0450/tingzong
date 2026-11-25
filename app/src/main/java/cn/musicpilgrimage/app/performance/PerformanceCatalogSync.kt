@@ -31,6 +31,41 @@ internal data class CloudCatalogTrack(
     val sortOrder: Int,
     val chart: CloudChartRef,
     val opus: CloudOpusRef,
+    val title: String = "",
+    val artist: String = "",
+    val durationUs: Long = 0L,
+    val placeIds: List<String> = emptyList(),
+    val workKey: String = "",
+) {
+    val hasDisplayMetadata: Boolean get() = title.isNotBlank() && artist.isNotBlank()
+}
+
+internal data class PerformanceCatalogItem(
+    val id: String,
+    val version: Int,
+    val title: String,
+    val artist: String,
+    val durationUs: Long = 0L,
+    val placeIds: List<String> = emptyList(),
+    val workKey: String = "",
+    val opusBytes: Long = 0L,
+    val chartReady: Boolean = false,
+    val audioReady: Boolean = false,
+    val track: CloudCatalogTrack? = null,
+    val entry: PerformanceEntry? = null,
+)
+
+internal fun PerformanceEntry.toCatalogItem(): PerformanceCatalogItem = PerformanceCatalogItem(
+    id = song.id,
+    version = song.version,
+    title = song.title,
+    artist = song.artist,
+    durationUs = song.durationUs,
+    placeIds = song.placeIds,
+    opusBytes = song.recording?.downloadFile?.second?.bytes ?: 0L,
+    chartReady = true,
+    audioReady = audioReady,
+    entry = this,
 )
 
 internal data class CloudCatalogManifest(
@@ -88,6 +123,14 @@ internal data class CloudCatalogManifest(
                         opusPath == "excerpt/$opusSha.ogg"
                 ) { "曲目音频校验信息无效: $id" }
 
+                val title = row.optString("title", "").trim()
+                val artist = row.optString("artist", "").trim()
+                val durationUs = row.optLong("durationUs", 0L).coerceAtLeast(0L)
+                val placeIds = row.optJSONArray("placeIds")?.let { arr ->
+                    List(arr.length()) { arr.optString(it, "") }.filter(String::isNotBlank)
+                } ?: emptyList()
+                val workKey = row.optString("workKey", "").trim()
+
                 CloudCatalogTrack(
                     id = id,
                     version = version,
@@ -95,6 +138,11 @@ internal data class CloudCatalogManifest(
                     sortOrder = sortOrder,
                     chart = CloudChartRef(chartPath, chartBytes, chartSha),
                     opus = CloudOpusRef(opusPath, opusBytes, opusSha, sourceSha),
+                    title = title,
+                    artist = artist,
+                    durationUs = durationUs,
+                    placeIds = placeIds,
+                    workKey = workKey,
                 )
             }
             return CloudCatalogManifest(schemaVersion, catalogRevision, updatedAt, tracks)
@@ -108,6 +156,7 @@ internal sealed interface CatalogSyncOutcome {
         val revision: Int,
         val songs: List<SongPackage>,
         val downloadedCharts: Int,
+        val tracks: List<CloudCatalogTrack> = emptyList(),
     ) : CatalogSyncOutcome
 }
 
@@ -156,17 +205,31 @@ internal class PerformanceCatalogStore(private val root: File) {
         }
     }
 
+    fun loadManifestTracks(): List<CloudCatalogTrack> = synchronized(lock) {
+        readManifest()?.compatibleTracks().orEmpty()
+    }
+
+    fun loadCachedSong(track: CloudCatalogTrack): SongPackage? = synchronized(lock) {
+        val file = chartFile(track.chart.sha256)
+        if (!file.isFile || file.length() != track.chart.bytes) return@synchronized null
+        runCatching {
+            val raw = file.readBytes()
+            require(sha256Of(raw) == track.chart.sha256) { "缓存谱面已损坏" }
+            parseAndBindTrack(raw, track)
+        }.getOrNull()
+    }
+
+    fun loadCachedSongById(id: String, version: Int? = null): SongPackage? = synchronized(lock) {
+        val manifest = readManifest() ?: return@synchronized null
+        val track = manifest.compatibleTracks().firstOrNull {
+            it.id == id && (version == null || it.version == version)
+        } ?: return@synchronized null
+        loadCachedSong(track)
+    }
+
     fun loadCachedSongs(): List<SongPackage> = synchronized(lock) {
         val manifest = readManifest() ?: return@synchronized emptyList()
-        manifest.compatibleTracks().mapNotNull { track ->
-            val file = chartFile(track.chart.sha256)
-            if (!file.isFile || file.length() != track.chart.bytes) return@mapNotNull null
-            runCatching {
-                val raw = file.readBytes()
-                require(sha256Of(raw) == track.chart.sha256) { "缓存谱面已损坏" }
-                parseAndBindTrack(raw, track)
-            }.getOrNull()
-        }
+        manifest.compatibleTracks().mapNotNull { track -> loadCachedSong(track) }
     }
 
     fun pruneUnused(activeChartHashes: Set<String>) = synchronized(lock) {
@@ -248,18 +311,26 @@ internal class PerformanceCatalogSync(
     private val client: OkHttpClient = defaultClient,
     private val requireHttps: Boolean = true,
 ) {
-    fun sync(force: Boolean = false): CatalogSyncOutcome {
+    private fun validatedBaseUrl(): String {
         val base = catalogBaseUrl.trimEnd('/')
         if (requireHttps) {
             check(base.startsWith("https://")) { "曲库服务尚未配置" }
         } else {
             check(base.startsWith("https://") || base.startsWith("http://")) { "曲库服务地址无效" }
         }
+        return base
+    }
+
+    fun sync(force: Boolean = false, prefetchAllCharts: Boolean = false): CatalogSyncOutcome {
+        val base = validatedBaseUrl()
 
         val cachedManifest = store.readManifest()
-        val cachedComplete = cachedManifest != null &&
-            cachedManifest.compatibleTracks().all { store.hasValidChart(it.chart) }
-        val etag = if (!force && cachedComplete) store.readEtag() else null
+        val cachedTracks = cachedManifest?.compatibleTracks().orEmpty()
+        val cachedUsable = cachedManifest != null && cachedTracks.isNotEmpty() && (
+            (!prefetchAllCharts && cachedTracks.all { it.hasDisplayMetadata }) ||
+                cachedTracks.all { store.hasValidChart(it.chart) }
+            )
+        val etag = if (!force && cachedUsable) store.readEtag() else null
 
         val manifestUrl = "$base/manifest.json"
         val request = Request.Builder()
@@ -274,7 +345,7 @@ internal class PerformanceCatalogSync(
         val manifestBytes: ByteArray
         val responseEtag: String?
         client.newCall(request).execute().use { response ->
-            if (response.code == 304 && cachedComplete) {
+            if (response.code == 304 && cachedUsable) {
                 return CatalogSyncOutcome.Unchanged
             }
             if (!response.isSuccessful) {
@@ -289,25 +360,38 @@ internal class PerformanceCatalogSync(
 
         val manifest = CloudCatalogManifest.from(JSONObject(String(manifestBytes, Charsets.UTF_8)))
         val compatible = manifest.compatibleTracks()
+        val needsEagerCharts = prefetchAllCharts || compatible.any { !it.hasDisplayMetadata }
         var downloadedCharts = 0
 
-        for (track in compatible) {
-            if (store.hasValidChart(track.chart)) {
-                val cachedBytes = store.chartFile(track.chart.sha256).readBytes()
-                PerformanceCatalogStore.parseAndBindTrack(cachedBytes, track)
-            } else {
-                val chartUrl = "$base/${track.chart.objectPath}"
-                val chartBytes = downloadChart(chartUrl, track.chart)
-                PerformanceCatalogStore.parseAndBindTrack(chartBytes, track)
-                store.writeChart(track.chart, chartBytes)
-                downloadedCharts += 1
+        if (needsEagerCharts) {
+            for (track in compatible) {
+                if (store.hasValidChart(track.chart)) {
+                    val cachedBytes = store.chartFile(track.chart.sha256).readBytes()
+                    PerformanceCatalogStore.parseAndBindTrack(cachedBytes, track)
+                } else {
+                    val chartUrl = "$base/${track.chart.objectPath}"
+                    val chartBytes = downloadChart(chartUrl, track.chart)
+                    PerformanceCatalogStore.parseAndBindTrack(chartBytes, track)
+                    store.writeChart(track.chart, chartBytes)
+                    downloadedCharts += 1
+                }
             }
         }
 
         store.commitManifest(manifestBytes, responseEtag)
         store.pruneUnused(compatible.mapTo(mutableSetOf()) { it.chart.sha256 })
         val songs = store.loadCachedSongs()
-        return CatalogSyncOutcome.Updated(manifest.catalogRevision, songs, downloadedCharts)
+        return CatalogSyncOutcome.Updated(manifest.catalogRevision, songs, downloadedCharts, compatible)
+    }
+
+    fun ensureChart(track: CloudCatalogTrack): SongPackage {
+        store.loadCachedSong(track)?.let { return it }
+        val base = validatedBaseUrl()
+        val chartUrl = "$base/${track.chart.objectPath}"
+        val chartBytes = downloadChart(chartUrl, track.chart)
+        val song = PerformanceCatalogStore.parseAndBindTrack(chartBytes, track)
+        store.writeChart(track.chart, chartBytes)
+        return song
     }
 
     private fun downloadChart(url: String, ref: CloudChartRef): ByteArray {

@@ -43,6 +43,11 @@ internal class PerformanceAudioStore(private val root: File) {
         }
     }
 
+    fun verifiedOpusDirectory(opus: CloudOpusRef): File? = synchronized(lock) {
+        val spec = RecordingFile(opus.bytes, opus.sha256)
+        if (AudioHttpTransfer.valid(opusBlob(spec), spec)) blobsDir else null
+    }
+
     fun verifiedDownloadDirectory(song: SongPackage): File? = synchronized(lock) {
         val recording = song.recording?.takeIf { it.local } ?: return@synchronized null
         val opus = recording.opus
@@ -92,7 +97,16 @@ internal class PerformanceAudioStore(private val root: File) {
     fun pruneUnused(activeSongs: List<SongPackage>) = synchronized(lock) {
         val activeOpusNames = activeSongs.mapNotNull { it.recording?.opus?.sha256 }.mapTo(mutableSetOf()) { "$it.ogg" }
         val activeSongIds = activeSongs.mapTo(mutableSetOf()) { it.id }
+        pruneByActiveSets(activeOpusNames, activeSongIds)
+    }
 
+    fun pruneUnusedManifest(activeTracks: List<CloudCatalogTrack>) = synchronized(lock) {
+        val activeOpusNames = activeTracks.mapTo(mutableSetOf()) { "${it.opus.sha256}.ogg" }
+        val activeSongIds = activeTracks.mapTo(mutableSetOf()) { it.id }
+        pruneByActiveSets(activeOpusNames, activeSongIds)
+    }
+
+    private fun pruneByActiveSets(activeOpusNames: Set<String>, activeSongIds: Set<String>) {
         blobsDir.listFiles()?.forEach { file ->
             if (file.isFile && file.name.endsWith(".ogg") && file.name !in activeOpusNames) {
                 file.delete()

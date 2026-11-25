@@ -331,4 +331,92 @@ class PerformanceCatalogSyncTest {
             assertEquals(listOf("song-good"), store.loadCachedSongs().map { it.id })
         }
     }
+
+    @Test
+    fun manifestWithMetadataSyncsWithoutBulkChartDownloadsAndLoadsChartOnDemand() {
+        val t1 = buildTrack("song-one", version = 1, title = "晴天", sortOrder = 0)
+        val t2 = buildTrack("song-two", version = 1, title = "简单爱", sortOrder = 1)
+        val catalogRoot = temporary.newFolder("catalog-ondemand")
+        val store = PerformanceCatalogStore(catalogRoot)
+
+        fun buildMetadataManifest(revision: Int, tracks: List<Pair<BuiltTrack, Pair<String, String>>>): ByteArray {
+            val arr = JSONArray()
+            tracks.forEach { (t, meta) ->
+                arr.put(
+                    JSONObject().apply {
+                        put("id", t.id)
+                        put("version", t.version)
+                        put("minSchemaVersion", t.minSchemaVersion)
+                        put("sortOrder", t.sortOrder)
+                        put("title", meta.first)
+                        put("artist", meta.second)
+                        put("durationUs", 3_000_000L)
+                        put("placeIds", JSONArray(listOf("place-${t.id}")))
+                        put(
+                            "chart",
+                            JSONObject()
+                                .put("object", "charts/${t.chartSha}.json")
+                                .put("bytes", t.chartBytes.size.toLong())
+                                .put("sha256", t.chartSha),
+                        )
+                        put(
+                            "opus",
+                            JSONObject()
+                                .put("object", "excerpt/${t.opusSha}.ogg")
+                                .put("bytes", t.opusBytes.size.toLong())
+                                .put("sha256", t.opusSha)
+                                .put("sourceSha256", t.sourceSha),
+                        )
+                    }
+                )
+            }
+            return JSONObject()
+                .put("schemaVersion", 1)
+                .put("catalogRevision", revision)
+                .put("updatedAt", "2026-11-25T18:00:00Z")
+                .put("tracks", arr)
+                .toString()
+                .toByteArray(Charsets.UTF_8)
+        }
+
+        MockCatalogServer(
+            manifestBytes = buildMetadataManifest(
+                1,
+                listOf(t1 to ("晴天" to "周杰伦"), t2 to ("简单爱" to "周杰伦")),
+            ),
+            etag = "\"meta-1\"",
+            charts = mutableMapOf(
+                "charts/${t1.chartSha}.json" to t1.chartBytes,
+                "charts/${t2.chartSha}.json" to t2.chartBytes,
+            ),
+        ).use { mock ->
+            val sync = PerformanceCatalogSync(store, mock.baseUrl, OkHttpClient(), requireHttps = false)
+
+            // 1. Manifest-only sync fetches zero charts upfront.
+            val outcome = sync.sync() as CatalogSyncOutcome.Updated
+            assertEquals(1, outcome.revision)
+            assertEquals(0, outcome.downloadedCharts)
+            assertEquals(0, mock.chartRequests.get())
+            assertEquals(listOf("晴天", "简单爱"), outcome.tracks.map { it.title })
+            assertEquals(listOf("song-one", "song-two"), store.loadManifestTracks().map { it.id })
+            assertTrue(store.loadCachedSongs().isEmpty())
+
+            // 2. Subsequent sync gets ETag 304 without downloading charts.
+            assertEquals(CatalogSyncOutcome.Unchanged, sync.sync())
+            assertEquals(0, mock.chartRequests.get())
+
+            // 3. On-demand ensureChart fetches and caches only the requested track.
+            val trackOne = outcome.tracks.first()
+            val songOne = sync.ensureChart(trackOne)
+            assertEquals("song-one", songOne.id)
+            assertEquals(t1.opusSha, songOne.recording?.opus?.sha256)
+            assertEquals(1, mock.chartRequests.get())
+
+            // 4. Repeat ensureChart serves from verified local cache with zero network requests.
+            val songOneAgain = sync.ensureChart(trackOne)
+            assertEquals("song-one", songOneAgain.id)
+            assertEquals(1, mock.chartRequests.get())
+            assertEquals(listOf("song-one"), store.loadCachedSongs().map { it.id })
+        }
+    }
 }

@@ -22,7 +22,7 @@ class PerformanceAudioDownloadWorker(context:Context,parameters:WorkerParameters
     override suspend fun doWork():Result=withContext(Dispatchers.IO) {
         val id=inputData.getString("song")?:return@withContext Result.failure()
         val version=inputData.getInt("version",-1)
-        val song=PerformanceCatalog.load(applicationContext).find{it.id==id&&it.version==version}?:return@withContext Result.failure()
+        val song=PerformanceCatalog.loadCachedSong(applicationContext,id,version)?:return@withContext Result.failure()
         val store=PerformanceAudioStore(applicationContext)
         val (filename, expected) = song.recording?.downloadFile ?: return@withContext Result.failure()
         val opusTag = opusTag(song)

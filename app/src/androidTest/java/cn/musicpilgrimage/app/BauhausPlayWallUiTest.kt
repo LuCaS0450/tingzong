@@ -39,12 +39,12 @@ class BauhausPlayWallUiTest {
         }
         compose.onNodeWithTag("wall-tab-2", useUnmergedTree = true).performClick()
         compose.waitUntil(25_000) {
-            PerformanceCatalog.load(compose.activity).isNotEmpty() &&
+            PerformanceCatalog.loadManifestTracks(compose.activity).isNotEmpty() &&
                 compose.onAllNodesWithTag("performance-list", useUnmergedTree = true)
                     .fetchSemanticsNodes().isNotEmpty()
         }
 
-        val songIds = PerformanceCatalog.load(compose.activity).map { it.id }
+        val songIds = PerformanceCatalog.loadManifestTracks(compose.activity).map { it.id }
         assertTrue("Expected cloud-synced performance catalog tracks", songIds.size >= 15)
 
         // Old generic header/status annotations must not appear on the Bauhaus piano wall.

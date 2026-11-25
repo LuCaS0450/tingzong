@@ -438,9 +438,11 @@ private fun SwissWallTabIcon(index: Int, tint: Color, focused: Boolean, modifier
     }
 }
 
-@Composable internal fun SwissPlayWall(entries:List<PerformanceEntry>,artwork:(SongPackage)->ReleaseArtwork?,loaded:Boolean,browse:RoomBrowseState,
+@Composable internal fun SwissPlayWall(entries:List<PerformanceCatalogItem>,loaded:Boolean,browse:RoomBrowseState,
     downloads:Map<String,AudioDownloadState>,onSong:(String)->Unit,onRetry:()->Unit,
-    catalogError:String?=null,onRefreshCatalog:()->Unit={}) {
+    catalogError:String?=null,onRefreshCatalog:()->Unit={},
+    filterExpanded:Boolean=false,searchQuery:String="",onSearchQueryChange:(String)->Unit={},
+    selectedArtist:String?=null,onSelectArtist:(String?)->Unit={}) {
     RoomBauhausPianoWall(
         entries = entries,
         loaded = loaded,
@@ -450,5 +452,10 @@ private fun SwissWallTabIcon(index: Int, tint: Color, focused: Boolean, modifier
         onRetry = onRetry,
         catalogError = catalogError,
         onRefreshCatalog = onRefreshCatalog,
+        filterExpanded = filterExpanded,
+        searchQuery = searchQuery,
+        onSearchQueryChange = onSearchQueryChange,
+        selectedArtist = selectedArtist,
+        onSelectArtist = onSelectArtist,
     )
 }
