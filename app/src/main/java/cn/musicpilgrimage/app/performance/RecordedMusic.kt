@@ -36,7 +36,8 @@ internal data class RecordedMusic(val sampleRate:Int,val variants:Map<Double,Str
         require(kotlin.math.abs(expectedFrames.toDouble()/sampleRate*speed*1e6-song.durationUs)<=20_000){"歌曲音频与谱面时长不一致"}
         val spec=files[name]
         fun verifiedOpus() = opus?.takeIf { localDirectory != null && speed == 1.0 }?.let { expected ->
-            File(localDirectory, OPUS_FILENAME).takeIf { AudioHttpTransfer.valid(it, expected) }
+            File(localDirectory, "${expected.sha256}.ogg").takeIf { AudioHttpTransfer.valid(it, expected) }
+                ?: File(localDirectory, OPUS_FILENAME).takeIf { AudioHttpTransfer.valid(it, expected) }
         }
         var opusFile = verifiedOpus()
         val input = if (localDirectory == null) context.assets.open("performance/${song.id}/audio/$name") else try {

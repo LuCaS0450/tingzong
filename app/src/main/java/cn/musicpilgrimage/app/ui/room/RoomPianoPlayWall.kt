@@ -141,6 +141,8 @@ internal fun RoomBauhausPianoWall(
     downloads: Map<String, AudioDownloadState>,
     onSong: (String) -> Unit,
     onRetry: () -> Unit,
+    catalogError: String? = null,
+    onRefreshCatalog: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val ivory = remember(context) { PianoWallTextures.load(context, "design/music-space/piano-ivory.jpg") }
@@ -197,6 +199,26 @@ internal fun RoomBauhausPianoWall(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     CircularProgressIndicator(Modifier.size(24.dp), color = RoomColors.Ink)
+                                }
+                            }
+                        } else if (loaded && entries.isEmpty()) {
+                            item("catalog-retry") {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(76.dp)
+                                        .tiledMaterial(ivory, 260.dp, Color(0xFFF8F6F0))
+                                        .testTag("performance-catalog-retry")
+                                        .clickable(role = Role.Button, onClick = onRefreshCatalog)
+                                        .padding(horizontal = 20.dp),
+                                    contentAlignment = Alignment.CenterStart,
+                                ) {
+                                    Text(
+                                        text = catalogError ?: "曲库暂未就绪，点此重试",
+                                        color = RoomColors.Red,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                    )
                                 }
                             }
                         }

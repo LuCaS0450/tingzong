@@ -47,13 +47,16 @@ class PerformanceAudioImportTest {
     }
     @ExtendedDeviceTest
     @Test fun installAuthorizedFullRecordingIntoFormalLibrary() {
+        PerformanceCatalogSync(PerformanceCatalogStore(context)).sync()
+        val storeCatalog=PerformanceCatalogStore(context)
         val song=PerformanceCatalog.load(context).single{it.id=="greatest-works"}
+        val trackRef=requireNotNull(storeCatalog.readManifest()).tracks.single{it.id=="greatest-works"}
         assertEquals("release-accent-rhythm",song.sources.getString("chartKind"))
         assertEquals("pcm16-delta",song.recording?.encoding)
         assertTrue(song.durationUs in 90_000_000..120_000_000)
         assertTrue(song.standard.size>=160)
         assertTrue(song.standard.count{it.hold}>=4)
-        val chart=context.assets.open("performance/greatest-works/song.json").bufferedReader().use{JSONObject(it.readText())}.getJSONObject("charts")
+        val chart=JSONObject(storeCatalog.chartFile(trackRef.chart.sha256).readText(Charsets.UTF_8)).getJSONObject("charts")
         assertFalse(chart.has("easy"))
         val targets=chart.getJSONArray("standard")
         val contributors=List(targets.length()){index->targets.getJSONObject(index).getJSONArray("contributors").let{values->List(values.length()){values.getString(it)}}}

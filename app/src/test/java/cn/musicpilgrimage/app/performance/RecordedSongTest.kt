@@ -77,11 +77,21 @@ class RecordedSongTest {
     @Test
     @Category(LocalAssetCheck::class)
     fun configuredAssetPackagesMatchTheCatalogue() {
-        val root=java.io.File("src/main/assets/performance")
-        val folders=root.listFiles()?.filter{it.isDirectory&&it.name!="piano"}?.map{it.name}.orEmpty()
-        assertEquals(PerformanceCatalog.ORDERED_SONG_IDS.toSet(),folders.toSet())
-        PerformanceCatalog.ORDERED_SONG_IDS.forEach {id->
-            val file=java.io.File(root,"$id/song.json")
+        // APK bundles only piano samples; songs are synced from cloud catalog.
+        val bundledRoot=java.io.File("src/main/assets/performance")
+        val bundledSongs=bundledRoot.listFiles()?.filter{it.isDirectory&&it.name!="piano"}.orEmpty()
+        assertTrue("Expected zero bundled songs in APK assets, found: ${bundledSongs.map{it.name}}",bundledSongs.isEmpty())
+        assertFalse("Bundled opus.json should be removed",java.io.File(bundledRoot,"opus.json").exists())
+
+        val sourceRoot=java.io.File("../content/performance/catalog-source")
+        val catalogJson=JSONObject(java.io.File(sourceRoot,"catalog.json").readText(Charsets.UTF_8))
+        val opusJson=JSONObject(java.io.File(sourceRoot,"opus.json").readText(Charsets.UTF_8))
+        val tracks=catalogJson.getJSONArray("tracks")
+        assertTrue(tracks.length()>=15)
+        for(i in 0 until tracks.length()) {
+            val row=tracks.getJSONObject(i)
+            val id=row.getString("id")
+            val file=java.io.File(sourceRoot,row.getString("chartFile"))
             assertTrue("Missing song.json for $id",file.isFile)
             val song=SongPackage.from(JSONObject(file.readText(Charsets.UTF_8)))
             assertEquals(id,song.id)
@@ -91,9 +101,9 @@ class RecordedSongTest {
             assertTrue(song.standard.size>=140)
             assertTrue(song.standard.any{it.hold})
             assertTrue(song.placeIds.isNotEmpty())
-            if(id!=PerformanceCatalog.SHARED_BACKGROUND_FOLDER) {
-                assertFalse("Duplicate background should not exist in $id",java.io.File(root,"$id/${song.background}").exists())
-            }
+            val opus=opusJson.getJSONObject(id)
+            assertEquals(song.recording!!.files.values.single().sha256,opus.getString("sourceSha256"))
+            assertTrue(opus.getLong("bytes")>0)
         }
     }
 }

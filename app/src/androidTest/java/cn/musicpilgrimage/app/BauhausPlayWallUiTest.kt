@@ -38,10 +38,14 @@ class BauhausPlayWallUiTest {
                 .fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("wall-tab-2", useUnmergedTree = true).performClick()
-        compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag("performance-list", useUnmergedTree = true)
-                .fetchSemanticsNodes().isNotEmpty()
+        compose.waitUntil(25_000) {
+            PerformanceCatalog.load(compose.activity).isNotEmpty() &&
+                compose.onAllNodesWithTag("performance-list", useUnmergedTree = true)
+                    .fetchSemanticsNodes().isNotEmpty()
         }
+
+        val songIds = PerformanceCatalog.load(compose.activity).map { it.id }
+        assertTrue("Expected cloud-synced performance catalog tracks", songIds.size >= 15)
 
         // Old generic header/status annotations must not appear on the Bauhaus piano wall.
         assertTrue(compose.onAllNodesWithText("可演奏曲目").fetchSemanticsNodes().isEmpty())
@@ -51,7 +55,7 @@ class BauhausPlayWallUiTest {
         val keybedBounds = compose.onNodeWithTag("performance-list", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot
 
-        PerformanceCatalog.ORDERED_SONG_IDS.forEach { id ->
+        songIds.forEach { id ->
             compose.onNodeWithTag("performance-list", useUnmergedTree = true).performScrollToKey(id)
             val node = compose.onNodeWithTag("performance-song-$id", useUnmergedTree = true)
             node.assertIsDisplayed()
@@ -67,8 +71,9 @@ class BauhausPlayWallUiTest {
         }
 
         // Return to top and verify tapping a right-hand black key does not launch the song behind it.
-        compose.onNodeWithTag("performance-list", useUnmergedTree = true).performScrollToKey("greatest-works")
-        val firstKey = compose.onNodeWithTag("performance-song-greatest-works", useUnmergedTree = true)
+        val firstId = songIds.first()
+        compose.onNodeWithTag("performance-list", useUnmergedTree = true).performScrollToKey(firstId)
+        val firstKey = compose.onNodeWithTag("performance-song-$firstId", useUnmergedTree = true)
         val firstSize = firstKey.fetchSemanticsNode().size
         firstKey.performTouchInput {
             click(Offset(firstSize.width * 0.85f, firstSize.height * 0.96f))

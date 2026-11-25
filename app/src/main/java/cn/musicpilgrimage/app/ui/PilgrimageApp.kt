@@ -356,8 +356,8 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
    val sourceCatalog by session.services.catalog.collectAsStateWithLifecycle()
    val performanceLibrary:PerformanceLibraryViewModel=viewModel()
    val performanceLibraryUi by performanceLibrary.state.collectAsStateWithLifecycle()
-   LaunchedEffect(route,performanceLibraryUi.loaded){
-    if(performanceLibraryUi.loaded&&(route=="performance"||route=="perform/{song}"))performanceLibrary.prepareAll()
+   LaunchedEffect(route){
+    if(route=="performance"||route=="perform/{song}")performanceLibrary.onWallEntered()
    }
    val previewPlayable=LocalPerformancePreviews.current
    val performanceEntries=performanceLibraryUi.entries+previewPlayable.filter{preview->performanceLibraryUi.entries.none{it.song.id==preview.song.id}}
@@ -700,7 +700,13 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
        {navigate("search")},back,archiveState.visits.map{it.location}.toSet(),active=entry==e)
      }
      page("performance"){NativeWallTab(2,{navigate("search")}){
-      SwissPlayWall(performanceEntries,performanceArtwork,performanceLibraryUi.loaded,wallBrowse,performanceLibraryUi.downloads,{navigate("perform/${Uri.encode(it)}")},{performanceLibrary.prepareAll(retry=true)})
+      SwissPlayWall(
+       performanceEntries,performanceArtwork,performanceLibraryUi.loaded,wallBrowse,
+       performanceLibraryUi.downloads,{navigate("perform/${Uri.encode(it)}")},
+       {performanceLibrary.prepareAll(retry=true)},
+       catalogError=performanceLibraryUi.catalogError,
+       onRefreshCatalog=performanceLibrary::retryCatalog,
+      )
      }}
      page("perform/{song}"){e->
       val performanceEntry=performanceEntries.find{it.song.id==e.arguments?.getString("song")}

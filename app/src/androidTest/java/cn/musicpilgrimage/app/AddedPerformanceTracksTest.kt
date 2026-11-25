@@ -32,7 +32,7 @@ class AddedPerformanceTracksTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
-    private val ids = PerformanceCatalog.ORDERED_SONG_IDS
+    private val ids get() = PerformanceCatalog.load(context).map { it.id }
     private val playTestIds = listOf("love-confession", "she-says", "you-complete-me")
     private val evidence get() = File(context.getExternalFilesDir(null), "added-performance").apply { mkdirs() }
     private lateinit var controller: PerformanceController
@@ -77,12 +77,13 @@ class AddedPerformanceTracksTest {
     @Test fun catalogueImportsWrongSongProtectionAndResultIsolation() {
         ActivityScenario.launch(MainActivity::class.java).use {
             await { catalogue().works.isNotEmpty() }
+            runBlocking(Dispatchers.IO) { PerformanceCatalogSync(PerformanceCatalogStore(context)).sync() }
             val songs = PerformanceCatalog.load(context)
-            assertEquals(PerformanceCatalog.ORDERED_SONG_IDS, songs.map { song -> song.id })
-            val background = context.assets.open("performance/greatest-works/background.webp").use { stream -> stream.readBytes() }
+            assertTrue(songs.size >= 15)
             val imported = mutableListOf<String>()
-            ids.forEach { id -> assertTrue("Missing local authorized audio: $id", source(id).isFile) }
-            ids.forEach { id ->
+            val currentIds = songs.map { it.id }
+            currentIds.forEach { id -> assertTrue("Missing local authorized audio: $id", source(id).isFile) }
+            currentIds.forEach { id ->
                 val song = songs.single { song -> song.id == id }
                 val work = catalogue().works.singleOrNull { work -> work.title == song.title && work.artist == song.artist }
                 val release = catalogue().releases.singleOrNull { rel -> rel.title == song.title && rel.artist == song.artist }
@@ -94,22 +95,18 @@ class AddedPerformanceTracksTest {
                 } else {
                     release!!.places.filter { link -> link.scenes.any { it.work == song.title } }.map { link -> link.place.id }.toSet()
                 }
-                if (id == PerformanceCatalog.SHARED_BACKGROUND_FOLDER) {
+                if (id == "greatest-works") {
                     // The original package links a selected subset of the work's places.
                     assertTrue(placeIds.containsAll(song.placeIds))
                 } else {
                     assertEquals(placeIds, song.placeIds.toSet())
-                    assertFalse("Added tracks share the primary background asset", song.background in context.assets.list("performance/$id").orEmpty())
                 }
-                assertArrayEquals(background, context.assets.open(PerformanceCatalog.backgroundAssetPath(context, song)).use { stream -> stream.readBytes() })
                 assertTrue(song.recording!!.local)
                 assertEquals("pcm16-delta", song.recording!!.encoding)
                 assertTrue(song.durationUs in 90_000_000..120_000_000)
                 assertEquals(setOf(1.0), song.recording!!.variants.keys)
                 assertTrue(song.standard.any { target -> target.hold })
                 assertTrue(song.standard.zipWithNext().all { (a, b) -> b.onsetUs - a.onsetUs >= 250000 && (!a.hold || b.onsetUs >= a.endUs) })
-                val json = context.assets.open("performance/$id/song.json").bufferedReader().use { stream -> JSONObject(stream.readText()) }
-                assertFalse(json.getJSONObject("charts").has("easy"))
                 importSong(song)
                 assertNotNull("Import did not produce ready audio: $id", PerformanceAudioStore(context).directory(song))
                 imported += id
@@ -143,9 +140,9 @@ class AddedPerformanceTracksTest {
             compose.onNodeWithTag("room-space-button").performClick()
             compose.mainClock.advanceTimeBy(700)
             compose.onNodeWithTag("room-module-performance").performClick()
-            await { compose.onAllNodesWithTag("performance-list").fetchSemanticsNodes().isNotEmpty() }
+            await { PerformanceCatalog.load(context).isNotEmpty() && compose.onAllNodesWithTag("performance-list").fetchSemanticsNodes().isNotEmpty() }
             capture("fifteen-song-list-top")
-            PerformanceCatalog.ORDERED_SONG_IDS.forEach { id ->
+            PerformanceCatalog.load(context).map { it.id }.forEach { id ->
                 compose.onNodeWithTag("performance-list").performScrollToKey(id)
                 compose.onNodeWithTag("performance-song-$id").assertIsDisplayed()
             }
