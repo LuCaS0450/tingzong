@@ -74,7 +74,10 @@ android {
     }
     packaging {
         resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}")
-        jniLibs { useLegacyPackaging = true }
+        jniLibs {
+            useLegacyPackaging = true
+            excludes += "**/libopus.so"
+        }
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
@@ -89,6 +92,7 @@ android {
 }
 dependencies {
     implementation("com.google.oboe:oboe:1.11.0")
+    implementation("com.fpliu.ndk.pkg.prefab.android.21:opus:1.3.1")
     implementation(platform("androidx.compose:compose-bom:2026.02.01"))
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.core:core-ktx:1.13.1")

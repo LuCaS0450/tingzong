@@ -50,7 +50,13 @@ internal data class RecordedMusic(val sampleRate:Int,val variants:Map<Double,Str
         if (input == null) {
             val opusFrames = kotlin.math.round(song.durationUs / 1e6 * OpusPcmDecoder.SAMPLE_RATE).toLong()
             require(opusFrames in 1..MAX_PCM_BYTES / 8) { "歌曲音频过大" }
-            val pcm = OpusPcmDecoder.decode(checkNotNull(opusFile), opusFrames.toInt())
+            val resolvedFile = checkNotNull(opusFile)
+            val tNative = android.os.SystemClock.elapsedRealtime()
+            if (engine.setOpusBacking(engine.handle, resolvedFile.absolutePath, speed, opusFrames.toInt())) {
+                android.util.Log.i("PerformanceTiming", "Native libopus load ${song.id}: ${android.os.SystemClock.elapsedRealtime() - tNative}ms ($opusFrames frames)")
+                return
+            }
+            val pcm = OpusPcmDecoder.decode(resolvedFile, opusFrames.toInt())
             val tJni = android.os.SystemClock.elapsedRealtime()
             check(engine.setBacking(engine.handle, OpusPcmDecoder.SAMPLE_RATE, speed, pcm)) { "歌曲音频无法读取" }
             android.util.Log.i("PerformanceTiming", "JNI setBacking ${song.id}: ${android.os.SystemClock.elapsedRealtime() - tJni}ms")

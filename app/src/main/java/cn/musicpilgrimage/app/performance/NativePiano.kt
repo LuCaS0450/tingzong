@@ -12,6 +12,7 @@ internal class NativePiano:Closeable {
     external fun setSample(handle:Long,root:Int,sampleRate:Int,pcm:FloatArray)
     external fun setScore(handle:Long,events:DoubleArray):Boolean
     external fun setBacking(handle:Long,sampleRate:Int,speed:Double,stereoPcm:FloatArray):Boolean
+    external fun setOpusBacking(handle:Long,filePath:String,speed:Double,expectedFrames:Int):Boolean
     external fun start(handle:Long,start:Double,end:Double,speed:Double,mask:Int,bpm:Double,beats:Int):Boolean
     external fun pause(handle:Long)
     external fun position(handle:Long):Long

@@ -1,10 +1,14 @@
 #include <oboe/Oboe.h>
+#include <opus/opus.h>
+#include <android/log.h>
 #include <jni.h>
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <memory>
 #include <vector>
@@ -259,6 +263,134 @@ public:
 #endif
 };
 PianoEngine* engine(jlong handle){return reinterpret_cast<PianoEngine*>(handle);}
+
+constexpr int kOpusSampleRate = 48000;
+constexpr int kOpusChannels = 2;
+constexpr int kOpusMaxFrameSamples = 5760; // 120ms @ 48kHz
+constexpr int64_t kMaxEndPaddingFrames = 960;
+
+uint16_t readLe16(const uint8_t* p) {
+    return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
+}
+
+bool decodeOggOpusFile(const char* path, int64_t expectedFrames, std::vector<float>& outPcm) {
+    if (!path || expectedFrames <= 0) return false;
+    FILE* f = std::fopen(path, "rb");
+    if (!f) return false;
+    if (std::fseek(f, 0, SEEK_END) != 0) { std::fclose(f); return false; }
+    const long fileLen = std::ftell(f);
+    if (fileLen <= 27 || fileLen > 64L * 1024L * 1024L) { std::fclose(f); return false; }
+    std::rewind(f);
+    std::vector<uint8_t> data(static_cast<size_t>(fileLen));
+    const size_t readCount = std::fread(data.data(), 1, data.size(), f);
+    std::fclose(f);
+    if (readCount != data.size()) return false;
+
+    const size_t targetSamples = static_cast<size_t>(expectedFrames) * kOpusChannels;
+    const size_t maxAllowedSamples = static_cast<size_t>(expectedFrames + kMaxEndPaddingFrames) * kOpusChannels;
+    outPcm.clear();
+    outPcm.reserve(targetSamples + kOpusMaxFrameSamples * kOpusChannels);
+
+    OpusDecoder* decoder = nullptr;
+    int skipRemaining = 0;
+    float outputGain = 1.0f;
+    int packetIndex = 0;
+    std::vector<uint8_t> packet;
+    packet.reserve(4096);
+    std::array<float, kOpusMaxFrameSamples * kOpusChannels> frameBuf{};
+
+    auto flushPacket = [&]() -> bool {
+        if (packet.empty()) return true;
+        if (packetIndex == 0) {
+            if (packet.size() < 19 || std::memcmp(packet.data(), "OpusHead", 8) != 0) return false;
+            const uint8_t channels = packet[9];
+            const uint8_t mappingFamily = packet[18];
+            if (channels != kOpusChannels || mappingFamily != 0) return false;
+            skipRemaining = static_cast<int>(readLe16(packet.data() + 10));
+            const int16_t gainQ8 = static_cast<int16_t>(readLe16(packet.data() + 16));
+            outputGain = (gainQ8 == 0) ? 1.0f : static_cast<float>(std::pow(10.0, static_cast<double>(gainQ8) / (20.0 * 256.0)));
+            int err = OPUS_OK;
+            decoder = opus_decoder_create(kOpusSampleRate, kOpusChannels, &err);
+            if (err != OPUS_OK || !decoder) return false;
+        } else if (packetIndex == 1) {
+            if (packet.size() < 8 || std::memcmp(packet.data(), "OpusTags", 8) != 0) return false;
+        } else {
+            if (!decoder) return false;
+            const int decoded = opus_decode_float(
+                decoder,
+                packet.data(),
+                static_cast<opus_int32>(packet.size()),
+                frameBuf.data(),
+                kOpusMaxFrameSamples,
+                0
+            );
+            if (decoded < 0) return false;
+            int offset = 0;
+            if (skipRemaining > 0) {
+                const int skipped = std::min(skipRemaining, decoded);
+                skipRemaining -= skipped;
+                offset = skipped;
+            }
+            const int keepFrames = decoded - offset;
+            if (keepFrames > 0) {
+                const size_t keepSamples = static_cast<size_t>(keepFrames) * kOpusChannels;
+                if (outPcm.size() + keepSamples > maxAllowedSamples) return false;
+                const float* src = frameBuf.data() + static_cast<size_t>(offset) * kOpusChannels;
+                if (outputGain == 1.0f) {
+                    outPcm.insert(outPcm.end(), src, src + keepSamples);
+                } else {
+                    const size_t base = outPcm.size();
+                    outPcm.resize(base + keepSamples);
+                    for (size_t i = 0; i < keepSamples; ++i) outPcm[base + i] = src[i] * outputGain;
+                }
+            }
+        }
+        packetIndex++;
+        packet.clear();
+        return true;
+    };
+
+    size_t pos = 0;
+    bool ok = true;
+    while (pos + 27 <= data.size()) {
+        if (std::memcmp(data.data() + pos, "OggS", 4) != 0 || data[pos + 4] != 0) {
+            ok = false;
+            break;
+        }
+        const uint8_t numSegments = data[pos + 26];
+        const size_t segTableStart = pos + 27;
+        const size_t bodyStart = segTableStart + numSegments;
+        if (bodyStart > data.size()) {
+            ok = false;
+            break;
+        }
+        size_t bodyPos = bodyStart;
+        for (uint8_t s = 0; s < numSegments; ++s) {
+            const uint8_t segLen = data[segTableStart + s];
+            if (bodyPos + segLen > data.size()) {
+                ok = false;
+                break;
+            }
+            if (segLen > 0) {
+                packet.insert(packet.end(), data.data() + bodyPos, data.data() + bodyPos + segLen);
+                bodyPos += segLen;
+            }
+            if (segLen < 255) {
+                if (!flushPacket()) {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if (!ok) break;
+        pos = bodyPos;
+    }
+
+    if (decoder) opus_decoder_destroy(decoder);
+    if (!ok || !packet.empty() || outPcm.size() < targetSamples) return false;
+    outPcm.resize(targetSamples);
+    return true;
+}
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_cn_musicpilgrimage_app_performance_NativePiano_create(JNIEnv*,jobject) {
@@ -276,6 +408,19 @@ extern "C" JNIEXPORT jboolean JNICALL Java_cn_musicpilgrimage_app_performance_Na
 }
 extern "C" JNIEXPORT jboolean JNICALL Java_cn_musicpilgrimage_app_performance_NativePiano_setBacking(JNIEnv* env,jobject,jlong h,jint rate,jdouble speed,jfloatArray array) {
     std::vector<float> pcm(static_cast<size_t>(env->GetArrayLength(array)));env->GetFloatArrayRegion(array,0,static_cast<jsize>(pcm.size()),pcm.data());return engine(h)->recorded(rate,speed,std::move(pcm));
+}
+extern "C" JNIEXPORT jboolean JNICALL Java_cn_musicpilgrimage_app_performance_NativePiano_setOpusBacking(JNIEnv* env,jobject,jlong h,jstring jpath,jdouble speed,jint expectedFrames) {
+    if (!jpath || expectedFrames <= 0) return JNI_FALSE;
+    const char* path = env->GetStringUTFChars(jpath, nullptr);
+    if (!path) return JNI_FALSE;
+    std::vector<float> pcm;
+    const bool decoded = decodeOggOpusFile(path, expectedFrames, pcm);
+    env->ReleaseStringUTFChars(jpath, path);
+    if (!decoded) {
+        __android_log_print(ANDROID_LOG_WARN, "PerformanceTiming", "Native libopus decode failed, will fallback");
+        return JNI_FALSE;
+    }
+    return engine(h)->recorded(kOpusSampleRate, speed, std::move(pcm)) ? JNI_TRUE : JNI_FALSE;
 }
 extern "C" JNIEXPORT jboolean JNICALL Java_cn_musicpilgrimage_app_performance_NativePiano_start(JNIEnv*,jobject,jlong h,jdouble start,jdouble end,jdouble speed,jint mask,jdouble bpm,jint beats){return engine(h)->begin(start,end,speed,mask,bpm,beats);}
 extern "C" JNIEXPORT void JNICALL Java_cn_musicpilgrimage_app_performance_NativePiano_pause(JNIEnv*,jobject,jlong h){engine(h)->pause();}
