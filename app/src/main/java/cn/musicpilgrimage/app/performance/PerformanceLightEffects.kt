@@ -2,12 +2,15 @@ package cn.musicpilgrimage.app.performance
 
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.cos
@@ -17,13 +20,16 @@ import kotlin.math.sin
 private val IvoryKeyTone = Color(0xFFF8F6F0)
 private val IvoryGlowWarm = Color(0xFFFFEED0)
 private val IvoryHotCore = Color(0xFFFFF4E8)
-private val ApricotIvory = Color(0xFFFBE3D2)
-private val CoralWarm = Color(0xFFEC7555)
+private val SilkIvory = Color(0xFFFFF0E2)
+private val SilkBlush = Color(0xFFFAD0BA)
+private val SoftPeach = Color(0xFFF59A74)
+private val ApricotIvory = Color(0xFFFCE6D4)
+private val CoralWarm = Color(0xFFEB6B4F)
 private val CoralGold = Color(0xFFF69973)
-private val VermilionBright = Color(0xFFD94A38)
-private val VermilionGlow = Color(0xFFED654C)
-private val CrimsonCleanTail = Color(0xFFC2352B)
-private val CrimsonActiveTail = Color(0xFFD94436)
+private val RoseLuminance = Color(0xFFE2475D)
+private val RubyRich = Color(0xFFB4253B)
+private val VelvetCrimson = Color(0xFFCF3636)
+private val VermilionBright = Color(0xFFDC4535)
 private val CrimsonAnodizedBase = Color(0xFFBD382B)
 private val CrimsonAnodizedBright = Color(0xFFDF4F40)
 private val CrimsonEmber = Color(0xFFEF6A56)
@@ -63,8 +69,9 @@ internal fun DrawScope.performanceReceptor(x: Float, line: Float, w: Float, colo
 
 /**
  * Unified full-width (78% lane width, matching tap notes) Bauhaus hold pillar
- * with smooth vertical sustain gradient, subtle metallic bevel, start-edge ivory lip,
- * and dual-phase travelling inner light waves while actively held.
+ * rendered with an Apple Music-inspired organic multi-blob mesh gradient.
+ * Each hold note gets a deterministic per-note seed so color fields feel organic and non-repetitive,
+ * and actively transforms (faster Lissajous fluid swirl, blooming luminous cores, shifting warmth) while held.
  */
 internal fun DrawScope.performanceRibbon(
     x: Float,
@@ -76,6 +83,8 @@ internal fun DrawScope.performanceRibbon(
     timeUs: Long = 0L,
     motion: Boolean = true,
     alphaScale: Float = 1f,
+    seed: Int = 0,
+    heldFraction: Float = 0f,
 ) {
     if (bottom <= top) return
     val alpha = alphaScale.coerceIn(0f, 1f)
@@ -84,71 +93,159 @@ internal fun DrawScope.performanceRibbon(
     val rw = (w * NoteWidthRatio).coerceAtLeast(10.dp.toPx())
     val left = x - rw * 0.5f
     val height = bottom - top
-    val radius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
+    val cornerPx = 3.dp.toPx()
+    val radius = CornerRadius(cornerPx, cornerPx)
     val tSec = timeUs / 1_000_000.0
-    val breath = if (holding && motion) (0.86f + 0.14f * sin(tSec * 9.5).toFloat()) else 1f
+    val frac = heldFraction.coerceIn(0f, 1f)
+    val holdBoost = if (holding) (0.65f + 0.35f * frac) else 0f
+    val breath = if (holding && motion) (0.90f + 0.10f * sin(tSec * 6.8 + seed * 0.7).toFloat()) else 1f
 
-    // 1. Crisp 11 o'clock cast shadow matching tap notes.
+    // 1. Soft 11 o'clock cast shadow matching tap notes.
     drawRoundRect(
-        color = Color(0xFF090B0A).copy(alpha = 0.48f * alpha),
+        color = Color(0xFF090B0A).copy(alpha = 0.42f * alpha),
         topLeft = Offset(left + 1.5.dp.toPx(), top + 2.5.dp.toPx()),
         size = Size(rw, height),
         cornerRadius = radius,
     )
 
-    // 2. Subtle outer warm glow while actively held.
+    // 2. Feathered outer warm aura bloom while actively held.
     if (holding) {
-        val auraPad = 4.dp.toPx()
+        val auraPad = (4.dp + (frac * 2.5f).dp).toPx()
         drawRoundRect(
             brush = Brush.verticalGradient(
-                0.0f to CrimsonActiveTail.copy(alpha = 0.14f * breath * alpha),
-                0.55f to CoralWarm.copy(alpha = 0.22f * breath * alpha),
-                1.0f to IvoryGlowWarm.copy(alpha = 0.30f * breath * alpha),
+                0.0f to RoseLuminance.copy(alpha = 0.12f * breath * alpha),
+                0.48f to CoralWarm.copy(alpha = (0.18f + 0.09f * frac) * breath * alpha),
+                1.0f to SilkIvory.copy(alpha = (0.24f + 0.12f * frac) * breath * alpha),
                 startY = top,
                 endY = bottom,
             ),
             topLeft = Offset(left - auraPad, top - 1.dp.toPx()),
             size = Size(rw + auraPad * 2f, height + 3.dp.toPx()),
-            cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+            cornerRadius = CornerRadius(cornerPx + auraPad * 0.5f, cornerPx + auraPad * 0.5f),
         )
     }
 
-    // 3. Pure, luminous vertical gradient with zero muddiness or dark-black tail:
-    //    clean Swiss crimson tail -> luminous vermilion -> warm coral -> apricot ivory onset.
-    val bodyBrush = if (holding) {
-        Brush.verticalGradient(
-            0.0f to CrimsonActiveTail.copy(alpha = 0.96f * alpha),
-            0.36f to VermilionGlow.copy(alpha = 0.98f * alpha),
-            0.74f to CoralGold.copy(alpha = 0.99f * alpha),
-            1.0f to IvoryHotCore.copy(alpha = alpha),
-            startY = top,
-            endY = bottom,
-        )
-    } else {
-        Brush.verticalGradient(
-            0.0f to CrimsonCleanTail.copy(alpha = 0.94f * alpha),
-            0.38f to VermilionBright.copy(alpha = 0.97f * alpha),
-            0.76f to CoralWarm.copy(alpha = 0.99f * alpha),
-            1.0f to ApricotIvory.copy(alpha = alpha),
-            startY = top,
-            endY = bottom,
-        )
+    // 3. True rounded clip path for silky Apple Music-style Gaussian multi-blob fluid mesh.
+    val pillarClip = Path().apply {
+        addRoundRect(RoundRect(left, top, left + rw, bottom, cornerPx, cornerPx))
     }
-    drawRoundRect(
-        brush = bodyBrush,
-        topLeft = Offset(left, top),
-        size = Size(rw, height),
-        cornerRadius = radius,
-    )
+    clipPath(pillarClip) {
+        // Warm, luminous diagonal silk base with gentle organic drift.
+        val drift = if (motion) sin(tSec * (if (holding) 1.9 else 0.55) + seed * 0.9).toFloat() * rw * 0.45f else 0f
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    lerp(RubyRich, RoseLuminance, holdBoost * 0.65f).copy(alpha = 0.97f * alpha),
+                    lerp(VelvetCrimson, CoralWarm, holdBoost * 0.60f).copy(alpha = 0.98f * alpha),
+                    lerp(CoralWarm, SoftPeach, holdBoost * 0.70f).copy(alpha = alpha),
+                ),
+                start = Offset(left - drift, top),
+                end = Offset(left + rw + drift, bottom),
+            ),
+            topLeft = Offset(left, top),
+            size = Size(rw, height),
+        )
 
-    // 4. Clean 11 o'clock specular sheen & internal travelling shimmer waves (no black edge darkening).
-    clipRect(left = left, top = top, right = left + rw, bottom = bottom) {
+        // Six oversized Gaussian-falloff color clouds wandering across and slightly beyond pillar edges,
+        // driven by irrational frequency ratios so every note has an organic, non-repeating Apple Music flow.
+        val speedMul = when {
+            !motion -> 0.0
+            holding -> 1.85
+            else -> 0.42
+        }
+        val s = seed * 1.6180339887
+        val meshSpan = maxOf(rw * 1.55f, minOf(height * 0.68f, rw * 2.40f))
+
+        for (b in 0 until 6) {
+            val freqX = when (b) {
+                0 -> 0.71; 1 -> 1.03; 2 -> 1.37; 3 -> 1.73; 4 -> 0.89; else -> 1.29
+            }
+            val freqY = when (b) {
+                0 -> 0.97; 1 -> 0.67; 2 -> 1.19; 3 -> 0.83; 4 -> 1.49; else -> 1.07
+            }
+            val phaseX = s * (b + 1.17) + b * 1.91 + tSec * speedMul * freqX
+            val phaseY = s * (b + 2.31) + b * 1.33 + tSec * speedMul * freqY
+
+            // Allow cloud centers to drift gently past the pillar sides so internal color transitions stay silky smooth.
+            val normX = 0.5f + 0.68f * sin(phaseX).toFloat()
+            val anchorY = (b + 0.5f) / 6f
+            val wanderY = (if (holding) 0.28f else 0.14f) * cos(phaseY).toFloat()
+            val upwardBloom = if (holding && b >= 3) -frac * 0.24f else 0f
+            val bx = left + rw * normX
+            val by = top + height * (anchorY + wanderY + upwardBloom).coerceIn(-0.18f, 1.18f)
+
+            val radBreath = if (holding && motion) (1.10f + 0.16f * sin(phaseX * 0.8 + phaseY * 0.6).toFloat()) else 1.0f
+            val br = meshSpan * (0.95f + (b % 3) * 0.24f) * radBreath
+
+            val idleCol = when (b) {
+                0 -> RubyRich
+                1 -> RoseLuminance
+                2 -> VelvetCrimson
+                3 -> CoralWarm
+                4 -> SoftPeach
+                else -> SilkBlush
+            }
+            val activeCol = when (b) {
+                0 -> RoseLuminance
+                1 -> CoralWarm
+                2 -> SoftPeach
+                3 -> SilkBlush
+                4 -> SilkIvory
+                else -> IvoryHotCore
+            }
+            val cloudColor = lerp(idleCol, activeCol, holdBoost)
+            val peakAlpha = (when (b) {
+                0 -> 0.72f
+                1 -> 0.74f
+                2 -> 0.68f
+                3 -> 0.76f
+                4 -> 0.64f + 0.22f * holdBoost
+                else -> 0.48f + 0.34f * holdBoost
+            }) * alpha
+
+            // 6-stop smooth Gaussian falloff eliminates any perceptible circular edge.
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0.00f to cloudColor.copy(alpha = peakAlpha),
+                    0.22f to cloudColor.copy(alpha = peakAlpha * 0.88f),
+                    0.44f to cloudColor.copy(alpha = peakAlpha * 0.60f),
+                    0.66f to cloudColor.copy(alpha = peakAlpha * 0.28f),
+                    0.84f to cloudColor.copy(alpha = peakAlpha * 0.08f),
+                    1.00f to Color.Transparent,
+                    center = Offset(bx, by),
+                    radius = br,
+                ),
+                radius = br,
+                center = Offset(bx, by),
+            )
+        }
+
+        // While holding, a silky warm-ivory luminescence blooms organically upward from the strike line contact.
+        if (holding) {
+            val contactR = maxOf(rw * 1.15f, height * (0.34f + 0.28f * frac))
+            val contactAlpha = (0.48f + 0.26f * frac) * breath * alpha
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0.00f to IvoryHotCore.copy(alpha = contactAlpha),
+                    0.28f to SilkIvory.copy(alpha = contactAlpha * 0.72f),
+                    0.58f to SoftPeach.copy(alpha = contactAlpha * 0.30f),
+                    0.82f to CoralWarm.copy(alpha = contactAlpha * 0.08f),
+                    1.00f to Color.Transparent,
+                    center = Offset(x + sin(tSec * 3.1 + seed).toFloat() * rw * 0.12f, bottom),
+                    radius = contactR,
+                ),
+                radius = contactR,
+                center = Offset(x + sin(tSec * 3.1 + seed).toFloat() * rw * 0.12f, bottom),
+            )
+        }
+
+        // Ultra-subtle translucent glass glaze along the 11 o'clock edge for refined physical depth.
         drawRect(
             brush = Brush.horizontalGradient(
-                0.0f to Color.White.copy(alpha = (if (holding) 0.18f else 0.12f) * alpha),
-                0.24f to Color.White.copy(alpha = (if (holding) 0.08f else 0.04f) * alpha),
-                0.65f to Color.Transparent,
-                1.0f to Color.Transparent,
+                0.00f to Color.White.copy(alpha = (if (holding) 0.18f else 0.11f) * alpha),
+                0.18f to Color.White.copy(alpha = (if (holding) 0.06f else 0.03f) * alpha),
+                0.60f to Color.Transparent,
+                1.00f to Color.Transparent,
                 startX = left,
                 endX = left + rw,
             ),
@@ -156,74 +253,28 @@ internal fun DrawScope.performanceRibbon(
             size = Size(rw, height),
         )
 
-        // Delicate dual-phase upward travelling shimmer bands while holding.
-        if (holding && motion && height > 12.dp.toPx()) {
-            val travelSpan = height + 72.dp.toPx()
-            for (wave in 0..1) {
-                val period = if (wave == 0) 0.72 else 1.18
-                val phaseOffset = if (wave == 0) 0.0 else 0.43
-                val phase = ((tSec / period + phaseOffset) % 1.0).toFloat()
-                val bandCenterY = bottom + 24.dp.toPx() - phase * travelSpan
-                val bandHalfH = (if (wave == 0) 28.dp else 18.dp).toPx()
-                val fadeNearTail = (1f - phase * 0.75f).coerceIn(0.15f, 1f)
-                val peakAlpha = (if (wave == 0) 0.34f else 0.22f) * fadeNearTail * alpha
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        0.0f to Color.Transparent,
-                        0.45f to IvoryGlowWarm.copy(alpha = peakAlpha * 0.65f),
-                        0.55f to IvoryHotCore.copy(alpha = peakAlpha),
-                        1.0f to Color.Transparent,
-                        startY = bandCenterY - bandHalfH,
-                        endY = bandCenterY + bandHalfH,
-                    ),
-                    topLeft = Offset(left, bandCenterY - bandHalfH),
-                    size = Size(rw, bandHalfH * 2f),
-                )
-            }
-            // Fine inner vertical side rails pulsing softly with sustain energy.
-            val railBrush = Brush.verticalGradient(
-                0.0f to Color.Transparent,
-                0.45f to IvoryGlowWarm.copy(alpha = 0.22f * breath * alpha),
-                1.0f to IvoryHotCore.copy(alpha = 0.68f * breath * alpha),
-                startY = top,
-                endY = bottom,
-            )
-            val railW = 1.25.dp.toPx()
-            drawRect(brush = railBrush, topLeft = Offset(left + 1.dp.toPx(), top), size = Size(railW, height))
-            drawRect(brush = railBrush, topLeft = Offset(left + rw - railW - 1.dp.toPx(), top), size = Size(railW, height))
-        }
-
-        // Crisp Bauhaus start-edge ivory strike lip at the onset bottom of the unified pillar.
-        val lipHeight = (if (holding) 2.5.dp else 3.5.dp).toPx().coerceAtMost(height)
+        // Delicate, crisp Bauhaus onset ivory edge lip.
+        val lipHeight = (if (holding) 2.2.dp else 3.2.dp).toPx().coerceAtMost(height)
         drawRect(
-            color = (if (holding) IvoryHotCore else IvoryKeyTone).copy(alpha = (if (holding) 0.96f else 0.92f) * alpha),
+            color = (if (holding) IvoryHotCore else IvoryKeyTone).copy(alpha = (if (holding) 0.95f else 0.90f) * alpha),
             topLeft = Offset(left, bottom - lipHeight),
             size = Size(rw, lipHeight),
         )
-        // Subtle center guide notch just above the start lip when approaching.
-        if (!holding && height > 14.dp.toPx()) {
-            drawLine(
-                color = IvoryKeyTone.copy(alpha = 0.36f * alpha),
-                start = Offset(left + rw * 0.28f, bottom - lipHeight - 4.dp.toPx()),
-                end = Offset(left + rw * 0.72f, bottom - lipHeight - 4.dp.toPx()),
-                strokeWidth = 1.dp.toPx(),
-            )
-        }
     }
 
-    // 5. Crisp hairline border from clean warm tail to ivory onset edge.
+    // 4. Subtle translucent rim light wrapping the rounded silhouette cleanly.
     drawRoundRect(
         brush = Brush.verticalGradient(
-            0.0f to ApricotIvory.copy(alpha = (if (holding) 0.42f else 0.26f) * alpha),
-            0.50f to (if (holding) IvoryGlowWarm else color).copy(alpha = (if (holding) 0.56f else 0.34f) * alpha),
-            1.0f to IvoryKeyTone.copy(alpha = (if (holding) 0.90f else 0.68f) * alpha),
+            0.0f to SilkBlush.copy(alpha = (if (holding) 0.42f else 0.22f) * alpha),
+            0.55f to (if (holding) SilkIvory else color).copy(alpha = (if (holding) 0.54f else 0.28f) * alpha),
+            1.0f to IvoryKeyTone.copy(alpha = (if (holding) 0.86f else 0.62f) * alpha),
             startY = top,
             endY = bottom,
         ),
         topLeft = Offset(left, top),
         size = Size(rw, height),
         cornerRadius = radius,
-        style = Stroke(width = (if (holding) 1.1.dp else 0.85.dp).toPx()),
+        style = Stroke(width = (if (holding) 1.dp else 0.75.dp).toPx()),
     )
 }
 

@@ -177,6 +177,8 @@ internal fun MusicLanes(
                                 timeUs = timeUs,
                                 motion = motion,
                                 alphaScale = holdAlpha,
+                                seed = t.id + t.lane * 17,
+                                heldFraction = ui.holdFractions.getOrElse(t.id) { 0f },
                             )
                         }
                     } else if (t.flick) {
@@ -352,77 +354,96 @@ private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, alphaScale:
 
 private fun DrawScope.drawFlickNote(x: Float, y: Float, w: Float, alphaScale: Float) {
     val nw = w * NoteWidthRatio
-    val nh = 32.dp.toPx()
+    val nh = 30.dp.toPx()
     val left = x - nw * 0.5f
     val top = y - nh * 0.5f
     val alpha = alphaScale.coerceIn(0f, 1f)
-    val corner = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
+    val cornerPx = 3.dp.toPx()
+    val corner = CornerRadius(cornerPx, cornerPx)
 
-    // 11 o'clock cast shadow.
+    // Soft 11 o'clock cast shadow matching tap & hold notes seamlessly.
     drawRoundRect(
-        color = Color(0xFF0A0C0B).copy(alpha = 0.58f * alpha),
+        color = Color(0xFF0A0C0B).copy(alpha = 0.46f * alpha),
         topLeft = Offset(left + 1.5.dp.toPx(), top + 2.5.dp.toPx()),
         size = Size(nw, nh),
         cornerRadius = corner,
     )
-    // Monochrome matte charcoal Bauhaus body to contrast crisply against ivory taps and crimson holds.
+    // Silky luminous anodized crimson-coral keycap surface (refined gradient, zero muddiness).
     drawRoundRect(
-        brush = Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF282E2B).copy(alpha = alpha),
-                Color(0xFF1A1F1D).copy(alpha = alpha),
-                Color(0xFF141816).copy(alpha = alpha),
-            ),
-            startY = top,
-            endY = top + nh,
+        brush = Brush.linearGradient(
+            0.00f to Color(0xFFED6852).copy(alpha = alpha),
+            0.48f to Color(0xFFD43E35).copy(alpha = alpha),
+            1.00f to Color(0xFFB82A38).copy(alpha = alpha),
+            start = Offset(left, top),
+            end = Offset(left + nw, top + nh),
         ),
         topLeft = Offset(left, top),
         size = Size(nw, nh),
         cornerRadius = corner,
     )
-    // Crisp Swiss crimson bottom actuation lip + ivory top edge highlight.
-    val lip = 3.5.dp.toPx()
+    // Delicate upper specular rim + refined ivory front lip.
+    val lip = 3.dp.toPx()
     drawRoundRect(
-        color = CrimsonHighlight.copy(alpha = alpha),
+        color = Color(0xFFF9F2EA).copy(alpha = 0.92f * alpha),
         topLeft = Offset(left, top + nh - lip),
         size = Size(nw, lip),
         cornerRadius = corner,
     )
     drawLine(
-        color = IvoryKeyFace.copy(alpha = 0.72f * alpha),
-        start = Offset(left + 1.dp.toPx(), top + 1.dp.toPx()),
-        end = Offset(left + nw - 1.dp.toPx(), top + 1.dp.toPx()),
+        color = Color.White.copy(alpha = 0.58f * alpha),
+        start = Offset(left + 2.dp.toPx(), top + 1.dp.toPx()),
+        end = Offset(left + nw - 2.dp.toPx(), top + 1.dp.toPx()),
         strokeWidth = 1.dp.toPx(),
     )
-    // Dual Bauhaus upward chevrons (upper ivory + primary Swiss crimson) for instant flick recognition.
-    val chevW = nw * 0.22f
-    val chevH = 5.5.dp.toPx()
-    val upperPath = Path().apply {
-        moveTo(x - chevW, y - 0.5.dp.toPx())
-        lineTo(x, y - chevH - 0.5.dp.toPx())
-        lineTo(x + chevW, y - 0.5.dp.toPx())
-    }
-    drawPath(
-        path = upperPath,
-        color = IvoryKeyFace.copy(alpha = 0.92f * alpha),
-        style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Square, join = StrokeJoin.Miter),
+    // Soft radial inner lift behind the centered ivory directional glyph.
+    val cy = top + (nh - lip) * 0.54f
+    drawCircle(
+        brush = Brush.radialGradient(
+            0.0f to Color(0xFFFFEDE2).copy(alpha = 0.24f * alpha),
+            1.0f to Color.Transparent,
+            center = Offset(x, cy),
+            radius = nw * 0.34f,
+        ),
+        radius = nw * 0.34f,
+        center = Offset(x, cy),
     )
-    val lowerPath = Path().apply {
-        moveTo(x - chevW, y + 5.dp.toPx())
-        lineTo(x, y + 5.dp.toPx() - chevH)
-        lineTo(x + chevW, y + 5.dp.toPx())
+    // Refined, silky-rounded ivory upward chevron with subtle shadow & faint echo arc above.
+    val chevW = nw * 0.17f
+    val chevH = 5.2.dp.toPx()
+    val mainChev = Path().apply {
+        moveTo(x - chevW, cy + chevH * 0.45f)
+        lineTo(x, cy - chevH * 0.55f)
+        lineTo(x + chevW, cy + chevH * 0.45f)
     }
     drawPath(
-        path = lowerPath,
-        color = CrimsonHighlight.copy(alpha = alpha),
-        style = Stroke(width = 2.1.dp.toPx(), cap = StrokeCap.Square, join = StrokeJoin.Miter),
+        path = mainChev,
+        color = Color(0xFF420D12).copy(alpha = 0.24f * alpha),
+        style = Stroke(width = 2.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+    )
+    drawPath(
+        path = mainChev,
+        color = IvoryKeyFace.copy(alpha = 0.96f * alpha),
+        style = Stroke(width = 1.85.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+    )
+    val echoW = nw * 0.105f
+    val echoH = 3.dp.toPx()
+    val echoY = cy - 4.2.dp.toPx()
+    val echoChev = Path().apply {
+        moveTo(x - echoW, echoY + echoH * 0.45f)
+        lineTo(x, echoY - echoH * 0.55f)
+        lineTo(x + echoW, echoY + echoH * 0.45f)
+    }
+    drawPath(
+        path = echoChev,
+        color = IvoryKeyFace.copy(alpha = 0.46f * alpha),
+        style = Stroke(width = 1.15.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
     )
     drawRoundRect(
-        color = IvoryKeyFace.copy(alpha = 0.68f * alpha),
+        color = Color.White.copy(alpha = 0.26f * alpha),
         topLeft = Offset(left, top),
         size = Size(nw, nh),
         cornerRadius = corner,
-        style = Stroke(width = 0.9.dp.toPx()),
+        style = Stroke(width = 0.75.dp.toPx()),
     )
 }
 
