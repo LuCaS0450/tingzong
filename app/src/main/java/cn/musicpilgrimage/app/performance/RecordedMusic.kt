@@ -36,7 +36,7 @@ internal data class RecordedMusic(val sampleRate:Int,val variants:Map<Double,Str
         require(kotlin.math.abs(expectedFrames.toDouble()/sampleRate*speed*1e6-song.durationUs)<=20_000){"歌曲音频与谱面时长不一致"}
         val spec=files[name]
         fun verifiedOpus() = opus?.takeIf { localDirectory != null && speed == 1.0 }?.let { expected ->
-            File(localDirectory, "${expected.sha256}.ogg").takeIf { AudioHttpTransfer.valid(it, expected) }
+            File(localDirectory, "${expected.sha256}.ogg").takeIf { PerformanceAudioStore.isVerifiedOpusBlob(it, expected) }
                 ?: File(localDirectory, OPUS_FILENAME).takeIf { AudioHttpTransfer.valid(it, expected) }
         }
         var opusFile = verifiedOpus()
@@ -51,7 +51,9 @@ internal data class RecordedMusic(val sampleRate:Int,val variants:Map<Double,Str
             val opusFrames = kotlin.math.round(song.durationUs / 1e6 * OpusPcmDecoder.SAMPLE_RATE).toLong()
             require(opusFrames in 1..MAX_PCM_BYTES / 8) { "歌曲音频过大" }
             val pcm = OpusPcmDecoder.decode(checkNotNull(opusFile), opusFrames.toInt())
+            val tJni = android.os.SystemClock.elapsedRealtime()
             check(engine.setBacking(engine.handle, OpusPcmDecoder.SAMPLE_RATE, speed, pcm)) { "歌曲音频无法读取" }
+            android.util.Log.i("PerformanceTiming", "JNI setBacking ${song.id}: ${android.os.SystemClock.elapsedRealtime() - tJni}ms")
             return
         }
         val (pcm,actualSha256)=decodeSamples(input,expectedFrames)

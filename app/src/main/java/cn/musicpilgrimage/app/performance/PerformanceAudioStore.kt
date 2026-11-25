@@ -45,14 +45,14 @@ internal class PerformanceAudioStore(private val root: File) {
 
     fun verifiedOpusDirectory(opus: CloudOpusRef): File? = synchronized(lock) {
         val spec = RecordingFile(opus.bytes, opus.sha256)
-        if (AudioHttpTransfer.valid(opusBlob(spec), spec)) blobsDir else null
+        if (isVerifiedOpusBlob(opusBlob(spec), spec)) blobsDir else null
     }
 
     fun verifiedDownloadDirectory(song: SongPackage): File? = synchronized(lock) {
         val recording = song.recording?.takeIf { it.local } ?: return@synchronized null
         val opus = recording.opus
         if (opus != null) {
-            if (AudioHttpTransfer.valid(opusBlob(opus), opus)) return@synchronized blobsDir
+            if (isVerifiedOpusBlob(opusBlob(opus), opus)) return@synchronized blobsDir
             val legacyDir = legacyFolder(song)
             if (AudioHttpTransfer.valid(File(legacyDir, RecordedMusic.OPUS_FILENAME), opus)) {
                 return@synchronized legacyDir
@@ -63,14 +63,26 @@ internal class PerformanceAudioStore(private val root: File) {
         return@synchronized legacyFolder(song).takeIf { AudioHttpTransfer.valid(File(it, name), spec) }
     }
 
+    fun partialForOpus(spec: RecordingFile): File =
+        File(blobsDir.apply { mkdirs() }, "${spec.sha256}.ogg.part")
+
     fun partial(song: SongPackage): File {
         val recording = checkNotNull(song.recording?.takeIf { it.local })
         val opus = recording.opus
         if (opus != null) {
-            return File(blobsDir.apply { mkdirs() }, "${opus.sha256}.ogg.part")
+            return partialForOpus(opus)
         }
         val (name, _) = checkNotNull(recording.downloadFile)
         return File(legacyFolder(song).apply { mkdirs() }, "$name.part")
+    }
+
+    /** Installs a part file already verified by AudioHttpTransfer.download into blobs/<sha256>.ogg via atomic rename. */
+    fun installVerifiedOpus(spec: RecordingFile, part: File): File = synchronized(lock) {
+        require(part.isFile && part.length() == spec.bytes) { "音乐文件校验未通过" }
+        val target = opusBlob(spec)
+        moveOrCopyAtomic(part, target)
+        markVerifiedBlob(target, spec)
+        blobsDir
     }
 
     fun installDownloaded(song: SongPackage, part: File): Unit = synchronized(lock) {
@@ -82,8 +94,9 @@ internal class PerformanceAudioStore(private val root: File) {
         } else {
             File(legacyFolder(song), name)
         }
-        atomicCopyAndDelete(part, target)
+        moveOrCopyAtomic(part, target)
         if (recording.opus != null) {
+            markVerifiedBlob(target, recording.opus)
             val legacyDir = legacyFolder(song)
             for (legacyName in recording.files.keys) {
                 File(legacyDir, legacyName).delete()
@@ -160,6 +173,36 @@ internal class PerformanceAudioStore(private val root: File) {
 
     companion object {
         private val lock = Any()
+        private val verifiedBlobs = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Long>>()
+
+        internal fun isVerifiedOpusBlob(file: File, spec: RecordingFile): Boolean {
+            if (!file.isFile || file.length() != spec.bytes) return false
+            val key = "${file.absolutePath}|${spec.sha256}"
+            val cached = verifiedBlobs[key]
+            val mod = file.lastModified()
+            if (cached != null && cached.first == spec.bytes && cached.second == mod) return true
+            if (!AudioHttpTransfer.valid(file, spec)) return false
+            verifiedBlobs[key] = spec.bytes to mod
+            return true
+        }
+
+        private fun markVerifiedBlob(file: File, spec: RecordingFile) {
+            verifiedBlobs["${file.absolutePath}|${spec.sha256}"] = spec.bytes to file.lastModified()
+        }
+
+        private fun moveOrCopyAtomic(source: File, target: File) {
+            val parent = requireNotNull(target.parentFile)
+            check(parent.mkdirs() || parent.isDirectory) { "无法保存歌曲音源" }
+            if (source.parentFile?.canonicalPath == parent.canonicalPath) {
+                try {
+                    moveAtomic(source, target)
+                    return
+                } catch (_: Exception) {
+                    // Fall back to copy+rename if cross-device or move fails.
+                }
+            }
+            atomicCopyAndDelete(source, target)
+        }
 
         private fun atomicCopyAndDelete(source: File, target: File) {
             val parent = requireNotNull(target.parentFile)

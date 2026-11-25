@@ -285,7 +285,6 @@ internal class PerformanceCatalogStore(private val root: File) {
             try {
                 FileOutputStream(temp).use { out ->
                     out.write(bytes)
-                    out.fd.sync()
                 }
                 try {
                     Files.move(
@@ -305,10 +304,19 @@ internal class PerformanceCatalogStore(private val root: File) {
     }
 }
 
+internal object PerformanceHttp {
+    val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(45, TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
+}
+
 internal class PerformanceCatalogSync(
     private val store: PerformanceCatalogStore,
     private val catalogBaseUrl: String = defaultBaseUrl(),
-    private val client: OkHttpClient = defaultClient,
+    private val client: OkHttpClient = PerformanceHttp.client,
     private val requireHttps: Boolean = true,
 ) {
     private fun validatedBaseUrl(): String {
@@ -408,12 +416,6 @@ internal class PerformanceCatalogSync(
     }
 
     companion object {
-        private val defaultClient = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .callTimeout(45, TimeUnit.SECONDS)
-            .build()
-
         fun defaultBaseUrl(): String =
             BuildConfig.SUPABASE_URL.trimEnd('/') + "/storage/v1/object/public/performance-catalog"
 

@@ -52,7 +52,7 @@ class PerformanceAudioDownloadWorker(context:Context,parameters:WorkerParameters
     companion object {
         internal const val TAG="performance-audio-download"
         internal fun opusTag(song: SongPackage) = song.recording?.opus?.let { "audio-opus:${it.sha256}" }
-        private val client=OkHttpClient.Builder().connectTimeout(20,TimeUnit.SECONDS).readTimeout(45,TimeUnit.SECONDS).build()
+        private val client get() = PerformanceHttp.client
         internal suspend fun enqueue(context:Context,song:SongPackage,mobileAllowed:Boolean)=withContext(Dispatchers.IO) {
             val manager=WorkManager.getInstance(context)
             val opus = opusTag(song)
@@ -103,6 +103,7 @@ internal object AudioHttpTransfer {
                 require(match.groupValues[1].toLong()==offset&&match.groupValues[3].toLong()==spec.bytes){"Audio range does not match"}
             }
             val start=if(resumed)offset else 0L
+            val streamDigest=if(start==0L)MessageDigest.getInstance("SHA-256") else null
             RandomAccessFile(part,"rw").use{output->
                 if(!resumed)output.setLength(0)
                 output.seek(start);var copied=start
@@ -111,16 +112,22 @@ internal object AudioHttpTransfer {
                     while(true){
                         val count=input.read(buffer);if(count<0)break
                         require(copied+count<=spec.bytes){"Audio exceeds trusted size"}
-                        output.write(buffer,0,count);copied+=count;onProgress(copied)
+                        output.write(buffer,0,count)
+                        streamDigest?.update(buffer,0,count)
+                        copied+=count;onProgress(copied)
                     }
                 }
-                output.fd.sync()
             }
-        }
-        if(!valid(part,spec)) {
-            // Retain interrupted prefixes, discard complete corrupt responses.
-            if(part.length()>=spec.bytes)part.delete()
-            throw IOException("音乐文件校验未通过，正在重新准备")
+            val verified=if(streamDigest!=null) {
+                part.length()==spec.bytes && streamDigest.digest().joinToString(""){"%02x".format(it)}==spec.sha256
+            } else {
+                valid(part,spec)
+            }
+            if(!verified) {
+                // Retain interrupted prefixes, discard complete corrupt responses.
+                if(part.length()>=spec.bytes)part.delete()
+                throw IOException("音乐文件校验未通过，正在重新准备")
+            }
         }
     }
 }

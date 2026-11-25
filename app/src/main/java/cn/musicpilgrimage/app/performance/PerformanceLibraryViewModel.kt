@@ -10,12 +10,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import cn.musicpilgrimage.app.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -240,7 +244,7 @@ internal class PerformanceLibraryViewModel(application: Application) : AndroidVi
         }
     }
 
-    /** Downloads and verifies only the selected song's chart (~55 KB) and audio (~1.3 MB) on demand. */
+    /** Downloads and verifies the selected song's chart (~80 KB) and audio (~1.3 MB) in parallel over a warm HTTP/2 pool. */
     fun prepareSong(songId: String, retry: Boolean = false) {
         val currentItem = mutable.value.items.find { it.id == songId } ?: return
         if (currentItem.entry?.audioReady == true) return
@@ -259,15 +263,88 @@ internal class PerformanceLibraryViewModel(application: Application) : AndroidVi
         if (retry) mutable.value = mutable.value.copy(error = null)
 
         viewModelScope.launch {
+            val startedAt = SystemClock.elapsedRealtime()
             try {
                 val track = currentItem.track
-                val hydratedEntry: PerformanceEntry = currentItem.entry ?: run {
-                    requireNotNull(track) { "曲目清单信息不可用" }
-                    mutable.value = mutable.value.copy(
-                        downloads = mutable.value.downloads + (songId to AudioDownloadState("正在获取谱面")),
+                mutable.value = mutable.value.copy(
+                    downloads = mutable.value.downloads + (
+                        songId to AudioDownloadState(
+                            if (needsAudioDownload) "正在准备 0%" else "正在加载音乐",
+                            if (needsAudioDownload) 0f else null,
+                        )
+                    ),
+                )
+
+                val (song, audioDir) = coroutineScope {
+                    val chartJob = async(Dispatchers.IO) {
+                        val t0 = SystemClock.elapsedRealtime()
+                        val loaded = currentItem.entry?.song ?: run {
+                            requireNotNull(track) { "曲目清单信息不可用" }
+                            catalogSync.ensureChart(track)
+                        }
+                        Log.i("PerformanceTiming", "Chart ready ${loaded.id}: ${SystemClock.elapsedRealtime() - t0}ms")
+                        loaded
+                    }
+
+                    val audioJob = async(Dispatchers.IO) {
+                        val t0 = SystemClock.elapsedRealtime()
+                        val opusSpec: RecordingFile? = track?.opus?.let { RecordingFile(it.bytes, it.sha256) }
+                            ?: currentItem.entry?.song?.recording?.opus
+                        if (opusSpec != null) {
+                            val existing = track?.let { store.verifiedOpusDirectory(it.opus) }
+                                ?: currentItem.entry?.song?.let { store.verifiedDownloadDirectory(it) }
+                            if (existing != null) {
+                                Log.i("PerformanceTiming", "Audio cache hit $songId: ${SystemClock.elapsedRealtime() - t0}ms")
+                                return@async existing
+                            }
+                            val base = BuildConfig.SUPABASE_URL.trimEnd('/') + "/storage/v1/object/public/performance-audio/excerpt"
+                            check(base.startsWith("https://")) { "音乐下载服务尚未配置" }
+                            val part = store.partialForOpus(opusSpec)
+                            val job = currentCoroutineContext()
+                            var lastUiMs = 0L
+                            AudioHttpTransfer.download(
+                                PerformanceHttp.client,
+                                "$base/${opusSpec.sha256}.ogg",
+                                part,
+                                opusSpec,
+                            ) { copied ->
+                                job.ensureActive()
+                                val now = SystemClock.elapsedRealtime()
+                                if (now - lastUiMs >= 60L || copied >= opusSpec.bytes) {
+                                    lastUiMs = now
+                                    val fraction = (copied.toFloat() / opusSpec.bytes).coerceIn(0f, 1f)
+                                    val pct = (fraction * 100).toInt()
+                                    mutable.update { state ->
+                                        state.copy(
+                                            downloads = state.downloads + (
+                                                songId to AudioDownloadState("正在准备 $pct%", fraction)
+                                            ),
+                                        )
+                                    }
+                                }
+                            }
+                            job.ensureActive()
+                            val dir = store.installVerifiedOpus(opusSpec, part)
+                            Log.i("PerformanceTiming", "Audio downloaded $songId (${opusSpec.bytes}B): ${SystemClock.elapsedRealtime() - t0}ms")
+                            dir
+                        } else {
+                            null
+                        }
+                    }
+
+                    val resolvedSong = chartJob.await()
+                    val resolvedDir = audioJob.await() ?: withContext(Dispatchers.IO) {
+                        store.verifiedDownloadDirectory(resolvedSong)
+                    }
+                    resolvedSong to resolvedDir
+                }
+
+                if (audioDir != null) {
+                    val readyEntry = PerformanceEntry(
+                        song = song,
+                        audioDirectory = audioDir,
+                        downloadReady = true,
                     )
-                    val song = withContext(Dispatchers.IO) { catalogSync.ensureChart(track) }
-                    val entry = withContext(Dispatchers.IO) { buildEntry(song) }
                     updateSingleItem(songId) { item ->
                         item.copy(
                             title = item.title.ifBlank { song.title },
@@ -275,22 +352,25 @@ internal class PerformanceLibraryViewModel(application: Application) : AndroidVi
                             durationUs = if (item.durationUs > 0L) item.durationUs else song.durationUs,
                             placeIds = item.placeIds.ifEmpty { song.placeIds },
                             chartReady = true,
-                            audioReady = entry.audioReady,
-                            entry = entry,
+                            audioReady = readyEntry.audioReady,
+                            entry = readyEntry,
                         )
                     }
-                    entry
-                }
-
-                if (hydratedEntry.audioReady) {
                     mutable.value = mutable.value.copy(downloads = mutable.value.downloads - songId)
+                    Log.i("PerformanceTiming", "Song prepared $songId total: ${SystemClock.elapsedRealtime() - startedAt}ms")
                     return@launch
                 }
 
-                mutable.value = mutable.value.copy(
-                    downloads = mutable.value.downloads + (songId to AudioDownloadState("正在准备音频")),
-                )
-                PerformanceAudioDownloadWorker.enqueue(getApplication(), hydratedEntry.song, mobileAllowed)
+                // Fallback for legacy non-opus entries
+                val entry = withContext(Dispatchers.IO) { buildEntry(song) }
+                updateSingleItem(songId) { item ->
+                    item.copy(chartReady = true, audioReady = entry.audioReady, entry = entry)
+                }
+                if (entry.audioReady) {
+                    mutable.value = mutable.value.copy(downloads = mutable.value.downloads - songId)
+                } else {
+                    PerformanceAudioDownloadWorker.enqueue(getApplication(), entry.song, mobileAllowed)
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
