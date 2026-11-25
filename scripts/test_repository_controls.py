@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from check_public_repository import audit, git, path_problem, scan_content
-from sync_private_materials import private_git, sync
+from sync_private_materials import _walk_candidates, private_git, sync
 
 
 def fixture(root):
@@ -86,6 +86,21 @@ class RepositoryControlsTest(unittest.TestCase):
                         'https://github.com/example/never-push.git')
             with self.assertRaisesRegex(RuntimeError, 'has a remote'):
                 sync(root, 'must refuse')
+
+    def test_python_fallback_walk_respects_ignore_rules(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / '.ignore').write_text('**/build/\n**/__pycache__/\n*.log\n', encoding='utf-8')
+            (root / 'content/ok').mkdir(parents=True)
+            (root / 'content/ok/song.json').write_text('{}', encoding='utf-8')
+            (root / 'content/ok/debug.log').write_text('log', encoding='utf-8')
+            (root / 'content/build').mkdir(parents=True)
+            (root / 'content/build/out.json').write_text('{}', encoding='utf-8')
+            (root / 'scripts/__pycache__').mkdir(parents=True)
+            (root / 'scripts/__pycache__/x.pyc').write_bytes(b'0')
+            (root / 'scripts/tool.py').write_text('print(1)\n', encoding='utf-8')
+            found = _walk_candidates(root, ['content', 'scripts'])
+            self.assertEqual(found, {'content/ok/song.json', 'scripts/tool.py'})
 
 
 if __name__ == '__main__':

@@ -1,7 +1,10 @@
 """Snapshot excluded project materials locally; never upload or copy working files."""
 import argparse
+import fnmatch
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -11,17 +14,79 @@ DIRECTORIES = ('content', 'docs', 'scripts', 'app/src', 'app/schemas')
 ROOT_SUFFIXES = {'.py', '.json', '.txt', '.cmd'}
 
 
+def _load_ignore_rules(root):
+    ignore_file = root / '.ignore'
+    dir_rules = []
+    file_rules = []
+    if not ignore_file.is_file():
+        return dir_rules, file_rules
+    for raw in ignore_file.read_text(encoding='utf-8').splitlines():
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        is_dir = line.endswith('/')
+        pattern = line.rstrip('/')
+        anchored = pattern.startswith('/')
+        if anchored:
+            pattern = pattern.lstrip('/')
+        if is_dir:
+            dir_rules.append((anchored, pattern))
+        else:
+            file_rules.append((anchored, pattern))
+    return dir_rules, file_rules
+
+
+def _matches_rule(rel_posix, name, anchored, pattern):
+    if anchored:
+        return fnmatch.fnmatch(rel_posix, pattern)
+    if pattern.startswith('**/'):
+        sub = pattern[3:]
+        return fnmatch.fnmatch(name, sub) or fnmatch.fnmatch(rel_posix, pattern) or fnmatch.fnmatch(rel_posix, sub)
+    if '/' in pattern:
+        return fnmatch.fnmatch(rel_posix, pattern) or fnmatch.fnmatch(rel_posix, '*/' + pattern)
+    return fnmatch.fnmatch(name, pattern)
+
+
+def _walk_candidates(root, directories):
+    dir_rules, file_rules = _load_ignore_rules(root)
+    files = set()
+    for base in directories:
+        base_path = root / base
+        for current, dirnames, filenames in os.walk(base_path):
+            current_path = Path(current)
+            rel_dir = current_path.relative_to(root).as_posix()
+            kept_dirs = []
+            for d in dirnames:
+                if d == '.git':
+                    continue
+                child_rel = f'{rel_dir}/{d}' if rel_dir != '.' else d
+                if any(_matches_rule(child_rel, d, anc, pat) for anc, pat in dir_rules):
+                    continue
+                kept_dirs.append(d)
+            dirnames[:] = kept_dirs
+            for f in filenames:
+                file_rel = f'{rel_dir}/{f}' if rel_dir != '.' else f
+                if any(_matches_rule(file_rel, f, anc, pat) for anc, pat in file_rules):
+                    continue
+                files.add(file_rel)
+    return files
+
+
 def candidates(root):
     directories = [name for name in DIRECTORIES if (root / name).is_dir()]
     # Only these explicit material/source directories bypass VCS ignores.
     # .ignore still excludes caches, outputs and dependency directories.
-    result = subprocess.run(
-        ['rg', '--files', '--hidden', '--no-ignore-vcs', '-g', '!**/.git/**',
-         *directories], cwd=root, capture_output=True,
-    )
-    if result.returncode not in (0, 1):
-        raise RuntimeError('Could not enumerate material directories with rg')
-    files = {name.replace('\\', '/') for name in result.stdout.decode('utf-8').splitlines()}
+    rg_bin = shutil.which('rg')
+    if rg_bin:
+        result = subprocess.run(
+            [rg_bin, '--files', '--hidden', '--no-ignore-vcs', '-g', '!**/.git/**',
+             *directories], cwd=root, capture_output=True,
+        )
+        if result.returncode not in (0, 1):
+            raise RuntimeError('Could not enumerate material directories with rg')
+        files = {name.replace('\\', '/') for name in result.stdout.decode('utf-8').splitlines()}
+    else:
+        files = _walk_candidates(root, directories)
     files.update(path.name for path in root.iterdir() if path.is_file()
                  and path.suffix.lower() in ROOT_SUFFIXES
                  and not path.name.startswith('output_'))
