@@ -12,22 +12,25 @@ import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.gestures.snapTo
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -36,10 +39,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.*
 import cn.musicpilgrimage.app.MusicTripState
 import cn.musicpilgrimage.app.MusicTripViewModel
@@ -59,25 +59,74 @@ import java.time.format.DateTimeFormatter
     val deleting=state.trips.find{it.id==deleteId}
     LazyColumn(
         Modifier.fillMaxSize().testTag("room-trips"),
-        contentPadding = PaddingValues(24.dp, 14.dp, 24.dp, 28.dp),
+        contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Text("出发的日子", Modifier.weight(1f), fontSize = 25.sp, fontWeight = FontWeight.SemiBold, color = RoomColors.Ink)
+            Row(
+                Modifier.fillMaxWidth().padding(bottom = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        "出发的日子",
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = (-0.3).sp,
+                        color = RoomColors.Ink,
+                    )
+                    if (state.trips.isNotEmpty()) {
+                        Text(
+                            "${state.trips.size} 个行程",
+                            fontSize = 13.sp,
+                            color = RoomColors.Muted,
+                        )
+                    }
+                }
                 SwissButton(
                     onClick = { vm.dismissError(); create = true; revealedId = null },
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    modifier = Modifier.heightIn(min = 40.dp),
                     enabled = !state.busy,
+                    shape = TripPrimaryButtonShape,
                     colors = ButtonDefaults.buttonColors(containerColor = RoomColors.Red, contentColor = RoomColors.Paper),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                ) { Text("新建行程") }
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp),
+                ) {
+                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("新建行程", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
-        if(state.busy)item{LinearProgressIndicator(Modifier.fillMaxWidth(),color=RoomColors.Navy)}
-        if(state.error!=null&&deleting==null)item{TripError(state.error)}
-        if(state.trips.isEmpty()&&!state.busy)item{Text("还没有行程。先选出行日期，再把喜欢的地点安排到每天。",fontSize=14.sp,lineHeight=23.sp,color=RoomColors.Muted)}
+        if(state.busy)item{LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(99.dp)),color=RoomColors.Navy)}
+        if(state.error!=null&&deleting==null)item{
+            Box(
+                Modifier.fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(RoomColors.Red.copy(alpha = 0.08f))
+                    .border(0.8.dp, RoomColors.Red.copy(alpha = 0.22f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                TripError(state.error)
+            }
+        }
+        if(state.trips.isEmpty()&&!state.busy)item{
+            Box(
+                Modifier.fillMaxWidth()
+                    .clip(TripCardShape)
+                    .background(tripBoardFace)
+                    .border(0.8.dp, RoomColors.Line.copy(alpha = 0.78f), TripCardShape)
+                    .padding(horizontal = 18.dp, vertical = 20.dp),
+            ) {
+                Text(
+                    "还没有行程。先选出行日期，再把喜欢的地点安排到每天。",
+                    fontSize = 14.sp,
+                    lineHeight = 23.sp,
+                    color = RoomColors.Muted,
+                )
+            }
+        }
         items(state.trips,key={it.id}){trip->
             TripSwipeRow(trip,revealedId==trip.id,!state.busy,{revealed->
                 if(revealed)revealedId=trip.id else if(revealedId==trip.id)revealedId=null
@@ -101,8 +150,16 @@ import java.time.format.DateTimeFormatter
 
 private enum class TripRowPosition { Closed, Delete }
 
+private val TripCardShape = RoundedCornerShape(16.dp)
+private val TripPrimaryButtonShape = RoundedCornerShape(12.dp)
+private val TripDaysBadgeShape = RoundedCornerShape(8.dp)
+
 private val tripBoardFace = Brush.verticalGradient(
-    listOf(lerp(RoomColors.Paper, Color.White, .66f), lerp(RoomColors.Paper, AppArt.Sand, .24f))
+    listOf(lerp(RoomColors.Paper, Color.White, .88f), lerp(RoomColors.Paper, AppArt.Sand, .12f))
+)
+
+private val tripCardBorder = Brush.verticalGradient(
+    listOf(Color.White.copy(alpha = .94f), RoomColors.Line.copy(alpha = .85f))
 )
 
 @Composable private fun TripSwipeRow(
@@ -120,6 +177,9 @@ private val tripBoardFace = Brush.verticalGradient(
     val scope=rememberCoroutineScope()
     val reportReveal by rememberUpdatedState(onReveal)
     val actionExposed=swipe.settledValue==TripRowPosition.Delete
+    val destinations = remember(trip.cities) {
+        trip.cities.distinctBy { it.pickerKey }.joinToString(" · ") { it.label }
+    }
     LaunchedEffect(swipe) {
         snapshotFlow{swipe.settledValue}.collect{reportReveal(it==TripRowPosition.Delete)}
     }
@@ -131,41 +191,122 @@ private val tripBoardFace = Brush.verticalGradient(
     Box(Modifier.fillMaxWidth().anchoredDraggable(
         swipe,reverseDirection=false,orientation=Orientation.Horizontal,enabled=enabled
     )) {
-        Box(Modifier.matchParentSize().background(RoomColors.Red),contentAlignment=Alignment.CenterEnd) {
+        Box(
+            Modifier.matchParentSize()
+                .graphicsLayer {
+                    val offsetPx = swipe.offset.takeUnless(Float::isNaN) ?: 0f
+                    alpha = ((-offsetPx) / 8.dp.toPx()).coerceIn(0f, 1f)
+                }
+                .clip(TripCardShape)
+                .background(RoomColors.Red),
+            contentAlignment=Alignment.CenterEnd,
+        ) {
             if(actionExposed)IconButton(onDelete,Modifier.width(actionWidth).testTag("trip-delete-${trip.id}"),enabled=enabled) {
                 Icon(Icons.Outlined.DeleteOutline,"删除${trip.displayName}",tint=RoomColors.Paper)
             } else Box(Modifier.width(actionWidth),contentAlignment=Alignment.Center) {
                 Icon(Icons.Outlined.DeleteOutline,null,tint=RoomColors.Paper)
             }
         }
-        Box(Modifier.fillMaxWidth().swipeCardOffset { swipe.requireOffset() }
-            .shadow(3.dp, RectangleShape, clip = false)
-            .background(tripBoardFace)
-            .border(0.5.dp, RoomColors.Line.copy(alpha = .86f))
-            .drawBehind {
-                val edge = 1.dp.toPx()
-                drawLine(Color.White, Offset(edge, edge), Offset(size.width - edge, edge), edge)
-                drawLine(RoomColors.Line, Offset(edge, size.height - edge), Offset(size.width - edge, size.height - edge), edge)
-            }
-            .testTag("trip-row-${trip.id}")
-            .clickable(enabled=enabled,role=Role.Button) {
-                if (!actionExposed) onOpen()
-                else scope.launch {
-                    if (motion) swipe.animateTo(TripRowPosition.Closed) else swipe.snapTo(TripRowPosition.Closed)
-                }
-            }.semantics {
-                if(enabled)customActions=listOf(CustomAccessibilityAction("删除行程"){onDelete();true})
-            }) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(trip.displayName, fontSize = 21.sp, fontWeight = FontWeight.SemiBold, color = RoomColors.Ink)
-                Text(buildAnnotatedString {
-                    append("${trip.start} — ${trip.end} · ")
-                    withStyle(SpanStyle(color = RoomColors.Red, fontWeight = FontWeight.SemiBold)) {
-                        append("${trip.days} 天")
+        Box(
+            Modifier.fillMaxWidth().swipeCardOffset { swipe.requireOffset() }
+                .shadow(
+                    elevation = 4.dp,
+                    shape = TripCardShape,
+                    ambientColor = RoomColors.Ink.copy(alpha = 0.08f),
+                    spotColor = RoomColors.Ink.copy(alpha = 0.14f),
+                    clip = false,
+                )
+                .clip(TripCardShape)
+                .background(tripBoardFace)
+                .border(0.8.dp, tripCardBorder, TripCardShape)
+                .testTag("trip-row-${trip.id}")
+                .clickable(enabled=enabled,role=Role.Button) {
+                    if (!actionExposed) onOpen()
+                    else scope.launch {
+                        if (motion) swipe.animateTo(TripRowPosition.Closed) else swipe.snapTo(TripRowPosition.Closed)
                     }
-                }, fontSize = 13.sp, color = RoomColors.Muted)
-                Text(trip.cities.distinctBy{it.pickerKey}.joinToString(" · "){it.label},fontSize=14.sp,color=RoomColors.Ink)
+                }.semantics {
+                    if(enabled)customActions=listOf(CustomAccessibilityAction("删除行程"){onDelete();true})
+                },
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            trip.displayName,
+                            Modifier.weight(1f),
+                            fontSize = 19.sp,
+                            lineHeight = 25.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = RoomColors.Ink,
+                        )
+                        Box(
+                            Modifier
+                                .clip(TripDaysBadgeShape)
+                                .background(RoomColors.Red.copy(alpha = 0.09f))
+                                .padding(horizontal = 9.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                "${trip.days} 天",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = RoomColors.Red,
+                            )
+                        }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.CalendarToday,
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp),
+                            tint = RoomColors.Muted.copy(alpha = 0.78f),
+                        )
+                        Text(
+                            "${trip.start} — ${trip.end}",
+                            fontSize = 13.sp,
+                            letterSpacing = 0.2.sp,
+                            color = RoomColors.Muted,
+                        )
+                    }
+                }
+                if (destinations.isNotBlank()) {
+                    HorizontalDivider(thickness = 0.5.dp, color = RoomColors.Line.copy(alpha = 0.55f))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Place,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp),
+                            tint = RoomColors.Red.copy(alpha = 0.78f),
+                        )
+                        Text(
+                            destinations,
+                            Modifier.weight(1f),
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            color = RoomColors.Ink.copy(alpha = 0.9f),
+                        )
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = RoomColors.Muted.copy(alpha = 0.55f),
+                        )
+                    }
+                }
             }
         }
     }
