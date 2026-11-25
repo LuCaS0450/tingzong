@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -76,6 +79,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.musicpilgrimage.app.data.ReleaseArtwork
+import cn.musicpilgrimage.app.design.AppPreferences
 import cn.musicpilgrimage.app.ui.AppNavEasing
 import cn.musicpilgrimage.app.ui.LocalPhysicalMotion
 import cn.musicpilgrimage.app.ui.room.BauhausBottomFooter
@@ -92,6 +96,7 @@ import cn.musicpilgrimage.app.ui.room.tiledMaterial
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private val ConsoleBaseDark = Color(0xFF141715)
 private val ConsoleSurfaceEbony = Color(0xFF1D211F)
@@ -508,9 +513,18 @@ internal fun PerformanceScreen(
                     Spacer(Modifier.height(14.dp))
                     CircularProgressIndicator(Modifier.size(24.dp), color = ConsoleCrimson, strokeWidth = 2.dp)
                 }
-                Spacer(Modifier.height(18.dp))
+                if (ui.state in listOf(PlayState.READY, PlayState.PAUSED) && controller.options.mode != PlayMode.LISTEN) {
+                    Spacer(Modifier.height(14.dp))
+                    HorizontalDivider(color = ModalCardDivider)
+                    Spacer(Modifier.height(12.dp))
+                    BauhausOffsetControl(
+                        offsetMs = ui.audioVisualOffsetMs,
+                        onOffsetChange = controller::setAudioVisualOffsetMs,
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
                 HorizontalDivider(color = ModalCardDivider)
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(16.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (ui.state !in listOf(PlayState.FAILED, PlayState.RECOVERING)) {
                         PerformancePanelButton(
@@ -635,6 +649,102 @@ private fun PerformancePanelSecondaryButton(label: String, tag: String, onClick:
             text = label,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun BauhausOffsetControl(
+    offsetMs: Int,
+    onOffsetChange: (Int) -> Unit,
+) {
+    val valueText = when {
+        offsetMs > 0 -> "+${offsetMs}ms"
+        offsetMs < 0 -> "${offsetMs}ms"
+        else -> "0ms"
+    }
+    val hintText = when {
+        offsetMs > 0 -> "音符提前 ${offsetMs}ms"
+        offsetMs < 0 -> "音符延后 ${-offsetMs}ms"
+        else -> "默认同步（觉得音符慢就向右调）"
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("performance-offset-control"),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "音画偏移",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ModalCardInk,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = "−",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ModalCardInk,
+                    modifier = Modifier
+                        .border(1.dp, ModalCardDivider, RoundedCornerShape(1.5.dp))
+                        .clickable { onOffsetChange((offsetMs - 10).coerceIn(AppPreferences.MIN_AV_OFFSET_MS, AppPreferences.MAX_AV_OFFSET_MS)) }
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .testTag("performance-offset-minus"),
+                )
+                Text(
+                    text = valueText,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (offsetMs == 0) ModalCardInk else ConsoleCrimson,
+                    style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
+                    modifier = Modifier
+                        .clickable { onOffsetChange(0) }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                        .testTag("performance-offset-value"),
+                )
+                Text(
+                    text = "+",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ModalCardInk,
+                    modifier = Modifier
+                        .border(1.dp, ModalCardDivider, RoundedCornerShape(1.5.dp))
+                        .clickable { onOffsetChange((offsetMs + 10).coerceIn(AppPreferences.MIN_AV_OFFSET_MS, AppPreferences.MAX_AV_OFFSET_MS)) }
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                        .testTag("performance-offset-plus"),
+                )
+            }
+        }
+        Slider(
+            value = offsetMs.toFloat(),
+            onValueChange = { raw ->
+                val snapped = (raw / 10f).roundToInt() * 10
+                onOffsetChange(snapped)
+            },
+            valueRange = AppPreferences.MIN_AV_OFFSET_MS.toFloat()..AppPreferences.MAX_AV_OFFSET_MS.toFloat(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(28.dp)
+                .testTag("performance-offset-slider"),
+            colors = SliderDefaults.colors(
+                thumbColor = ConsoleCrimson,
+                activeTrackColor = ConsoleCrimson,
+                inactiveTrackColor = ModalCardDivider,
+            ),
+        )
+        Text(
+            text = hintText,
+            fontSize = 11.sp,
+            color = ModalCardMuted,
         )
     }
 }

@@ -32,7 +32,7 @@ internal data class PerformanceUi(val state:PlayState=PlayState.LOADING,val posi
     val countIn:Int=0,val score:Int=0,val combo:Int=0,val bestCombo:Int=0,
     val judgments:List<Judgment> = emptyList(),val holdFractions:List<Float> = emptyList(),
     val feedbacks:List<MusicFeedback> = emptyList(),val message:String?=null,val saved:Boolean=false,
-    val highestScore:Int?=null,val newRecord:Boolean=false)
+    val highestScore:Int?=null,val newRecord:Boolean=false,val audioVisualOffsetMs:Int=0)
 
 /** Control and judgments run on Main. Only sample decoding and Room writes leave that thread. */
 internal class PerformanceController(application:Application,val song:SongPackage,val owner:String,
@@ -57,12 +57,34 @@ internal class PerformanceController(application:Application,val song:SongPackag
     private var initialized=false
     private var startGeneration=0
     private var muted=respectMute
+    private var audioVisualOffsetMs=0
     private var resultSaving=false
+    private val preferences=AppPreferences(application)
     private val focus=PlaybackAudioSession(application){pause("音乐已暂停")}
 
+    private fun chartPositionUs(rawPositionUs:Long):Long =
+        (rawPositionUs + audioVisualOffsetMs * 1_000L).coerceIn(startUs, endUs)
+
+    fun setAudioVisualOffsetMs(offsetMs:Int) {
+        val clamped=offsetMs.coerceIn(AppPreferences.MIN_AV_OFFSET_MS, AppPreferences.MAX_AV_OFFSET_MS)
+        if(clamped==audioVisualOffsetMs && mutableUi.value.audioVisualOffsetMs==clamped)return
+        audioVisualOffsetMs=clamped
+        mutableUi.value=mutableUi.value.copy(audioVisualOffsetMs=clamped)
+        viewModelScope.launch { preferences.setAudioVisualOffsetMs(clamped) }
+    }
+
     init {
-        if(respectMute)viewModelScope.launch {
-            AppPreferences(application).changes.collect {value->muted=value.muted;piano?.let{it.setMuted(it.handle,muted)}}
+        viewModelScope.launch {
+            preferences.changes.collect { value ->
+                if(respectMute) {
+                    muted=value.muted
+                    piano?.let{it.setMuted(it.handle,muted)}
+                }
+                audioVisualOffsetMs=value.audioVisualOffsetMs
+                if(mutableUi.value.audioVisualOffsetMs!=audioVisualOffsetMs) {
+                    mutableUi.value=mutableUi.value.copy(audioVisualOffsetMs=audioVisualOffsetMs)
+                }
+            }
         }
         writes.launch {
             for((block,done) in writeQueue) {
@@ -228,42 +250,45 @@ internal class PerformanceController(application:Application,val song:SongPackag
     fun frame() {
         if(mutableUi.value.state!=PlayState.PLAYING)return
         val engine=piano ?: return
-        val position=engine.position(engine.handle).coerceAtMost(endUs)
+        val rawPosition=engine.position(engine.handle).coerceAtMost(endUs)
+        val chartPosition=chartPositionUs(rawPosition)
         val count=engine.counting(engine.handle)
         if(engine.failed(engine.handle)) {recoverAudioOutput();return}
         if(count==0 && shouldRestoreHolds) {
-            shouldRestoreHolds=false;judge.resume(position)
+            shouldRestoreHolds=false;judge.resume(chartPosition)
         }
         val previous=mutableUi.value.judgments
-        if(count==0)judge.tick(position)
-        publish(PlayState.PLAYING,position)
+        if(count==0)judge.tick(chartPosition)
+        publish(PlayState.PLAYING,chartPosition)
         mutableUi.value=mutableUi.value.copy(countIn=count)
-        if(holdChanged(previous)||position-persistedAtUs>=2_000_000)saveProgress(position)
+        if(holdChanged(previous)||rawPosition-persistedAtUs>=2_000_000)saveProgress(rawPosition)
         if(count==0 && !engine.isPlaying(engine.handle)) {
-            if(position>=endUs-20_000)finish() else pause("音乐已暂停")
+            if(rawPosition>=endUs-20_000)finish() else pause("音乐已暂停")
         }
     }
     fun down(lane:Int):Boolean {
         if(mutableUi.value.state!=PlayState.PLAYING || mutableUi.value.countIn>0 || options.mode==PlayMode.LISTEN)return false
         val engine=piano ?: return false
-        val position=engine.position(engine.handle)
+        val rawPosition=engine.position(engine.handle)
+        val chartPosition=chartPositionUs(rawPosition)
         val previous=mutableUi.value.judgments
-        val hit=judge.down(lane,position)
-        publish(PlayState.PLAYING,position)
+        val hit=judge.down(lane,chartPosition)
+        publish(PlayState.PLAYING,chartPosition)
         val kind=when {hit==null->FeedbackKind.EMPTY;hit.target.hold->FeedbackKind.HOLD_START;else->FeedbackKind.TAP}
         mutableUi.value=mutableUi.value.copy(feedbacks=(mutableUi.value.feedbacks+
-            MusicFeedback(lane,position,kind,hit?.judgment ?: Judgment.WAITING)).takeLast(8))
-        if(holdChanged(previous))saveProgress(position)
+            MusicFeedback(lane,chartPosition,kind,hit?.judgment ?: Judgment.WAITING)).takeLast(8))
+        if(holdChanged(previous))saveProgress(rawPosition)
         return hit!=null
     }
     fun up(lane:Int) {
         if(mutableUi.value.state!=PlayState.PLAYING || mutableUi.value.countIn>0)return
         val engine=piano ?: return
-        val position=engine.position(engine.handle)
+        val rawPosition=engine.position(engine.handle)
+        val chartPosition=chartPositionUs(rawPosition)
         val previous=mutableUi.value.judgments
-        judge.up(lane,position)
-        publish(PlayState.PLAYING,position)
-        if(holdChanged(previous))saveProgress(position)
+        judge.up(lane,chartPosition)
+        publish(PlayState.PLAYING,chartPosition)
+        if(holdChanged(previous))saveProgress(rawPosition)
     }
     fun pause(reason:String?=null) {
         startGeneration++

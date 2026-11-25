@@ -222,22 +222,24 @@ public:
                     if(clock_gettime(CLOCK_MONOTONIC,&nowTs)==0) {
                         const int64_t nowNs=static_cast<int64_t>(nowTs.tv_sec)*1000000000LL+nowTs.tv_nsec;
                         const double elapsedSec=static_cast<double>(nowNs-ts.value().timestamp)*1e-9;
-                        elapsedFrames=std::clamp(elapsedSec*rate,-rate*0.1,rate*0.2);
+                        elapsedFrames=std::clamp(elapsedSec*rate,-rate*0.05,rate*0.1);
                     }
                     const double hwPosNow=static_cast<double>(ts.value().position)+elapsedFrames;
                     const double written=static_cast<double>(audioStream->getFramesWritten()+numFrames);
                     const double delta=written-hwPosNow;
-                    if(delta>=0.0 && delta<=rate*0.35)rawLatency=delta;
+                    if(delta>=0.0 && delta<=rate*0.18)rawLatency=std::min(delta,rate*0.06);
                 }
                 if(rawLatency<0.0) {
-                    rawLatency=std::clamp(static_cast<double>(audioStream->getBufferSizeInFrames()),0.0,rate*0.15);
+                    rawLatency=std::clamp(static_cast<double>(audioStream->getBufferSizeInFrames()),0.0,rate*0.06);
                 }
             } else {
                 rawLatency=0.0;
             }
             if(smoothedLatencyFrames<0.0)smoothedLatencyFrames=rawLatency;
             else smoothedLatencyFrames=smoothedLatencyFrames*0.85+rawLatency*0.15;
-            const double presentedFrame=std::clamp(frame-smoothedLatencyFrames*speed,startFrame,endFrame);
+            // Offset audio buffer latency against ~25ms visual presentation pipeline so notes do not lag behind sound.
+            const double effectiveLatencyFrames=std::max(0.0,smoothedLatencyFrames-rate*0.025);
+            const double presentedFrame=std::clamp(frame-effectiveLatencyFrames*speed,startFrame,endFrame);
             const int64_t candidateUs=static_cast<int64_t>(presentedFrame/rate*1000000);
             if(candidateUs>lastReportedUs)lastReportedUs=candidateUs;
             visibleUs.store(lastReportedUs,std::memory_order_release);

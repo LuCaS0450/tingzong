@@ -58,6 +58,8 @@ import kotlin.math.roundToInt
 
 private const val HorizonUs = 1_550_000L
 private val KeycapZoneHeight = 84.dp
+private val StrikeLineElevation = 36.dp
+private val StrikeBandHalfHeight = 17.dp
 private val CavitySlotDark = Color(0xFF141715)
 private val CavitySlotAlternate = Color(0xFF171B19)
 private val LaneDividerSilver = Color(0xFFE2E8E8)
@@ -75,23 +77,43 @@ internal fun MusicLaneBackdrop(modifier: Modifier, stageClarity: Float = 1f) {
     val clarity = stageClarity.coerceIn(0.6f, 1.3f)
     Canvas(modifier.fillMaxSize()) {
         val laneWidth = size.width / 4f
-        val line = (size.height - KeycapZoneHeight.toPx()).coerceAtLeast(1f)
+        val keycapTop = (size.height - KeycapZoneHeight.toPx()).coerceAtLeast(1f)
+        val line = (keycapTop - StrikeLineElevation.toPx()).coerceAtLeast(1f)
+        val bandHalf = StrikeBandHalfHeight.toPx()
         for (lane in 0..3) {
             val left = lane * laneWidth
             drawRect(
                 color = if (lane % 2 == 0) CavitySlotDark.copy(alpha = 0.42f) else CavitySlotAlternate.copy(alpha = 0.30f),
                 topLeft = Offset(left, 0f),
-                size = Size(laneWidth, line),
+                size = Size(laneWidth, keycapTop),
             )
             if (lane > 0) {
                 drawLine(
                     color = LaneDividerSilver.copy(alpha = 0.10f * clarity),
                     start = Offset(left, 0f),
-                    end = Offset(left, line),
+                    end = Offset(left, keycapTop),
                     strokeWidth = 0.75.dp.toPx(),
                 )
             }
         }
+        // Subtle Bauhaus strike-zone recess centered on the judgment line so players see the exact target band.
+        drawRect(
+            color = Color(0xFF0A0D0C).copy(alpha = 0.56f * clarity),
+            topLeft = Offset(0f, line - bandHalf),
+            size = Size(size.width, bandHalf * 2f),
+        )
+        drawLine(
+            color = IvoryKeyFace.copy(alpha = 0.16f * clarity),
+            start = Offset(0f, line - bandHalf),
+            end = Offset(size.width, line - bandHalf),
+            strokeWidth = 0.75.dp.toPx(),
+        )
+        drawLine(
+            color = IvoryKeyFace.copy(alpha = 0.16f * clarity),
+            start = Offset(0f, line + bandHalf),
+            end = Offset(size.width, line + bandHalf),
+            strokeWidth = 0.75.dp.toPx(),
+        )
     }
 }
 
@@ -118,45 +140,76 @@ internal fun MusicLanes(
     val noteRedColor = CrimsonSignal
 
     Box(modifier.fillMaxSize().clipToBounds()) {
-        // 1. Falling tap blocks & hold ribbons clipped at the judgment seam.
+        // 1. Falling tap blocks & hold ribbons clipped at the keycap top edge (passing smoothly through the elevated strike line).
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width / 4f
-            val line = (size.height - KeycapZoneHeight.toPx()).coerceAtLeast(1f)
+            val keycapTop = (size.height - KeycapZoneHeight.toPx()).coerceAtLeast(1f)
+            val line = (keycapTop - StrikeLineElevation.toPx()).coerceAtLeast(1f)
             val pps = line / HorizonUs
-            val min = timeUs - 240_000L
+            val min = timeUs - 320_000L
             val max = timeUs + HorizonUs
 
-            clipRect(left = 0f, top = 0f, right = size.width, bottom = line + 1.5.dp.toPx()) {
+            // Draw the elevated Bauhaus precision judgment hairline & lane ticks beneath notes.
+            drawLine(
+                color = IvoryKeyFace.copy(alpha = 0.78f * clarity),
+                start = Offset(0f, line),
+                end = Offset(size.width, line),
+                strokeWidth = 1.5.dp.toPx(),
+            )
+            for (lane in 0..3) {
+                val left = lane * w
+                val cx = left + w / 2f
+                // Subtle center calibration guide mark inside each lane's strike band.
+                drawLine(
+                    color = CrimsonSignal.copy(alpha = 0.85f * clarity),
+                    start = Offset(cx - w * 0.14f, line),
+                    end = Offset(cx + w * 0.14f, line),
+                    strokeWidth = 2.dp.toPx(),
+                )
+                if (lane > 0) {
+                    drawLine(
+                        color = CrimsonSignal.copy(alpha = 0.72f * clarity),
+                        start = Offset(left, line - 5.dp.toPx()),
+                        end = Offset(left, line + 5.dp.toPx()),
+                        strokeWidth = 1.25.dp.toPx(),
+                    )
+                }
+            }
+
+            clipRect(left = 0f, top = 0f, right = size.width, bottom = keycapTop) {
                 controller.targets.forEach { t ->
                     if (t.endUs < min || t.onsetUs > max) return@forEach
                     val j = ui.judgments.getOrElse(t.id) { Judgment.WAITING }
                     if (j in listOf(Judgment.PERFECT, Judgment.GOOD, Judgment.PARTIAL)) return@forEach
                     val x = t.lane * w + w / 2f
                     val y = line - (t.onsetUs - timeUs) * pps
+                    val passAlpha = if (y > line) {
+                        (1f - ((y - line) / (StrikeLineElevation.toPx() * 1.15f))).coerceIn(0.18f, 1f)
+                    } else 1f
                     if (t.hold) {
                         val heldY = if (j == Judgment.HOLDING) line else y
                         val topY = (line - (t.endUs - timeUs) * pps).coerceAtLeast(-20f)
                         performanceRibbon(x, topY, heldY, w, noteRedColor, j == Judgment.HOLDING)
                         if (j != Judgment.HOLDING) {
-                            drawHoldHead(x, y, w)
+                            drawHoldHead(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.28f else passAlpha)
                         }
                     } else {
-                        drawIvoryTapNote(x, y, w, faded = j == Judgment.MISSED)
+                        drawIvoryTapNote(x, y, w, alphaScale = if (j == Judgment.MISSED) 0.28f * passAlpha else passAlpha)
                     }
                 }
             }
 
-            // Judgment threshold groove directly above the ivory keycaps.
+            // Keycap top seam groove directly above the ivory keycaps.
             drawRect(
                 color = Color(0xFF0B0D0C),
-                topLeft = Offset(0f, line - 1.5.dp.toPx()),
+                topLeft = Offset(0f, keycapTop - 1.5.dp.toPx()),
                 size = Size(size.width, 3.dp.toPx()),
             )
             drawLine(
-                color = IvoryKeyFace.copy(alpha = 0.28f * clarity),
-                start = Offset(0f, line),
-                end = Offset(size.width, line),
-                strokeWidth = 1.dp.toPx(),
+                color = IvoryKeyFace.copy(alpha = 0.22f * clarity),
+                start = Offset(0f, keycapTop),
+                end = Offset(size.width, keycapTop),
+                strokeWidth = 0.75.dp.toPx(),
             )
         }
 
@@ -239,7 +292,8 @@ internal fun MusicLanes(
         // 3. Judgment beams, sustain hold progress above keycaps, and geometric impact bursts.
         Canvas(Modifier.fillMaxSize()) {
             val w = size.width / 4f
-            val line = (size.height - KeycapZoneHeight.toPx()).coerceAtLeast(1f)
+            val keycapTop = (size.height - KeycapZoneHeight.toPx()).coerceAtLeast(1f)
+            val line = (keycapTop - StrikeLineElevation.toPx()).coerceAtLeast(1f)
             for (lane in 0..3) {
                 val x = lane * w + w / 2f
                 performanceReceptor(x, line, w, noteIvoryColor, lane in pressed)
@@ -324,13 +378,13 @@ internal fun MusicLanes(
     }
 }
 
-private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, faded: Boolean) {
+private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, alphaScale: Float) {
     val nw = w * 0.78f
     val nh = 32.dp.toPx()
     val left = x - nw * 0.5f
-    // Align bottom edge with the judgment line coordinate `y` so the note meets the keycap lip on beat.
-    val top = y - nh
-    val alpha = if (faded) 0.28f else 1f
+    // Align note center with the elevated judgment line coordinate `y` for unambiguous strike timing.
+    val top = y - nh * 0.5f
+    val alpha = alphaScale.coerceIn(0f, 1f)
     val corner = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
 
     // 11 o'clock cast shadow on matte charcoal cavity.
@@ -355,7 +409,7 @@ private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, faded: Bool
         size = Size(nw, nh),
         cornerRadius = corner,
     )
-    // Subtle front thickness strip + top highlight.
+    // Subtle front thickness strip + top highlight + precision center mark.
     val lip = 3.5.dp.toPx()
     drawRoundRect(
         color = IvoryKeyFront.copy(alpha = alpha),
@@ -369,6 +423,12 @@ private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, faded: Bool
         end = Offset(left + nw - 1.dp.toPx(), top + 1.dp.toPx()),
         strokeWidth = 1.dp.toPx(),
     )
+    drawLine(
+        color = IvoryKeyBorder.copy(alpha = 0.22f * alpha),
+        start = Offset(left + nw * 0.28f, y),
+        end = Offset(left + nw * 0.72f, y),
+        strokeWidth = 1.dp.toPx(),
+    )
     drawRoundRect(
         color = IvoryKeyBorder.copy(alpha = 0.85f * alpha),
         topLeft = Offset(left, top),
@@ -378,32 +438,33 @@ private fun DrawScope.drawIvoryTapNote(x: Float, y: Float, w: Float, faded: Bool
     )
 }
 
-private fun DrawScope.drawHoldHead(x: Float, y: Float, w: Float) {
+private fun DrawScope.drawHoldHead(x: Float, y: Float, w: Float, alphaScale: Float = 1f) {
     val nw = w * 0.76f
     val nh = 16.dp.toPx()
     val left = x - nw * 0.5f
-    val top = y - nh
+    val top = y - nh * 0.5f
+    val alpha = alphaScale.coerceIn(0f, 1f)
     val corner = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx())
     drawRoundRect(
-        color = Color(0xFF0A0C0B).copy(alpha = 0.52f),
+        color = Color(0xFF0A0C0B).copy(alpha = 0.52f * alpha),
         topLeft = Offset(left + 1.5.dp.toPx(), top + 2.5.dp.toPx()),
         size = Size(nw, nh),
         cornerRadius = corner,
     )
     drawRoundRect(
-        color = CrimsonSignal,
+        color = CrimsonSignal.copy(alpha = alpha),
         topLeft = Offset(left, top),
         size = Size(nw, nh),
         cornerRadius = corner,
     )
     drawLine(
-        color = IvoryKeyFace.copy(alpha = 0.88f),
-        start = Offset(left + 2.dp.toPx(), top + 2.dp.toPx()),
-        end = Offset(left + nw - 2.dp.toPx(), top + 2.dp.toPx()),
+        color = IvoryKeyFace.copy(alpha = 0.88f * alpha),
+        start = Offset(left + 2.dp.toPx(), y),
+        end = Offset(left + nw - 2.dp.toPx(), y),
         strokeWidth = 1.5.dp.toPx(),
     )
     drawRoundRect(
-        color = IvoryKeyBorder.copy(alpha = 0.9f),
+        color = IvoryKeyBorder.copy(alpha = 0.9f * alpha),
         topLeft = Offset(left, top),
         size = Size(nw, nh),
         cornerRadius = corner,
