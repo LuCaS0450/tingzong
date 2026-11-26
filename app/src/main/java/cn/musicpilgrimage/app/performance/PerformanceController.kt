@@ -99,6 +99,8 @@ internal class PerformanceController(application:Application,val song:SongPackag
             var loaded:NativePiano?=null
             try {
                 // A single loader owns the stopped native engine until it is handed to Main.
+                val bestDeferred = async(Dispatchers.IO) { dao.bestResult(owner,song.id,options.difficulty)?.score }
+                val savedDeferred = async(Dispatchers.IO) { dao.checkpoint(owner,song.id,song.version,options.difficulty,options.storageKey) }
                 withContext(Dispatchers.IO) {
                     val engine=NativePiano();loaded=engine
                     loadAudio(engine)
@@ -106,9 +108,9 @@ internal class PerformanceController(application:Application,val song:SongPackag
                 ensureActive()
                 piano=loaded;loaded=null
                 piano?.let{it.setMuted(it.handle,muted)}
-                val previousBest=dao.bestResult(owner,song.id,options.difficulty)?.score
+                val previousBest=bestDeferred.await()
                 mutableUi.value=mutableUi.value.copy(highestScore=previousBest)
-                val saved=dao.checkpoint(owner,song.id,song.version,options.difficulty,options.storageKey)
+                val saved=savedDeferred.await()
                 val restoredJudge = saved?.let {
                     runCatching {
                         require(it.positionUs in startUs..endUs)
