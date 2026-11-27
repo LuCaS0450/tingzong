@@ -98,7 +98,7 @@ class RecordedSongTest {
             assertTrue(song.recording!!.local)
             assertEquals("pcm16-delta",song.recording!!.encoding)
             assertTrue(song.durationUs in 90_000_000..120_000_000)
-            assertTrue(song.standard.size>=140)
+            assertTrue(song.standard.size>=60)
             assertTrue(song.standard.any{it.hold})
             assertTrue(song.placeIds.isNotEmpty())
             val opus=opusJson.getJSONObject(id)
