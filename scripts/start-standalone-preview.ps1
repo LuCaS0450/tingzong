@@ -135,13 +135,11 @@ try {
         $taskAudioOverrides=@()
         try {
             if($Avd -eq 'Pixel_10a') {
-                # Keep QEMU DirectSound output at guest 48 kHz with enough ring buffer and lead time
-                # so 60 fps stage rendering never starves DirectSound and causes crackling.
+                # Use QEMU's winaudio backend at guest 48 kHz to avoid DirectSound crackling/noise floor.
                 $taskAudioDefaults=@{
+                    QEMU_AUDIO_DRV='winaudio'
                     QEMU_AUDIO_TIMER_PERIOD='100'
                     QEMU_AUDIO_DAC_FIXED_FREQ='48000'
-                    QEMU_DSOUND_LATENCY_MILLIS='100'
-                    QEMU_DSOUND_BUFSIZE_OUT='32768'
                 }
                 foreach($taskAudioSetting in $taskAudioDefaults.GetEnumerator()) {
                     if($null -eq [Environment]::GetEnvironmentVariable($taskAudioSetting.Key,'Process')) {
@@ -149,7 +147,7 @@ try {
                         $taskAudioOverrides+=$taskAudioSetting.Key
                     }
                 }
-                Write-TaskLog "Pixel_10a audio: $env:QEMU_AUDIO_TIMER_PERIOD Hz mixer, $env:QEMU_AUDIO_DAC_FIXED_FREQ Hz output, $env:QEMU_DSOUND_LATENCY_MILLIS ms DirectSound lead, $env:QEMU_DSOUND_BUFSIZE_OUT B buffer."
+                Write-TaskLog "Pixel_10a audio: $env:QEMU_AUDIO_DRV driver, $env:QEMU_AUDIO_TIMER_PERIOD Hz mixer, $env:QEMU_AUDIO_DAC_FIXED_FREQ Hz output."
             }
             $taskProcess=Start-Process -FilePath $taskEmulator -ArgumentList $taskArguments -WindowStyle Normal -PassThru -RedirectStandardOutput (Join-Path $taskRoot 'artifacts\standalone-emulator.log') -RedirectStandardError (Join-Path $taskRoot 'artifacts\standalone-emulator-error.log')
         } finally {
