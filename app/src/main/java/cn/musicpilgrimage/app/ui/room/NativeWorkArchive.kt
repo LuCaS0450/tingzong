@@ -1,24 +1,17 @@
 package cn.musicpilgrimage.app.ui.room
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -91,41 +84,12 @@ internal fun NativeWorkArchive(
                                 Text(reason, fontSize = 14.sp, lineHeight = 22.sp, color = RoomColors.Ink)
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(14.dp))
                         Row(Modifier.fillMaxWidth()) {
                             ArchiveFavoriteAction(favorite, onFavorite, Modifier.testTag("work-archive-favorite"))
                             ArchiveSearchAction(onSearch, Modifier.testTag("work-archive-search"))
-                        }
-                        if (onPerform != null) {
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp)
-                                    .height(46.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(Color(0xFF1A1E1C))
-                                    .drawBehind {
-                                        drawRect(RoomColors.Red, size = Size(3.dp.toPx(), size.height))
-                                    }
-                                    .clickable(role = Role.Button, onClickLabel = "演奏${work.title}", onClick = onPerform)
-                                    .padding(start = 16.dp, end = 14.dp)
-                                    .testTag("work-archive-perform"),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    text = "开始演奏",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFFF8F6F0),
-                                )
-                                Text(
-                                    text = "PLAY →",
-                                    fontSize = 11.sp,
-                                    letterSpacing = 1.6.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFFC9C3B8),
-                                )
+                            if (onPerform != null) {
+                                ArchivePerformAction("演奏${work.title}", onPerform, Modifier.testTag("work-archive-perform"))
                             }
                         }
                         ReleaseSectionTitle("关联地点", "PLACES")

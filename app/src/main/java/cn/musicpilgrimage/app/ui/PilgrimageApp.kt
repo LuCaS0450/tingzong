@@ -399,6 +399,25 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
      ?: performanceItems.firstOrNull{musicTerm(it.title)==normTitle&&musicTerm(it.artist)==normArtist}
      ?: performanceItems.firstOrNull{musicTerm(it.title)==normTitle}
    }
+   fun findPerformanceForRelease(release:MusicRelease):PerformanceCatalogItem? {
+    if(release.works.isNotEmpty())return null
+    val normArtist=musicTerm(release.artist);val normTitle=musicTerm(release.title)
+    val releasePlaceIds=release.places.mapTo(mutableSetOf()){it.place.id}
+    val releaseSceneWorkKeys=release.places.asSequence().flatMap{it.scenes.asSequence()}
+     .map{"${it.artistId}|${musicTerm(it.work)}"}.toSet()
+    val knownWorkIds=musicCatalog.works.mapTo(mutableSetOf()){it.id}
+    val knownWorkPairs=musicCatalog.works.mapTo(mutableSetOf()){musicTerm(it.artist) to musicTerm(it.title)}
+    fun belongsToOtherWork(item:PerformanceCatalogItem)=
+     (item.workKey.isNotEmpty()&&item.workKey in knownWorkIds) ||
+      (musicTerm(item.artist) to musicTerm(item.title)) in knownWorkPairs
+    return performanceItems.firstOrNull{it.workKey.isNotEmpty()&&it.workKey in releaseSceneWorkKeys}
+     ?: performanceItems.firstOrNull{
+      musicTerm(it.artist)==normArtist && it.placeIds.any{pid->pid in releasePlaceIds} && !belongsToOtherWork(it)
+     }
+     ?: performanceItems.firstOrNull{
+      musicTerm(it.artist)==normArtist && musicTerm(it.title)==normTitle && !belongsToOtherWork(it)
+     }
+   }
    val libraryOwner=remember(owner){owner?.let{"user:$it"} ?: LibraryDatabase.guestOwner(context)}
    val tripState=storedTrips.takeIf{it.owner==libraryOwner}?:MusicTripState(libraryOwner,busy=true)
    val tripCities=remember(sourceCatalog,tripState.trips){
@@ -708,10 +727,13 @@ private fun usesEdgeToEdgeArchiveLayout(route:String?)=when(route) {
        allowBackHandler=entry?.id==e.id&&addTripPlace==null&&sheetCoordinator.entries.isEmpty()&&!photoViewerCoordinator.isOpen&&discardAction==null,
        onStartInteractivePop={interactivePopProgress=it},
       ) { onBack ->
+       val playableTrack=findPerformanceForRelease(release)
        RoomAlbum(
         release,release.id in musicFavorites.releases,{music.toggleFavorite(release.id,true)},
         {followMusicArchiveLink(e,"song/${Uri.encode(it.id)}")},{openArchivePlace(e,it,release.places)},
         onBack=onBack,onSearch={navigate("release-search/${Uri.encode(release.id)}")},
+        performTitle=playableTrack?.title,
+        onPerform=playableTrack?.let{track-> {navigate("perform/${Uri.encode(track.id)}")}},
        )
       }
      }}

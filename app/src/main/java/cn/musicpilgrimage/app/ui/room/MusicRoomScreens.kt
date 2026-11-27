@@ -62,8 +62,8 @@ import kotlinx.coroutines.flow.first
     })
 }
 
-@Composable internal fun RoomAlbum(release:MusicRelease,favorite:Boolean,onFavorite:()->Unit,onWork:(MusicWork)->Unit,onPlace:(String)->Unit,onBack:()->Unit={},onSearch:()->Unit={}) {
-    NativeReleaseArchive(release,favorite,onFavorite,onWork,onPlace,onBack,onSearch)
+@Composable internal fun RoomAlbum(release:MusicRelease,favorite:Boolean,onFavorite:()->Unit,onWork:(MusicWork)->Unit,onPlace:(String)->Unit,onBack:()->Unit={},onSearch:()->Unit={},performTitle:String?=null,onPerform:(()->Unit)?=null) {
+    NativeReleaseArchive(release,favorite,onFavorite,onWork,onPlace,onBack,onSearch,performTitle,onPerform)
 }
 @Composable internal fun RoomSearch(catalog:MusicCatalogue,initialQuery:String="",onWork:(MusicWork)->Unit) {
     var query by rememberSaveable(initialQuery) { mutableStateOf(initialQuery) }

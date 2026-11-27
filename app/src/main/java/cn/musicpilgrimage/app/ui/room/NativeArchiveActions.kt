@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Piano
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,5 +58,16 @@ internal fun RowScope.ArchiveFavoriteAction(
 internal fun RowScope.ArchiveSearchAction(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ArchiveIconAction("搜索", onClick, modifier) {
         Icon(Icons.Outlined.Search, null, it)
+    }
+}
+
+@Composable
+internal fun RowScope.ArchivePerformAction(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ArchiveIconAction(label, onClick, modifier) {
+        Icon(Icons.Outlined.Piano, null, it)
     }
 }

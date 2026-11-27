@@ -15,8 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
@@ -47,6 +47,8 @@ internal fun NativeReleaseArchive(
     onPlace: (String) -> Unit,
     onBack: () -> Unit,
     onSearch: () -> Unit,
+    performTitle: String? = null,
+    onPerform: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val entryId = LocalRouteEntryId.current
@@ -172,10 +174,17 @@ internal fun NativeReleaseArchive(
                             fontSize = 28.sp, lineHeight = 37.sp, fontWeight = FontWeight.SemiBold, color = RoomColors.Ink,
                         )
                         Text("${release.artist} · 发行封面",fontSize = 12.sp,color = RoomColors.Muted)
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(14.dp))
                         Row(Modifier.fillMaxWidth()) {
                             ArchiveFavoriteAction(favorite, onFavorite, Modifier.testTag("release-archive-favorite"))
                             ArchiveSearchAction(onSearch, Modifier.testTag("release-archive-search"))
+                            if (onPerform != null) {
+                                ArchivePerformAction(
+                                    label = "演奏${performTitle ?: release.title}",
+                                    onClick = onPerform,
+                                    modifier = Modifier.testTag("release-archive-perform"),
+                                )
+                            }
                         }
                         ReleaseSectionTitle("收录作品", "WORKS")
                         release.works.forEachIndexed { index, work ->

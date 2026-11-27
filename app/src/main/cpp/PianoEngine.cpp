@@ -286,7 +286,11 @@ public:
             ->setSharingMode(oboe::SharingMode::Exclusive)->setDataCallback(this)->setErrorCallback(this);
         if(builder.openStream(stream)!=oboe::Result::OK)return false;
         rate=stream->getSampleRate();releaseFrames=static_cast<int>(rate*.24);
-        stream->setBufferSizeInFrames(stream->getFramesPerBurst()*2);
+        const int32_t burst=stream->getFramesPerBurst();
+        const int32_t targetBursts=(stream->getPerformanceMode()==oboe::PerformanceMode::LowLatency)?2:4;
+        const int32_t capacity=stream->getBufferCapacityInFrames();
+        const int32_t desired=(capacity>0)?std::min(burst*targetBursts,capacity):burst*targetBursts;
+        stream->setBufferSizeInFrames(desired);
         return true;
     }
     void pause() {
